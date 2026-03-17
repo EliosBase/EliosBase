@@ -12,7 +12,7 @@ export default function CTA() {
             <h2 className="font-[family-name:var(--font-heading)] text-3xl md:text-4xl font-bold mb-4 text-white">Build the Future of AI Infrastructure</h2>
             <p className="text-white/40 text-lg max-w-xl mx-auto mb-8">Join the decentralized AI economy. Deploy agents, provide compute, or integrate your services.</p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="#" className="px-8 py-3.5 rounded-xl font-semibold bg-white text-black hover:bg-white/90 transition-colors duration-200 cursor-pointer">Launch App</a>
+              <a href="/app" className="px-8 py-3.5 rounded-xl font-semibold bg-white text-black hover:bg-white/90 transition-colors duration-200 cursor-pointer">Launch App</a>
               <a href="#" className="px-8 py-3.5 rounded-xl font-semibold border border-white/20 text-white hover:bg-white/5 transition-colors duration-200 cursor-pointer">Read Documentation</a>
             </div>
           </div>

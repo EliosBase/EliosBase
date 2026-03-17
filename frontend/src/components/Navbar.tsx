@@ -59,7 +59,7 @@ export default function Navbar() {
 
         <div className="hidden md:block">
           <a
-            href="#cta"
+            href="/app"
             className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-white text-black hover:bg-white/90 transition-colors duration-200 cursor-pointer"
           >
             Launch App
@@ -88,7 +88,7 @@ export default function Navbar() {
             </a>
           ))}
           <a
-            href="#cta"
+            href="/app"
             onClick={() => setOpen(false)}
             className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-white text-black text-center cursor-pointer"
           >

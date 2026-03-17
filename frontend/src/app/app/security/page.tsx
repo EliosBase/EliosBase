@@ -1,0 +1,126 @@
+import StatCard from '@/components/dashboard/StatCard';
+import SecurityAlertComponent from '@/components/dashboard/SecurityAlert';
+import { securityAlerts, guardrails, auditLog } from '@/lib/mock-data';
+import { Shield, ShieldOff, AlertTriangle } from 'lucide-react';
+
+const securityStats = [
+  { label: 'Threats Blocked', value: '247', trend: '+18 today', trendUp: true },
+  { label: 'Guardrails Active', value: '5/6', trend: '1 triggered', trendUp: true },
+  { label: 'Proofs Verified', value: '8,491', trend: '100% valid', trendUp: true },
+  { label: 'Uptime', value: '99.97%', trend: '0 outages (30d)', trendUp: true },
+];
+
+const guardrailStatusStyles = {
+  active: { dot: 'bg-green-500', label: 'Active', textColor: 'text-green-400' },
+  paused: { dot: 'bg-yellow-500', label: 'Paused', textColor: 'text-yellow-400' },
+  triggered: { dot: 'bg-red-500', label: 'Triggered', textColor: 'text-red-400' },
+};
+
+const resultColors = {
+  ALLOW: 'text-green-400',
+  DENY: 'text-red-400',
+  FLAG: 'text-yellow-400',
+};
+
+export default function SecurityPage() {
+  return (
+    <div className="space-y-6 max-w-7xl">
+      {/* Stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {securityStats.map((stat) => (
+          <StatCard key={stat.label} {...stat} />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Alerts */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="glass p-5 rounded-2xl">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertTriangle size={16} className="text-white/50" />
+              <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)] tracking-wide">
+                Security Alerts
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {securityAlerts.map((alert) => (
+                <SecurityAlertComponent key={alert.id} alert={alert} />
+              ))}
+            </div>
+          </div>
+
+          {/* Audit Log */}
+          <div className="glass p-5 rounded-2xl">
+            <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)] tracking-wide mb-4">
+              Zero-Trust Audit Log
+            </h2>
+            <div className="overflow-x-auto">
+              <div className="min-w-[600px]">
+                <div className="grid grid-cols-[80px_1fr_1fr_1fr_60px] gap-2 px-3 py-2 text-[10px] text-white/30 uppercase tracking-wider font-[family-name:var(--font-mono)] border-b border-white/6">
+                  <span>Time</span>
+                  <span>Action</span>
+                  <span>Actor</span>
+                  <span>Target</span>
+                  <span>Result</span>
+                </div>
+                {auditLog.map((entry, i) => (
+                  <div
+                    key={i}
+                    className="grid grid-cols-[80px_1fr_1fr_1fr_60px] gap-2 px-3 py-2 text-xs font-[family-name:var(--font-mono)] hover:bg-white/3 transition-colors border-b border-white/3 last:border-0"
+                  >
+                    <span className="text-white/40">{entry.timestamp}</span>
+                    <span className="text-white/60">{entry.action}</span>
+                    <span className="text-white/40 truncate">{entry.actor}</span>
+                    <span className="text-white/40 truncate">{entry.target}</span>
+                    <span className={`font-semibold ${resultColors[entry.result]}`}>{entry.result}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Guardrails Panel */}
+        <div>
+          <div className="glass p-5 rounded-2xl">
+            <div className="flex items-center gap-2 mb-4">
+              <Shield size={16} className="text-white/50" />
+              <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)] tracking-wide">
+                Guardrails
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {guardrails.map((gr) => {
+                const style = guardrailStatusStyles[gr.status];
+                return (
+                  <div key={gr.id} className="p-3 rounded-lg bg-white/3 border border-white/5">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        {gr.status === 'triggered' ? (
+                          <ShieldOff size={14} className="text-red-400" />
+                        ) : (
+                          <Shield size={14} className="text-white/40" />
+                        )}
+                        <h4 className="text-sm text-white/80 font-[family-name:var(--font-body)]">
+                          {gr.name}
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+                        <span className={`text-[10px] ${style.textColor}`}>{style.label}</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-white/35 mb-1.5">{gr.description}</p>
+                    <p className="text-[10px] text-white/25 font-[family-name:var(--font-mono)]">
+                      Triggered {gr.triggeredCount}× total
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
