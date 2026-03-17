@@ -1,16 +1,21 @@
+"use client";
+
+import NeuralBackground from "@/components/ui/flow-field-background";
+
 export default function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden cyber-scanline hex-bg">
-      {/* Floating geometric shapes - B&W */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-[15%] w-20 h-20 border border-white/10 rounded-xl rotate-45 animate-float" />
-        <div className="absolute top-1/3 right-1/4 w-16 h-16 border border-white/10 rounded-full animate-float-delay" />
-        <div className="absolute bottom-1/4 left-1/3 w-24 h-24 border border-white/8 rounded-2xl rotate-12 animate-float-slow" />
-        <div className="absolute top-2/3 right-[15%] w-12 h-12 border border-white/10 rounded-lg rotate-45 animate-float" />
-        <div className="absolute top-[20%] right-1/3 w-32 h-32 bg-white/3 rounded-full blur-3xl animate-pulse-glow" />
-        <div className="absolute bottom-1/3 left-1/4 w-40 h-40 bg-white/3 rounded-full blur-3xl animate-pulse-glow" />
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* Flow field background — only on this section */}
+      <div className="absolute inset-0 z-0">
+        <NeuralBackground
+          color="#ffffff"
+          trailOpacity={0.08}
+          particleCount={700}
+          speed={0.7}
+        />
       </div>
 
+      {/* Content */}
       <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-24">
         <div className="inline-block px-4 py-1.5 rounded-full border border-white/20 bg-white/5 mb-8">
           <span className="text-xs font-semibold tracking-widest uppercase text-white/80">
@@ -65,8 +70,8 @@ export default function Hero() {
         </div>
       </div>
 
-      {/* Bottom fade */}
-      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black to-transparent" />
+      {/* Bottom fade into rest of page */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-black to-transparent z-10" />
     </section>
   );
 }

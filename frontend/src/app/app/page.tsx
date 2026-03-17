@@ -1,0 +1,101 @@
+import StatCard from '@/components/dashboard/StatCard';
+import ActivityFeed from '@/components/dashboard/ActivityFeed';
+import ProofBadge from '@/components/dashboard/ProofBadge';
+import { dashboardStats, sparklineData, tasks, activityFeed, agents } from '@/lib/mock-data';
+import { Bot, Star } from 'lucide-react';
+
+const chartDataMap = [sparklineData.agents, sparklineData.tasks, sparklineData.tvl, sparklineData.proofs];
+
+export default function DashboardPage() {
+  const activeTasks = tasks.filter((t) => t.status === 'active');
+  const topAgents = [...agents].sort((a, b) => b.reputation - a.reputation).slice(0, 5);
+
+  return (
+    <div className="space-y-6 max-w-7xl">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {dashboardStats.map((stat, i) => (
+          <StatCard key={stat.label} {...stat} chartData={chartDataMap[i]} />
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Recent Tasks */}
+        <div className="lg:col-span-2">
+          <div className="glass p-5 rounded-2xl">
+            <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)] tracking-wide mb-4">
+              Recent Tasks
+            </h2>
+            <div className="space-y-3">
+              {activeTasks.map((task) => {
+                const proofStatus = task.currentStep === 'ZK Verifying'
+                  ? 'verifying' as const
+                  : 'pending' as const;
+                return (
+                  <div key={task.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-white/3 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white/80 font-[family-name:var(--font-body)] truncate">
+                        {task.title}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Bot size={11} className="text-white/30" />
+                        <span className="text-[11px] text-white/40">{task.assignedAgent}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                      <ProofBadge status={proofStatus} />
+                      <span className="text-xs text-white/50 font-[family-name:var(--font-mono)]">
+                        {task.reward}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Top Agents Leaderboard */}
+        <div>
+          <div className="glass p-5 rounded-2xl">
+            <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)] tracking-wide mb-4">
+              Top Agents
+            </h2>
+            <div className="space-y-2">
+              {topAgents.map((agent, i) => (
+                <div key={agent.id} className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-white/3 transition-colors">
+                  <span className="text-xs text-white/25 w-4 text-center font-[family-name:var(--font-mono)]">
+                    {i + 1}
+                  </span>
+                  <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center">
+                    <Bot size={14} className="text-white/50" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white/80 font-[family-name:var(--font-body)] truncate">
+                      {agent.name}
+                    </p>
+                    <p className="text-[10px] text-white/30">
+                      {agent.tasksCompleted.toLocaleString()} tasks
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 text-white/50">
+                    <Star size={11} className="fill-current" />
+                    <span className="text-xs font-medium">{agent.reputation}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Activity Feed */}
+      <div className="glass p-5 rounded-2xl">
+        <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)] tracking-wide mb-4">
+          Activity Feed
+        </h2>
+        <ActivityFeed events={activityFeed} />
+      </div>
+    </div>
+  );
+}

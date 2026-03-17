@@ -1,0 +1,94 @@
+'use client';
+
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { LayoutDashboard, Store, ListChecks, Wallet, ShieldCheck, X } from 'lucide-react';
+
+const navItems = [
+  { href: '/app', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/app/marketplace', label: 'Marketplace', icon: Store },
+  { href: '/app/tasks', label: 'Tasks', icon: ListChecks },
+  { href: '/app/wallet', label: 'Wallet', icon: Wallet },
+  { href: '/app/security', label: 'Security', icon: ShieldCheck },
+];
+
+interface SidebarProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+export default function Sidebar({ open, onClose }: SidebarProps) {
+  const pathname = usePathname();
+
+  const isActive = (href: string) => {
+    if (href === '/app') return pathname === '/app';
+    return pathname.startsWith(href);
+  };
+
+  return (
+    <>
+      {/* Mobile overlay */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed top-0 left-0 z-50 h-full w-60 glass border-r border-white/6 flex flex-col transition-transform duration-300 lg:translate-x-0 ${
+          open ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Logo */}
+        <div className="flex items-center justify-between px-5 py-5 border-b border-white/6">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-lg font-bold tracking-widest font-[family-name:var(--font-heading)]">
+              <span className="text-white">ELIOS</span>
+              <span className="text-white/60">BASE</span>
+            </span>
+          </Link>
+          <button onClick={onClose} className="lg:hidden text-white/50 hover:text-white">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Nav links */}
+        <nav className="flex-1 px-3 py-4 space-y-1">
+          {navItems.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                isActive(href)
+                  ? 'bg-white/10 text-white'
+                  : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Icon size={18} />
+              <span className="font-[family-name:var(--font-body)]">{label}</span>
+            </Link>
+          ))}
+        </nav>
+
+        {/* Bottom section */}
+        <div className="px-4 py-4 border-t border-white/6">
+          <div className="flex items-center gap-3 px-2">
+            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-mono text-white/70">
+              0x
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-white/70 font-[family-name:var(--font-mono)] truncate">
+                0x7a3b...f8e2
+              </p>
+              <p className="text-[10px] text-white/40">Connected</p>
+            </div>
+            <div className="w-2 h-2 rounded-full bg-green-500" />
+          </div>
+        </div>
+      </aside>
+    </>
+  );
+}
