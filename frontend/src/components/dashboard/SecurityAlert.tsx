@@ -1,5 +1,7 @@
 import { type SecurityAlert as SecurityAlertType } from '@/lib/types';
 import { AlertTriangle, AlertCircle, Info, CheckCircle } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 
 const severityConfig = {
   critical: { icon: AlertTriangle, bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400', badge: 'bg-red-500/20 text-red-400' },
@@ -15,6 +17,27 @@ interface SecurityAlertProps {
 export default function SecurityAlertComponent({ alert }: SecurityAlertProps) {
   const config = severityConfig[alert.severity];
   const Icon = config.icon;
+  const queryClient = useQueryClient();
+  const [resolving, setResolving] = useState(false);
+
+  async function handleResolve() {
+    setResolving(true);
+    try {
+      const res = await fetch(`/api/security/alerts/${alert.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolved: true }),
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: ['security-alerts'] });
+        queryClient.invalidateQueries({ queryKey: ['security-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['audit-log'] });
+        queryClient.invalidateQueries({ queryKey: ['activity'] });
+      }
+    } finally {
+      setResolving(false);
+    }
+  }
 
   return (
     <div className={`${config.bg} border ${config.border} rounded-xl p-4`}>
@@ -44,6 +67,15 @@ export default function SecurityAlertComponent({ alert }: SecurityAlertProps) {
               {alert.source}
             </span>
             <span className="text-[10px] text-white/25">{alert.timestamp}</span>
+            {!alert.resolved && (
+              <button
+                onClick={handleResolve}
+                disabled={resolving}
+                className="ml-auto text-[10px] px-2 py-0.5 rounded-md bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-colors disabled:opacity-50 font-medium"
+              >
+                {resolving ? 'Resolving...' : 'Resolve'}
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { toAgent } from '@/lib/transforms';
+import { logAudit, logActivity } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -31,6 +32,18 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  await logAudit({
+    action: 'AGENT_REGISTER',
+    actor: session.walletAddress ?? session.userId!,
+    target: id,
+    result: 'ALLOW',
+  });
+  await logActivity({
+    type: 'agent',
+    message: `New agent registered: ${body.name}`,
+    userId: session.userId,
+  });
 
   return NextResponse.json(toAgent(data), { status: 201 });
 }
