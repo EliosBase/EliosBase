@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { toAgent } from '@/lib/transforms';
-import { logAudit, logActivity } from '@/lib/audit';
+import { logAudit, logActivity, generateId } from '@/lib/audit';
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const supabase = createServiceClient();
 
-  const id = `ag-${Date.now().toString(36)}`;
+  const id = generateId('ag');
   const { data, error } = await supabase
     .from('agents')
     .insert({

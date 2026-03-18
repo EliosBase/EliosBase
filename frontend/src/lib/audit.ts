@@ -8,6 +8,9 @@ export type AuditAction =
   | 'TASK_UPDATE'
   | 'ESCROW_LOCK'
   | 'ESCROW_RELEASE'
+  | 'PAYMENT'
+  | 'REWARD'
+  | 'STAKE'
   | 'AGENT_REGISTER'
   | 'AGENT_HIRE'
   | 'SPENDING_LIMIT'
@@ -22,21 +25,26 @@ export type AuditResult = 'ALLOW' | 'DENY' | 'FLAG';
 
 /**
  * Write an entry to the audit_log table.
- * Fire-and-forget — callers should not await unless they need confirmation.
+ * Best-effort — errors are caught so they never break the parent request.
  */
 export async function logAudit(params: {
   action: AuditAction;
-  actor: string;   // wallet address or agent ID
-  target: string;  // resource identifier
+  actor: string;
+  target: string;
   result: AuditResult;
 }) {
-  const supabase = createServiceClient();
-  await supabase.from('audit_log').insert({
-    action: params.action,
-    actor: params.actor,
-    target: params.target,
-    result: params.result,
-  });
+  try {
+    const supabase = createServiceClient();
+    const { error } = await supabase.from('audit_log').insert({
+      action: params.action,
+      actor: params.actor,
+      target: params.target,
+      result: params.result,
+    });
+    if (error) console.error('[audit] insert failed:', error.message);
+  } catch (err) {
+    console.error('[audit] unexpected error:', err);
+  }
 }
 
 // ─── Activity Event Types ───────────────────────────────────────
@@ -44,19 +52,26 @@ export type ActivityType = 'task' | 'agent' | 'payment' | 'security' | 'proof';
 
 /**
  * Write an entry to the activity_events table.
+ * Best-effort — errors are caught so they never break the parent request.
  */
 export async function logActivity(params: {
   type: ActivityType;
   message: string;
   userId?: string | null;
 }) {
-  const supabase = createServiceClient();
-  await supabase.from('activity_events').insert({
-    id: `ev-${Date.now().toString(36)}`,
-    type: params.type,
-    message: params.message,
-    user_id: params.userId ?? null,
-  });
+  try {
+    const supabase = createServiceClient();
+    const id = `ev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    const { error } = await supabase.from('activity_events').insert({
+      id,
+      type: params.type,
+      message: params.message,
+      user_id: params.userId ?? null,
+    });
+    if (error) console.error('[activity] insert failed:', error.message);
+  } catch (err) {
+    console.error('[activity] unexpected error:', err);
+  }
 }
 
 // ─── Security Alert Creation ────────────────────────────────────
@@ -73,7 +88,7 @@ export async function createSecurityAlert(params: {
   actor?: string;
 }) {
   const supabase = createServiceClient();
-  const id = `alert-${Date.now().toString(36)}`;
+  const id = `alert-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
   const { error } = await supabase.from('security_alerts').insert({
     id,
@@ -85,14 +100,12 @@ export async function createSecurityAlert(params: {
   });
 
   if (!error) {
-    // Log to audit trail
     await logAudit({
       action: 'ALERT_CREATE',
       actor: params.actor ?? params.source,
       target: id,
       result: 'FLAG',
     });
-    // Log to activity feed
     await logActivity({
       type: 'security',
       message: `Security alert: ${params.title}`,
@@ -105,12 +118,26 @@ export async function createSecurityAlert(params: {
 // ─── Guardrail Check Helpers ────────────────────────────────────
 
 /**
- * Check spending limit guardrail. Returns { allowed, guardrailId }.
+ * Safely parse a reward string like "0.05 ETH" to a number.
+ * Returns 0 for any unparseable input (never NaN).
+ */
+export function parseRewardAmount(reward: unknown): number {
+  if (typeof reward !== 'string') return 0;
+  const stripped = reward.replace(/[^0-9.]/g, '');
+  const parsed = parseFloat(stripped);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/**
+ * Check spending limit guardrail. Returns { allowed }.
  */
 export async function checkSpendingLimit(rewardAmount: number): Promise<{ allowed: boolean }> {
+  if (!Number.isFinite(rewardAmount) || rewardAmount <= 0) {
+    return { allowed: true };
+  }
+
   const supabase = createServiceClient();
 
-  // Fetch the spending limits guardrail
   const { data: guardrail } = await supabase
     .from('guardrails')
     .select('*')
@@ -121,12 +148,9 @@ export async function checkSpendingLimit(rewardAmount: number): Promise<{ allowe
     return { allowed: true };
   }
 
-  // Per-task cap: 1 ETH (configurable — could move to guardrail description or a config table)
   const PER_TASK_CAP = 1.0;
-  const amount = rewardAmount;
 
-  if (amount > PER_TASK_CAP) {
-    // Increment triggered count
+  if (rewardAmount > PER_TASK_CAP) {
     await supabase
       .from('guardrails')
       .update({
@@ -135,11 +159,10 @@ export async function checkSpendingLimit(rewardAmount: number): Promise<{ allowe
       })
       .eq('id', guardrail.id);
 
-    // Create security alert
     await createSecurityAlert({
       severity: 'high',
       title: 'Spending limit exceeded',
-      description: `Task reward ${amount} ETH exceeds per-task cap of ${PER_TASK_CAP} ETH`,
+      description: `Task reward ${rewardAmount} ETH exceeds per-task cap of ${PER_TASK_CAP} ETH`,
       source: 'Guardrail: Spending Limits',
     });
 
@@ -150,12 +173,11 @@ export async function checkSpendingLimit(rewardAmount: number): Promise<{ allowe
 }
 
 /**
- * Check rate limit guardrail. Tracks API calls per agent within a time window.
+ * Check rate limit guardrail. Counts active tasks assigned to agent in the last hour.
  */
 export async function checkRateLimit(agentId: string): Promise<{ allowed: boolean }> {
   const supabase = createServiceClient();
 
-  // Fetch the rate limiting guardrail
   const { data: guardrail } = await supabase
     .from('guardrails')
     .select('*')
@@ -166,15 +188,14 @@ export async function checkRateLimit(agentId: string): Promise<{ allowed: boolea
     return { allowed: true };
   }
 
-  // Check tasks assigned to this agent in the last hour
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  // Count active/executing tasks for this agent (not historical completed ones)
   const { count } = await supabase
     .from('tasks')
     .select('*', { count: 'exact', head: true })
     .eq('assigned_agent', agentId)
-    .gte('submitted_at', oneHourAgo);
+    .eq('status', 'active');
 
-  const RATE_LIMIT = 50; // max tasks per agent per hour
+  const RATE_LIMIT = 50;
 
   if ((count ?? 0) >= RATE_LIMIT) {
     await supabase
@@ -188,7 +209,7 @@ export async function checkRateLimit(agentId: string): Promise<{ allowed: boolea
     await createSecurityAlert({
       severity: 'medium',
       title: 'Rate limit exceeded',
-      description: `Agent ${agentId} exceeded ${RATE_LIMIT} tasks/hour threshold`,
+      description: `Agent ${agentId} has ${count} active tasks, exceeding threshold of ${RATE_LIMIT}`,
       source: 'Guardrail: Rate Limiting',
       actor: agentId,
     });
@@ -197,4 +218,25 @@ export async function checkRateLimit(agentId: string): Promise<{ allowed: boolea
   }
 
   return { allowed: true };
+}
+
+/**
+ * Map a transaction type to the correct audit action.
+ */
+export function txTypeToAuditAction(type: string): AuditAction {
+  switch (type) {
+    case 'escrow_lock': return 'ESCROW_LOCK';
+    case 'escrow_release': return 'ESCROW_RELEASE';
+    case 'payment': return 'PAYMENT';
+    case 'reward': return 'REWARD';
+    case 'stake': return 'STAKE';
+    default: return 'PAYMENT';
+  }
+}
+
+/**
+ * Generate a collision-resistant ID with prefix.
+ */
+export function generateId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 }

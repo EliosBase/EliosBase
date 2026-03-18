@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { toTask } from '@/lib/transforms';
-import { logAudit, logActivity, checkSpendingLimit } from '@/lib/audit';
+import { logAudit, logActivity, checkSpendingLimit, parseRewardAmount, generateId } from '@/lib/audit';
 
 export async function GET(req: NextRequest) {
   const supabase = createServiceClient();
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query.order('submitted_at', { ascending: false });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
   }
 
   return NextResponse.json(data.map(toTask));
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   const supabase = createServiceClient();
 
   // Guardrail: check spending limit before allowing task creation
-  const rewardNum = parseFloat(body.reward?.replace(/[^0-9.]/g, '') || '0');
+  const rewardNum = parseRewardAmount(body.reward);
   const { allowed } = await checkSpendingLimit(rewardNum);
   if (!allowed) {
     await logAudit({
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const id = `task-${Date.now().toString(36)}`;
+  const id = generateId('task');
   const { data, error } = await supabase
     .from('tasks')
     .insert({
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to create task' }, { status: 500 });
   }
 
   // Audit + activity logging

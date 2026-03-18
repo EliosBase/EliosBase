@@ -19,21 +19,30 @@ export default function SecurityAlertComponent({ alert }: SecurityAlertProps) {
   const Icon = config.icon;
   const queryClient = useQueryClient();
   const [resolving, setResolving] = useState(false);
+  const [error, setError] = useState('');
 
   async function handleResolve() {
+    if (resolving) return;
     setResolving(true);
+    setError('');
     try {
       const res = await fetch(`/api/security/alerts/${alert.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resolved: true }),
       });
-      if (res.ok) {
-        queryClient.invalidateQueries({ queryKey: ['security-alerts'] });
-        queryClient.invalidateQueries({ queryKey: ['security-stats'] });
-        queryClient.invalidateQueries({ queryKey: ['audit-log'] });
-        queryClient.invalidateQueries({ queryKey: ['activity'] });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: 'Failed to resolve' }));
+        setError(data.error || 'Failed to resolve alert');
+        return;
       }
+      queryClient.invalidateQueries({ queryKey: ['security-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['security-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['audit-log'] });
+      queryClient.invalidateQueries({ queryKey: ['activity'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    } catch {
+      setError('Network error');
     } finally {
       setResolving(false);
     }
@@ -77,6 +86,9 @@ export default function SecurityAlertComponent({ alert }: SecurityAlertProps) {
               </button>
             )}
           </div>
+          {error && (
+            <p className="text-[10px] text-red-400 mt-1">{error}</p>
+          )}
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import StatCard from '@/components/dashboard/StatCard';
 import SecurityAlertComponent from '@/components/dashboard/SecurityAlert';
 import { useSecurityAlerts } from '@/hooks/useSecurityAlerts';
@@ -8,7 +9,7 @@ import { useAuditLog } from '@/hooks/useAuditLog';
 import { useSecurityStats } from '@/hooks/useSecurityStats';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useQueryClient } from '@tanstack/react-query';
-import { Shield, ShieldOff, AlertTriangle } from 'lucide-react';
+import { Shield, ShieldOff, AlertTriangle, Loader2 } from 'lucide-react';
 
 const guardrailStatusStyles = {
   active: { dot: 'bg-green-500', label: 'Active', textColor: 'text-green-400' },
@@ -29,6 +30,8 @@ export default function SecurityPage() {
   const { data: auditLog = [] } = useAuditLog(isAuthenticated);
   const { data: stats } = useSecurityStats(isAuthenticated);
   const queryClient = useQueryClient();
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState('');
 
   const securityStats = [
     {
@@ -57,20 +60,33 @@ export default function SecurityPage() {
     },
   ];
 
-  async function toggleGuardrail(id: string, currentStatus: string) {
-    const newStatus = currentStatus === 'active' ? 'paused' : 'active';
-    const res = await fetch(`/api/security/guardrails/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: newStatus }),
-    });
-    if (res.ok) {
+  const toggleGuardrail = useCallback(async (id: string, currentStatus: string) => {
+    if (togglingId) return;
+    setTogglingId(id);
+    setToggleError('');
+    try {
+      const newStatus = currentStatus === 'active' ? 'paused' : 'active';
+      const res = await fetch(`/api/security/guardrails/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setToggleError(data.error || 'Failed to toggle guardrail');
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ['guardrails'] });
       queryClient.invalidateQueries({ queryKey: ['security-stats'] });
       queryClient.invalidateQueries({ queryKey: ['audit-log'] });
       queryClient.invalidateQueries({ queryKey: ['activity'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    } catch {
+      setToggleError('Network error');
+    } finally {
+      setTogglingId(null);
     }
-  }
+  }, [togglingId, queryClient]);
 
   if (!isAuthenticated) {
     return (
@@ -148,9 +164,13 @@ export default function SecurityPage() {
                 Guardrails
               </h2>
             </div>
+            {toggleError && (
+              <p className="text-[10px] text-red-400 mb-3">{toggleError}</p>
+            )}
             <div className="space-y-3">
               {guardrails.map((gr) => {
                 const style = guardrailStatusStyles[gr.status];
+                const isToggling = togglingId === gr.id;
                 return (
                   <div key={gr.id} className="p-3 rounded-lg bg-white/3 border border-white/5">
                     <div className="flex items-center justify-between mb-1">
@@ -171,13 +191,16 @@ export default function SecurityPage() {
                         </div>
                         <button
                           onClick={() => toggleGuardrail(gr.id, gr.status)}
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                          disabled={isToggling || !!togglingId}
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors disabled:opacity-50 ${
                             gr.status === 'active'
                               ? 'bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/25'
                               : 'bg-green-500/15 text-green-400 hover:bg-green-500/25'
                           }`}
                         >
-                          {gr.status === 'active' ? 'Pause' : 'Activate'}
+                          {isToggling ? (
+                            <Loader2 size={10} className="animate-spin inline" />
+                          ) : gr.status === 'active' ? 'Pause' : 'Activate'}
                         </button>
                       </div>
                     </div>

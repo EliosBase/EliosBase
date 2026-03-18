@@ -26,7 +26,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .single();
 
   if (error || !data) {
-    return NextResponse.json({ error: error?.message || 'Alert not found' }, { status: 500 });
+    const status = error ? 500 : 404;
+    return NextResponse.json({ error: error?.message || 'Alert not found' }, { status });
   }
 
   if (body.resolved) {
