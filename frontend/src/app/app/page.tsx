@@ -3,13 +3,14 @@
 import StatCard from '@/components/dashboard/StatCard';
 import ActivityFeed from '@/components/dashboard/ActivityFeed';
 import ProofBadge from '@/components/dashboard/ProofBadge';
-import { dashboardStats, sparklineData } from '@/lib/constants';
+import { sparklineData } from '@/lib/constants';
 import { useTasks } from '@/hooks/useTasks';
 import { useAgents } from '@/hooks/useAgents';
 import { useActivity } from '@/hooks/useActivity';
 import { useRealtimeActivity } from '@/hooks/useRealtimeActivity';
 import { useRealtimeTasks } from '@/hooks/useRealtimeTasks';
 import { useRealtimeAgents } from '@/hooks/useRealtimeAgents';
+import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { Bot, Star } from 'lucide-react';
 
 const chartDataMap = [sparklineData.agents, sparklineData.tasks, sparklineData.tvl, sparklineData.proofs];
@@ -18,12 +19,40 @@ export default function DashboardPage() {
   const { data: tasks = [] } = useTasks();
   const { data: agents = [] } = useAgents();
   const { data: activityFeed = [] } = useActivity();
+  const { data: stats } = useDashboardStats();
   useRealtimeActivity();
   useRealtimeTasks();
   useRealtimeAgents();
 
   const activeTasks = tasks.filter((t) => t.status === 'active');
   const topAgents = [...agents].sort((a, b) => b.reputation - a.reputation).slice(0, 5);
+
+  const dashboardStats = [
+    {
+      label: 'Active Agents',
+      value: stats ? stats.activeAgents.toLocaleString() : '--',
+      trend: '+12.3%',
+      trendUp: true,
+    },
+    {
+      label: 'Tasks in Progress',
+      value: stats ? stats.activeTasks.toLocaleString() : '--',
+      trend: '+8.7%',
+      trendUp: true,
+    },
+    {
+      label: 'Total Value Locked',
+      value: stats ? `${stats.tvl.toFixed(2)} ETH` : '--',
+      trend: '+23.1%',
+      trendUp: true,
+    },
+    {
+      label: 'ZK Proofs Today',
+      value: stats ? stats.zkProofs.toLocaleString() : '--',
+      trend: '+5.4%',
+      trendUp: true,
+    },
+  ];
 
   return (
     <div className="space-y-6 max-w-7xl">

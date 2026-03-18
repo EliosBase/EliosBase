@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { type Agent } from '@/lib/types';
-import { Bot, Star, CheckCircle } from 'lucide-react';
+import { Bot, Star, CheckCircle, Loader2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AgentCardProps {
   agent: Agent;
@@ -16,6 +17,37 @@ const statusColors = {
 
 export default function AgentCard({ agent }: AgentCardProps) {
   const [hired, setHired] = useState(false);
+  const [hiring, setHiring] = useState(false);
+  const [error, setError] = useState('');
+  const queryClient = useQueryClient();
+
+  async function handleHire() {
+    if (hired || hiring) return;
+    setHiring(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/agents/${agent.id}/hire`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || 'Failed to hire agent');
+        return;
+      }
+      setHired(true);
+      queryClient.invalidateQueries({ queryKey: ['agents'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['activity'] });
+      queryClient.invalidateQueries({ queryKey: ['audit-log'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet-stats'] });
+    } catch {
+      setError('Network error');
+    } finally {
+      setHiring(false);
+    }
+  }
 
   return (
     <div className="glass p-5 rounded-2xl">
@@ -75,22 +107,33 @@ export default function AgentCard({ agent }: AgentCardProps) {
           </p>
         </div>
         <button
-          onClick={() => setHired(!hired)}
+          onClick={handleHire}
+          disabled={hired || hiring || agent.status === 'offline'}
           className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
             hired
               ? 'bg-green-500/15 text-green-400 border border-green-500/20'
-              : 'bg-white text-black hover:bg-white/90'
-          }`}
+              : agent.status === 'offline'
+                ? 'bg-white/10 text-white/30 cursor-not-allowed'
+                : 'bg-white text-black hover:bg-white/90'
+          } disabled:opacity-70`}
         >
           {hired ? (
             <span className="flex items-center gap-1">
               <CheckCircle size={12} /> Hired
+            </span>
+          ) : hiring ? (
+            <span className="flex items-center gap-1">
+              <Loader2 size={12} className="animate-spin" /> Hiring...
             </span>
           ) : (
             'Hire'
           )}
         </button>
       </div>
+
+      {error && (
+        <p className="text-[10px] text-red-400 mt-2">{error}</p>
+      )}
 
       <p className="text-[10px] text-white/30 mt-2">
         {agent.tasksCompleted.toLocaleString()} tasks completed
