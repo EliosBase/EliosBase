@@ -3,15 +3,9 @@
 import StatCard from '@/components/dashboard/StatCard';
 import TransactionRow from '@/components/dashboard/TransactionRow';
 import { useTransactions } from '@/hooks/useTransactions';
+import { useWalletStats } from '@/hooks/useWalletStats';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Shield, Users, Clock, Zap } from 'lucide-react';
-
-const walletStats = [
-  { label: 'Balance', value: '12.45 ETH', trend: '+2.1 ETH this week', trendUp: true },
-  { label: 'In Escrow', value: '2.00 ETH', trend: '2 active locks', trendUp: true },
-  { label: 'Total Earned', value: '127.5 ELIO', trend: '+42.5 today', trendUp: true },
-  { label: 'Staked', value: '500 ELIO', trend: 'Earning 8.2% APY', trendUp: true },
-];
 
 const smartWalletFeatures = [
   { icon: Shield, name: 'Spending Limits', description: 'Per-task cap of 1.0 ETH, daily cap of 5.0 ETH', active: true },
@@ -23,6 +17,34 @@ const smartWalletFeatures = [
 export default function WalletPage() {
   const { isAuthenticated } = useAuthContext();
   const { data: transactions = [], isLoading } = useTransactions(isAuthenticated);
+  const { data: stats } = useWalletStats(isAuthenticated);
+
+  const walletStats = [
+    {
+      label: 'Balance',
+      value: stats?.balance ?? '--',
+      trend: stats?.balanceTrend ?? '',
+      trendUp: true,
+    },
+    {
+      label: 'In Escrow',
+      value: stats?.inEscrow ?? '--',
+      trend: stats?.inEscrowTrend ?? '',
+      trendUp: true,
+    },
+    {
+      label: 'Total Earned',
+      value: stats?.totalEarned ?? '--',
+      trend: stats?.totalEarnedTrend ?? '',
+      trendUp: true,
+    },
+    {
+      label: 'Staked',
+      value: stats?.staked ?? '--',
+      trend: stats?.stakedTrend ?? '',
+      trendUp: true,
+    },
+  ];
 
   if (!isAuthenticated) {
     return (
