@@ -63,7 +63,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .single();
 
   if (error || !data) {
-    return NextResponse.json({ error: error?.message || 'Task not found' }, { status: 500 });
+    const status = error ? 500 : 404;
+    return NextResponse.json({ error: error ? 'Failed to update task' : 'Task not found' }, { status });
   }
 
   // Determine audit action based on what changed

@@ -42,6 +42,8 @@ export default function AgentCard({ agent }: AgentCardProps) {
       queryClient.invalidateQueries({ queryKey: ['activity'] });
       queryClient.invalidateQueries({ queryKey: ['audit-log'] });
       queryClient.invalidateQueries({ queryKey: ['wallet-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['security-stats'] });
     } catch {
       setError('Network error');
     } finally {
