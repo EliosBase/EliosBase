@@ -44,7 +44,9 @@ export default function Footer() {
             </p>
             <div className="flex gap-3">
               <a
-                href="#"
+                href="https://x.com/eliosbase"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors duration-200 text-white/50 hover:text-white cursor-pointer"
                 aria-label="Twitter"
               >
