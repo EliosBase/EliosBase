@@ -1,4 +1,4 @@
-import { type ActivityEvent } from '@/lib/mock-data';
+import { type ActivityEvent } from '@/lib/types';
 import { Zap, CreditCard, ListChecks, ShieldCheck, Bot } from 'lucide-react';
 
 const iconMap = {

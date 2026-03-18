@@ -5,6 +5,9 @@ import { usePathname } from 'next/navigation';
 import CyberBackground from '@/components/CyberBackground';
 import Sidebar from '@/components/dashboard/Sidebar';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import WalletProvider from '@/providers/WalletProvider';
+import AuthProvider from '@/providers/AuthProvider';
+import AuthGate from '@/components/dashboard/AuthGate';
 
 const pageTitles: Record<string, string> = {
   '/app': 'Dashboard',
@@ -20,16 +23,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const title = pageTitles[pathname] || 'Dashboard';
 
   return (
-    <div className="min-h-screen">
-      <CyberBackground />
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <AuthProvider>
+      <WalletProvider>
+        <AuthGate>
+          <div className="min-h-screen">
+            <CyberBackground />
+            <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <div className="lg:pl-60 min-h-screen flex flex-col">
-        <DashboardHeader title={title} onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6 relative z-10">
-          {children}
-        </main>
-      </div>
-    </div>
+            <div className="lg:pl-60 min-h-screen flex flex-col">
+              <DashboardHeader title={title} onMenuClick={() => setSidebarOpen(true)} />
+              <main className="flex-1 p-4 sm:p-6 relative z-10">
+                {children}
+              </main>
+            </div>
+          </div>
+        </AuthGate>
+      </WalletProvider>
+    </AuthProvider>
   );
 }

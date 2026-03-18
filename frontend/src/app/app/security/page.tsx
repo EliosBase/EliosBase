@@ -1,6 +1,11 @@
+'use client';
+
 import StatCard from '@/components/dashboard/StatCard';
 import SecurityAlertComponent from '@/components/dashboard/SecurityAlert';
-import { securityAlerts, guardrails, auditLog } from '@/lib/mock-data';
+import { useSecurityAlerts } from '@/hooks/useSecurityAlerts';
+import { useGuardrails } from '@/hooks/useGuardrails';
+import { useAuditLog } from '@/hooks/useAuditLog';
+import { useAuthContext } from '@/providers/AuthProvider';
 import { Shield, ShieldOff, AlertTriangle } from 'lucide-react';
 
 const securityStats = [
@@ -16,13 +21,28 @@ const guardrailStatusStyles = {
   triggered: { dot: 'bg-red-500', label: 'Triggered', textColor: 'text-red-400' },
 };
 
-const resultColors = {
+const resultColors: Record<string, string> = {
   ALLOW: 'text-green-400',
   DENY: 'text-red-400',
   FLAG: 'text-yellow-400',
 };
 
 export default function SecurityPage() {
+  const { isAuthenticated } = useAuthContext();
+  const { data: securityAlerts = [] } = useSecurityAlerts(isAuthenticated);
+  const { data: guardrails = [] } = useGuardrails(isAuthenticated);
+  const { data: auditLog = [] } = useAuditLog(isAuthenticated);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <p className="text-white/40 text-sm font-[family-name:var(--font-body)]">
+          Connect your wallet and sign in to view security data.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-7xl">
       {/* Stats */}

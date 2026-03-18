@@ -3,16 +3,25 @@
 import { useState } from 'react';
 import TaskCard from '@/components/dashboard/TaskCard';
 import TaskSubmitModal from '@/components/dashboard/TaskSubmitModal';
-import { tasks } from '@/lib/mock-data';
+import { useTasks } from '@/hooks/useTasks';
 import { Plus } from 'lucide-react';
 
 export default function TasksPage() {
   const [showModal, setShowModal] = useState(false);
   const [tab, setTab] = useState<'active' | 'completed'>('active');
+  const { data: tasks = [], isLoading } = useTasks();
 
   const activeTasks = tasks.filter((t) => t.status === 'active');
   const completedTasks = tasks.filter((t) => t.status === 'completed');
   const displayedTasks = tab === 'active' ? activeTasks : completedTasks;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-5xl">

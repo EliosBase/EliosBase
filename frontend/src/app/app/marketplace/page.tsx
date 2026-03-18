@@ -3,13 +3,17 @@
 import { useState, useMemo } from 'react';
 import SearchBar from '@/components/dashboard/SearchBar';
 import AgentCard from '@/components/dashboard/AgentCard';
-import { agents } from '@/lib/mock-data';
-
-const allCapabilities = Array.from(new Set(agents.flatMap((a) => a.capabilities))).sort();
+import { useAgents } from '@/hooks/useAgents';
 
 export default function MarketplacePage() {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('');
+  const { data: agents = [], isLoading } = useAgents();
+
+  const allCapabilities = useMemo(
+    () => Array.from(new Set(agents.flatMap((a) => a.capabilities))).sort(),
+    [agents]
+  );
 
   const filtered = useMemo(() => {
     return agents.filter((agent) => {
@@ -21,7 +25,15 @@ export default function MarketplacePage() {
         !activeFilter || agent.capabilities.includes(activeFilter);
       return matchesSearch && matchesFilter;
     });
-  }, [search, activeFilter]);
+  }, [agents, search, activeFilter]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-7xl">

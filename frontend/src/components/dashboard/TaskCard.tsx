@@ -1,5 +1,6 @@
 import ProofBadge from './ProofBadge';
-import { type Task, TASK_STEPS } from '@/lib/mock-data';
+import { type Task } from '@/lib/types';
+import { TASK_STEPS } from '@/lib/constants';
 import { Bot } from 'lucide-react';
 
 interface TaskCardProps {
