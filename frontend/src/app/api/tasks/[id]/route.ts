@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { toTask } from '@/lib/transforms';
+import { logAudit, logActivity, checkRateLimit } from '@/lib/audit';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -37,6 +38,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (body.completedAt) updates.completed_at = body.completedAt;
   if (body.zkProofId) updates.zk_proof_id = body.zkProofId;
 
+  // Guardrail: rate limit check when assigning an agent
+  if (body.assignedAgent) {
+    const { allowed } = await checkRateLimit(body.assignedAgent);
+    if (!allowed) {
+      await logAudit({
+        action: 'RATE_LIMIT',
+        actor: session.walletAddress ?? session.userId!,
+        target: `agent:${body.assignedAgent}`,
+        result: 'DENY',
+      });
+      return NextResponse.json(
+        { error: 'Agent has exceeded rate limit' },
+        { status: 429 }
+      );
+    }
+  }
+
   const { data, error } = await supabase
     .from('tasks')
     .update(updates)
@@ -46,6 +64,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (error || !data) {
     return NextResponse.json({ error: error?.message || 'Task not found' }, { status: 500 });
+  }
+
+  // Determine audit action based on what changed
+  const actor = session.walletAddress ?? session.userId!;
+  if (body.assignedAgent) {
+    await logAudit({ action: 'TASK_ASSIGN', actor, target: id, result: 'ALLOW' });
+    await logActivity({ type: 'task', message: `Task assigned to agent: ${data.agents?.name ?? body.assignedAgent}`, userId: session.userId });
+  }
+  if (body.status === 'completed') {
+    await logAudit({ action: 'TASK_COMPLETE', actor, target: id, result: 'ALLOW' });
+    await logActivity({ type: 'task', message: `Task completed: ${data.title}`, userId: session.userId });
+  }
+  if (body.currentStep && body.currentStep !== 'Complete') {
+    await logAudit({ action: 'TASK_UPDATE', actor, target: id, result: 'ALLOW' });
+    await logActivity({ type: 'task', message: `Task "${data.title}" moved to ${body.currentStep}`, userId: session.userId });
+  }
+  if (body.zkProofId) {
+    await logAudit({ action: 'PROOF_SUBMIT', actor, target: id, result: 'ALLOW' });
+    await logActivity({ type: 'proof', message: `ZK proof submitted for task: ${data.title}`, userId: session.userId });
   }
 
   return NextResponse.json(toTask(data));

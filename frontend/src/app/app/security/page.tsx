@@ -5,15 +5,10 @@ import SecurityAlertComponent from '@/components/dashboard/SecurityAlert';
 import { useSecurityAlerts } from '@/hooks/useSecurityAlerts';
 import { useGuardrails } from '@/hooks/useGuardrails';
 import { useAuditLog } from '@/hooks/useAuditLog';
+import { useSecurityStats } from '@/hooks/useSecurityStats';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { useQueryClient } from '@tanstack/react-query';
 import { Shield, ShieldOff, AlertTriangle } from 'lucide-react';
-
-const securityStats = [
-  { label: 'Threats Blocked', value: '247', trend: '+18 today', trendUp: true },
-  { label: 'Guardrails Active', value: '5/6', trend: '1 triggered', trendUp: true },
-  { label: 'Proofs Verified', value: '8,491', trend: '100% valid', trendUp: true },
-  { label: 'Uptime', value: '99.97%', trend: '0 outages (30d)', trendUp: true },
-];
 
 const guardrailStatusStyles = {
   active: { dot: 'bg-green-500', label: 'Active', textColor: 'text-green-400' },
@@ -32,6 +27,50 @@ export default function SecurityPage() {
   const { data: securityAlerts = [] } = useSecurityAlerts(isAuthenticated);
   const { data: guardrails = [] } = useGuardrails(isAuthenticated);
   const { data: auditLog = [] } = useAuditLog(isAuthenticated);
+  const { data: stats } = useSecurityStats(isAuthenticated);
+  const queryClient = useQueryClient();
+
+  const securityStats = [
+    {
+      label: 'Threats Blocked',
+      value: stats ? String(stats.threatsBlocked) : '--',
+      trend: stats?.threatsBlockedTrend ?? '',
+      trendUp: true,
+    },
+    {
+      label: 'Guardrails Active',
+      value: stats ? `${stats.guardrailsActive}/${stats.guardrailsTotal}` : '--',
+      trend: stats?.guardrailsTrend ?? '',
+      trendUp: true,
+    },
+    {
+      label: 'Proofs Verified',
+      value: stats ? stats.proofsVerified.toLocaleString() : '--',
+      trend: stats?.proofsTrend ?? '',
+      trendUp: true,
+    },
+    {
+      label: 'Uptime',
+      value: stats?.uptime ?? '--',
+      trend: stats?.uptimeTrend ?? '',
+      trendUp: true,
+    },
+  ];
+
+  async function toggleGuardrail(id: string, currentStatus: string) {
+    const newStatus = currentStatus === 'active' ? 'paused' : 'active';
+    const res = await fetch(`/api/security/guardrails/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: newStatus }),
+    });
+    if (res.ok) {
+      queryClient.invalidateQueries({ queryKey: ['guardrails'] });
+      queryClient.invalidateQueries({ queryKey: ['security-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['audit-log'] });
+      queryClient.invalidateQueries({ queryKey: ['activity'] });
+    }
+  }
 
   if (!isAuthenticated) {
     return (
@@ -125,14 +164,26 @@ export default function SecurityPage() {
                           {gr.name}
                         </h4>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                        <span className={`text-[10px] ${style.textColor}`}>{style.label}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+                          <span className={`text-[10px] ${style.textColor}`}>{style.label}</span>
+                        </div>
+                        <button
+                          onClick={() => toggleGuardrail(gr.id, gr.status)}
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors ${
+                            gr.status === 'active'
+                              ? 'bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/25'
+                              : 'bg-green-500/15 text-green-400 hover:bg-green-500/25'
+                          }`}
+                        >
+                          {gr.status === 'active' ? 'Pause' : 'Activate'}
+                        </button>
                       </div>
                     </div>
                     <p className="text-[11px] text-white/35 mb-1.5">{gr.description}</p>
                     <p className="text-[10px] text-white/25 font-[family-name:var(--font-mono)]">
-                      Triggered {gr.triggeredCount}× total
+                      Triggered {gr.triggeredCount}x total
                     </p>
                   </div>
                 );
