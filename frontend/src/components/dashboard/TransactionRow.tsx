@@ -1,4 +1,4 @@
-import { type Transaction } from '@/lib/mock-data';
+import { type Transaction } from '@/lib/types';
 import { ArrowUpRight, ArrowDownLeft, Lock, Unlock, Award } from 'lucide-react';
 
 const typeConfig = {

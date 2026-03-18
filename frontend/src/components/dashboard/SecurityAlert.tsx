@@ -1,4 +1,4 @@
-import { type SecurityAlert as SecurityAlertType } from '@/lib/mock-data';
+import { type SecurityAlert as SecurityAlertType } from '@/lib/types';
 import { AlertTriangle, AlertCircle, Info, CheckCircle } from 'lucide-react';
 
 const severityConfig = {

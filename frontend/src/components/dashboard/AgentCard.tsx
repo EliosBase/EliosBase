@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { type Agent } from '@/lib/mock-data';
+import { type Agent } from '@/lib/types';
 import { Bot, Star, CheckCircle } from 'lucide-react';
 
 interface AgentCardProps {

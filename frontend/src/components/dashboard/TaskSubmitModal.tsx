@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { useCreateTask } from '@/hooks/useTasks';
 
 interface TaskSubmitModalProps {
   onClose: () => void;
@@ -11,12 +12,14 @@ export default function TaskSubmitModal({ onClose }: TaskSubmitModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [reward, setReward] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const createTask = useCreateTask();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(onClose, 1500);
+    createTask.mutate(
+      { title, description, reward: `${reward} ETH` },
+      { onSuccess: () => { setTimeout(onClose, 1500); } }
+    );
   };
 
   return (
@@ -43,7 +46,7 @@ export default function TaskSubmitModal({ onClose }: TaskSubmitModalProps) {
             Define your task and set a reward for the executing agent.
           </p>
 
-          {submitted ? (
+          {createTask.isSuccess ? (
             <div className="py-8 text-center">
               <div className="w-12 h-12 rounded-full bg-green-500/15 flex items-center justify-center mx-auto mb-3">
                 <span className="text-green-400 text-xl">✓</span>
@@ -95,11 +98,18 @@ export default function TaskSubmitModal({ onClose }: TaskSubmitModalProps) {
                 />
               </div>
 
+              {createTask.isError && (
+                <p className="text-xs text-red-400">
+                  {createTask.error.message}
+                </p>
+              )}
+
               <button
                 type="submit"
-                className="w-full py-3 rounded-xl bg-white text-black font-semibold text-sm hover:bg-white/90 transition-colors mt-2"
+                disabled={createTask.isPending}
+                className="w-full py-3 rounded-xl bg-white text-black font-semibold text-sm hover:bg-white/90 transition-colors mt-2 disabled:opacity-50"
               >
-                Submit Task
+                {createTask.isPending ? 'Submitting...' : 'Submit Task'}
               </button>
             </form>
           )}

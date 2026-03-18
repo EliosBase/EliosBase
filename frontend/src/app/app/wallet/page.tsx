@@ -1,6 +1,9 @@
+'use client';
+
 import StatCard from '@/components/dashboard/StatCard';
 import TransactionRow from '@/components/dashboard/TransactionRow';
-import { transactions } from '@/lib/mock-data';
+import { useTransactions } from '@/hooks/useTransactions';
+import { useAuthContext } from '@/providers/AuthProvider';
 import { Shield, Users, Clock, Zap } from 'lucide-react';
 
 const walletStats = [
@@ -18,6 +21,19 @@ const smartWalletFeatures = [
 ];
 
 export default function WalletPage() {
+  const { isAuthenticated } = useAuthContext();
+  const { data: transactions = [], isLoading } = useTransactions(isAuthenticated);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <p className="text-white/40 text-sm font-[family-name:var(--font-body)]">
+          Connect your wallet and sign in to view transactions.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-6xl">
       {/* Stats */}
@@ -62,11 +78,17 @@ export default function WalletPage() {
             <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)] tracking-wide mb-4">
               Transaction History
             </h2>
-            <div className="space-y-1">
-              {transactions.map((tx) => (
-                <TransactionRow key={tx.id} tx={tx} />
-              ))}
-            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {transactions.map((tx) => (
+                  <TransactionRow key={tx.id} tx={tx} />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

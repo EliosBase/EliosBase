@@ -3,6 +3,9 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, Store, ListChecks, Wallet, ShieldCheck, X } from 'lucide-react';
+import { usePhantom } from '@/hooks/usePhantom';
+import { useAuthContext } from '@/providers/AuthProvider';
+import { useMounted } from '@/hooks/useMounted';
 
 const navItems = [
   { href: '/app', label: 'Dashboard', icon: LayoutDashboard },
@@ -19,6 +22,9 @@ interface SidebarProps {
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { isConnected, shortAddress } = usePhantom();
+  const { isAuthenticated } = useAuthContext();
+  const mounted = useMounted();
 
   const isActive = (href: string) => {
     if (href === '/app') return pathname === '/app';
@@ -75,18 +81,30 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Bottom section */}
         <div className="px-4 py-4 border-t border-white/6">
-          <div className="flex items-center gap-3 px-2">
-            <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-mono text-white/70">
-              0x
+          {mounted && isConnected ? (
+            <div className="flex items-center gap-3 px-2">
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-mono text-white/70">
+                0x
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-white/70 font-[family-name:var(--font-mono)] truncate">
+                  {shortAddress}
+                </p>
+                <p className="text-[10px] text-white/40">Base Network</p>
+              </div>
+              <div className={`w-2 h-2 rounded-full ${isAuthenticated ? 'bg-green-500' : 'bg-yellow-500'}`} />
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-white/70 font-[family-name:var(--font-mono)] truncate">
-                0x7a3b...f8e2
-              </p>
-              <p className="text-[10px] text-white/40">Connected</p>
+          ) : (
+            <div className="flex items-center gap-3 px-2">
+              <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs font-mono text-white/30">
+                --
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-white/30">Not connected</p>
+              </div>
+              <div className="w-2 h-2 rounded-full bg-white/20" />
             </div>
-            <div className="w-2 h-2 rounded-full bg-green-500" />
-          </div>
+          )}
         </div>
       </aside>
     </>
