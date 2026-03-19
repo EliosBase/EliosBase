@@ -12,6 +12,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Role check: only operator or admin can resolve alerts
+  if (session.role && session.role === 'submitter') {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+  }
+
   const body = await req.json();
   const supabase = createServiceClient();
 
@@ -27,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (error || !data) {
     const status = error ? 500 : 404;
-    return NextResponse.json({ error: error?.message || 'Alert not found' }, { status });
+    return NextResponse.json({ error: error ? 'Internal server error' : 'Alert not found' }, { status });
   }
 
   if (body.resolved) {

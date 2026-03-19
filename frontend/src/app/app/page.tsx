@@ -31,25 +31,25 @@ export default function DashboardPage() {
     {
       label: 'Active Agents',
       value: stats ? stats.activeAgents.toLocaleString() : '--',
-      trend: '+12.3%',
+      trend: stats?.activeAgentsTrend ?? '',
       trendUp: true,
     },
     {
       label: 'Tasks in Progress',
       value: stats ? stats.activeTasks.toLocaleString() : '--',
-      trend: '+8.7%',
+      trend: stats?.activeTasksTrend ?? '',
       trendUp: true,
     },
     {
       label: 'Total Value Locked',
       value: stats ? `${stats.tvl.toFixed(2)} ETH` : '--',
-      trend: '+23.1%',
+      trend: stats?.tvlTrend ?? '',
       trendUp: true,
     },
     {
-      label: 'ZK Proofs Today',
+      label: 'ZK Proofs',
       value: stats ? stats.zkProofs.toLocaleString() : '--',
-      trend: '+5.4%',
+      trend: stats?.zkProofsTrend ?? '',
       trendUp: true,
     },
   ];

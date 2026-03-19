@@ -29,6 +29,18 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
+
+  // Input validation
+  if (!body.title || typeof body.title !== 'string' || body.title.length > 200) {
+    return NextResponse.json({ error: 'Title is required (max 200 chars)' }, { status: 400 });
+  }
+  if (!body.description || typeof body.description !== 'string' || body.description.length > 2000) {
+    return NextResponse.json({ error: 'Description is required (max 2000 chars)' }, { status: 400 });
+  }
+  if (!body.reward || typeof body.reward !== 'string') {
+    return NextResponse.json({ error: 'Reward is required' }, { status: 400 });
+  }
+
   const supabase = createServiceClient();
 
   // Guardrail: check spending limit before allowing task creation

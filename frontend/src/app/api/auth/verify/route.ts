@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     session.userId = user.id;
     session.walletAddress = user.wallet_address;
     session.chainId = fields.chainId;
+    session.role = user.role;
     session.nonce = undefined;
     await session.save();
 

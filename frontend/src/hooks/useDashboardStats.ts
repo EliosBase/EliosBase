@@ -4,9 +4,13 @@ import { useQuery } from '@tanstack/react-query';
 
 export interface DashboardStats {
   activeAgents: number;
+  activeAgentsTrend: string;
   activeTasks: number;
+  activeTasksTrend: string;
   tvl: number;
+  tvlTrend: string;
   zkProofs: number;
+  zkProofsTrend: string;
 }
 
 async function fetchDashboardStats(): Promise<DashboardStats> {
