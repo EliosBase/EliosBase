@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   submitter_id UUID REFERENCES users(id) NOT NULL,
   submitted_at TIMESTAMPTZ DEFAULT now(),
   completed_at TIMESTAMPTZ,
-  zk_proof_id TEXT
+  zk_proof_id TEXT,
+  step_changed_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status);
 CREATE INDEX IF NOT EXISTS idx_tasks_submitter ON tasks (submitter_id);
@@ -56,7 +57,8 @@ CREATE TABLE IF NOT EXISTS transactions (
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('confirmed', 'pending', 'failed')),
   timestamp TIMESTAMPTZ DEFAULT now(),
   tx_hash TEXT NOT NULL,
-  user_id UUID REFERENCES users(id)
+  user_id UUID REFERENCES users(id),
+  block_number BIGINT
 );
 CREATE INDEX IF NOT EXISTS idx_tx_user ON transactions (user_id);
 CREATE INDEX IF NOT EXISTS idx_tx_hash ON transactions (tx_hash);

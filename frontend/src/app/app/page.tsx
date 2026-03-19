@@ -11,6 +11,7 @@ import { useRealtimeActivity } from '@/hooks/useRealtimeActivity';
 import { useRealtimeTasks } from '@/hooks/useRealtimeTasks';
 import { useRealtimeAgents } from '@/hooks/useRealtimeAgents';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { useBatchTaskAdvancement } from '@/hooks/useTaskAdvancement';
 import { Bot, Star } from 'lucide-react';
 
 const chartDataMap = [sparklineData.agents, sparklineData.tasks, sparklineData.tvl, sparklineData.proofs];
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   useRealtimeActivity();
   useRealtimeTasks();
   useRealtimeAgents();
+  useBatchTaskAdvancement();
 
   const activeTasks = tasks.filter((t) => t.status === 'active');
   const topAgents = [...agents].sort((a, b) => b.reputation - a.reputation).slice(0, 5);

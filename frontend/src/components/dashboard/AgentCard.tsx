@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { type Agent } from '@/lib/types';
 import { Bot, Star, CheckCircle, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useEscrowLock } from '@/hooks/useEscrow';
+import { useAuthContext } from '@/providers/AuthProvider';
 
 interface AgentCardProps {
   agent: Agent;
@@ -15,28 +17,71 @@ const statusColors = {
   offline: 'bg-white/30',
 };
 
+type HireStep = 'idle' | 'signing' | 'mining' | 'confirming' | 'hired' | 'error';
+
 export default function AgentCard({ agent }: AgentCardProps) {
-  const [hired, setHired] = useState(false);
-  const [hiring, setHiring] = useState(false);
+  const [step, setStep] = useState<HireStep>('idle');
   const [error, setError] = useState('');
   const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuthContext();
+  const { lock, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useEscrowLock();
+
+  // Track contract interaction state
+  useEffect(() => {
+    if (isSigning && step === 'idle') setStep('signing');
+    if (isMining && step === 'signing') setStep('mining');
+  }, [isSigning, isMining, step]);
+
+  // When tx is confirmed on-chain, call the hire API with the real tx hash
+  useEffect(() => {
+    if (isConfirmed && txHash && step === 'mining') {
+      setStep('confirming');
+      registerHire(txHash);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConfirmed, txHash]);
+
+  // Handle contract errors
+  useEffect(() => {
+    if (contractError && step !== 'idle' && step !== 'hired') {
+      setStep('error');
+      const msg = contractError.message?.includes('User rejected')
+        ? 'Transaction rejected'
+        : contractError.message?.slice(0, 100) || 'Transaction failed';
+      setError(msg);
+    }
+  }, [contractError, step]);
 
   async function handleHire() {
-    if (hired || hiring) return;
-    setHiring(true);
+    if (step !== 'idle' && step !== 'error') return;
+    if (!isAuthenticated) {
+      setError('Connect wallet and sign in first');
+      setStep('error');
+      return;
+    }
     setError('');
+    setStep('idle');
+    reset();
+
+    // Phase 1: On-chain — lock funds via smart contract
+    lock('pending-task', agent.id, agent.pricePerTask);
+  }
+
+  async function registerHire(hash: string) {
+    // Phase 2: Off-chain — tell the API about the real tx
     try {
       const res = await fetch(`/api/agents/${agent.id}/hire`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ txHash: hash }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || 'Failed to hire agent');
+        const data = await res.json().catch(() => ({ error: 'Failed to register hire' }));
+        setError(data.error || 'Failed to register hire');
+        setStep('error');
         return;
       }
-      setHired(true);
+      setStep('hired');
       queryClient.invalidateQueries({ queryKey: ['agents'] });
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['activity'] });
@@ -46,10 +91,26 @@ export default function AgentCard({ agent }: AgentCardProps) {
       queryClient.invalidateQueries({ queryKey: ['security-stats'] });
     } catch {
       setError('Network error');
-    } finally {
-      setHiring(false);
+      setStep('error');
     }
   }
+
+  function retryHire() {
+    setStep('idle');
+    setError('');
+    reset();
+  }
+
+  const buttonLabel = {
+    idle: 'Hire',
+    signing: 'Sign Tx...',
+    mining: 'Mining...',
+    confirming: 'Confirming...',
+    hired: 'Hired',
+    error: 'Retry',
+  }[step];
+
+  const isDisabled = ['signing', 'mining', 'confirming'].includes(step) || agent.status === 'offline';
 
   return (
     <div className="glass p-5 rounded-2xl">
@@ -78,7 +139,6 @@ export default function AgentCard({ agent }: AgentCardProps) {
         {agent.description}
       </p>
 
-      {/* Reputation bar */}
       <div className="mb-3">
         <div className="h-1 rounded-full bg-white/5 overflow-hidden">
           <div
@@ -88,7 +148,6 @@ export default function AgentCard({ agent }: AgentCardProps) {
         </div>
       </div>
 
-      {/* Capabilities */}
       <div className="flex flex-wrap gap-1.5 mb-4">
         {agent.capabilities.map((cap) => (
           <span
@@ -100,7 +159,6 @@ export default function AgentCard({ agent }: AgentCardProps) {
         ))}
       </div>
 
-      {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-white/6">
         <div>
           <p className="text-xs text-white/40">Price</p>
@@ -109,26 +167,24 @@ export default function AgentCard({ agent }: AgentCardProps) {
           </p>
         </div>
         <button
-          onClick={handleHire}
-          disabled={hired || hiring || agent.status === 'offline'}
+          onClick={step === 'error' ? retryHire : handleHire}
+          disabled={isDisabled || step === 'hired'}
           className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-            hired
+            step === 'hired'
               ? 'bg-green-500/15 text-green-400 border border-green-500/20'
               : agent.status === 'offline'
                 ? 'bg-white/10 text-white/30 cursor-not-allowed'
-                : 'bg-white text-black hover:bg-white/90'
+                : step === 'error'
+                  ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/20'
+                  : 'bg-white text-black hover:bg-white/90'
           } disabled:opacity-70`}
         >
-          {hired ? (
-            <span className="flex items-center gap-1">
-              <CheckCircle size={12} /> Hired
-            </span>
-          ) : hiring ? (
-            <span className="flex items-center gap-1">
-              <Loader2 size={12} className="animate-spin" /> Hiring...
-            </span>
+          {step === 'hired' ? (
+            <span className="flex items-center gap-1"><CheckCircle size={12} /> Hired</span>
+          ) : ['signing', 'mining', 'confirming'].includes(step) ? (
+            <span className="flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> {buttonLabel}</span>
           ) : (
-            'Hire'
+            buttonLabel
           )}
         </button>
       </div>
