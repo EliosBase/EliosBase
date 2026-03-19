@@ -4,7 +4,9 @@ import { getSession } from '@/lib/session';
 import { logAudit, logActivity } from '@/lib/audit';
 import { toGuardrail } from '@/lib/transforms';
 
-// PATCH /api/security/guardrails/[id] — toggle guardrail status
+const VALID_STATUSES = ['active', 'paused', 'triggered'];
+
+// PATCH /api/security/guardrails/[id] — toggle guardrail status (operator/admin only)
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getSession();
@@ -12,23 +14,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await req.json();
-  const supabase = createServiceClient();
-
-  const updates: Record<string, unknown> = {};
-  if (body.status && ['active', 'paused', 'triggered'].includes(body.status)) {
-    updates.status = body.status;
+  // Role check: only operator or admin can toggle guardrails
+  if (session.role && session.role === 'submitter') {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
   }
+
+  const body = await req.json();
+
+  if (!body.status || !VALID_STATUSES.includes(body.status)) {
+    return NextResponse.json(
+      { error: `Status must be one of: ${VALID_STATUSES.join(', ')}` },
+      { status: 400 }
+    );
+  }
+
+  const supabase = createServiceClient();
 
   const { data, error } = await supabase
     .from('guardrails')
-    .update(updates)
+    .update({ status: body.status })
     .eq('id', id)
     .select()
     .single();
 
   if (error || !data) {
-    return NextResponse.json({ error: error?.message || 'Guardrail not found' }, { status: 500 });
+    const status = error ? 500 : 404;
+    return NextResponse.json({ error: error ? 'Internal server error' : 'Guardrail not found' }, { status });
   }
 
   await logAudit({
