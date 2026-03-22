@@ -20,9 +20,14 @@ export function validateOrigin(req: NextRequest): NextResponse | null {
   }
 
   const expectedOrigin = new URL(siteUrl).origin;
-  if (origin !== expectedOrigin) {
-    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 });
+
+  // Allow exact match or same Vercel project preview deployments
+  if (origin === expectedOrigin) return null;
+  if (origin.endsWith('.vercel.app') && expectedOrigin.endsWith('.vercel.app')) {
+    // Same project: both contain the project slug
+    const projectSlug = expectedOrigin.match(/-([a-z0-9]+)\.vercel\.app$/)?.[1];
+    if (projectSlug && origin.includes(projectSlug)) return null;
   }
 
-  return null;
+  return NextResponse.json({ error: 'Invalid origin' }, { status: 403 });
 }
