@@ -39,8 +39,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   const [, nextStep, minSeconds] = transition;
 
-  // Check elapsed time since last update
-  const stepChangedAt = new Date(task.submitted_at).getTime();
+  // Check elapsed time since step changed
+  const stepChangedAt = task.step_changed_at
+    ? new Date(task.step_changed_at).getTime()
+    : new Date(task.submitted_at).getTime();
   const elapsed = (Date.now() - stepChangedAt) / 1000;
 
   if (elapsed < minSeconds) {
@@ -54,6 +56,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   // Advance the step
   const updates: Record<string, unknown> = {
     current_step: nextStep,
+    step_changed_at: new Date().toISOString(),
   };
 
   // If completing the task

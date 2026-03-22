@@ -38,12 +38,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const updates: Record<string, unknown> = {};
   if (body.currentStep) {
     updates.current_step = body.currentStep;
-    // step_changed_at removed — column not in schema
+    updates.step_changed_at = new Date().toISOString();
   }
   if (body.status) updates.status = body.status;
   if (body.assignedAgent) {
     updates.assigned_agent = body.assignedAgent;
-    // step_changed_at removed — column not in schema
+    updates.step_changed_at = new Date().toISOString();
   }
   if (body.completedAt) updates.completed_at = body.completedAt;
   if (body.zkProofId) updates.zk_proof_id = body.zkProofId;
