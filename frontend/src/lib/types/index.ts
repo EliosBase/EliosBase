@@ -32,6 +32,8 @@ export interface Task {
   submittedAt: string;
   completedAt?: string;
   zkProofId?: string;
+  submitterId?: string;
+  agentOperatorAddress?: string;
 }
 
 export interface ActivityEvent {

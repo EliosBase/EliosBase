@@ -4,12 +4,14 @@ import { useState } from 'react';
 import TaskCard from '@/components/dashboard/TaskCard';
 import TaskSubmitModal from '@/components/dashboard/TaskSubmitModal';
 import { useTasks } from '@/hooks/useTasks';
+import { useAuthContext } from '@/providers/AuthProvider';
 import { Plus } from 'lucide-react';
 
 export default function TasksPage() {
   const [showModal, setShowModal] = useState(false);
   const [tab, setTab] = useState<'active' | 'completed'>('active');
-  const { data: tasks = [], isLoading } = useTasks();
+  const { data: tasks = [], isLoading, isError, refetch } = useTasks();
+  const { session } = useAuthContext();
 
   const activeTasks = tasks.filter((t) => t.status === 'active');
   const completedTasks = tasks.filter((t) => t.status === 'completed');
@@ -19,6 +21,17 @@ export default function TasksPage() {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="w-6 h-6 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <p className="text-white/40 text-sm font-[family-name:var(--font-body)]">Failed to load tasks.</p>
+        <button onClick={() => refetch()} className="px-4 py-2 rounded-lg bg-white/10 text-white/60 text-sm hover:bg-white/15 transition-colors">
+          Retry
+        </button>
       </div>
     );
   }
@@ -62,7 +75,7 @@ export default function TasksPage() {
       {/* Task List */}
       <div className="space-y-4">
         {displayedTasks.map((task) => (
-          <TaskCard key={task.id} task={task} />
+          <TaskCard key={task.id} task={task} isSubmitter={session?.userId === task.submitterId} />
         ))}
       </div>
 

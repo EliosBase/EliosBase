@@ -8,6 +8,9 @@ export async function GET() {
     return NextResponse.json({ authenticated: false });
   }
 
+  // Sliding window: refresh cookie TTL on every authenticated read
+  await session.save();
+
   return NextResponse.json({
     authenticated: true,
     userId: session.userId,

@@ -1,9 +1,18 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 
 // GET /api/cron/advance-tasks — batch-advance all eligible active tasks
 // Can be called by Vercel cron, external scheduler, or manual trigger
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Verify cron secret in production
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const authHeader = req.headers.get('authorization');
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
   const supabase = createServiceClient();
 
   // Fetch all active tasks

@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { toTask } from '@/lib/transforms';
 import { logAudit, logActivity, checkRateLimit } from '@/lib/audit';
+import { validateOrigin } from '@/lib/csrf';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,6 +23,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const csrfError = validateOrigin(req);
+  if (csrfError) return csrfError;
+
   const { id } = await params;
   const session = await getSession();
   if (!session.userId) {

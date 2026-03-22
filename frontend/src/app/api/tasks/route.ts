@@ -3,12 +3,13 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { toTask } from '@/lib/transforms';
 import { logAudit, logActivity, checkSpendingLimit, parseRewardAmount, generateId } from '@/lib/audit';
+import { validateOrigin } from '@/lib/csrf';
 
 export async function GET(req: NextRequest) {
   const supabase = createServiceClient();
   const { searchParams } = req.nextUrl;
 
-  let query = supabase.from('tasks').select('*, agents(name)');
+  let query = supabase.from('tasks').select('*, agents(name, owner_id, users:owner_id(wallet_address))');
 
   const status = searchParams.get('status');
   if (status) query = query.eq('status', status);
@@ -23,6 +24,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateOrigin(req);
+  if (csrfError) return csrfError;
+
   const session = await getSession();
   if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

@@ -32,7 +32,7 @@ export interface DbTask {
   submitted_at: string;
   completed_at: string | null;
   zk_proof_id: string | null;
-  agents?: { name: string };
+  agents?: { name: string; owner_id?: string | null; users?: { wallet_address: string } | null };
 }
 
 export interface DbTransaction {

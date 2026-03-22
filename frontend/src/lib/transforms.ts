@@ -27,6 +27,8 @@ export function toTask(row: DbTask): Task {
     submittedAt: row.submitted_at,
     completedAt: row.completed_at ?? undefined,
     zkProofId: row.zk_proof_id ?? undefined,
+    submitterId: row.submitter_id,
+    agentOperatorAddress: row.agents?.users?.wallet_address ?? undefined,
   };
 }
 

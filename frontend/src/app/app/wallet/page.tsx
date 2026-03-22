@@ -106,9 +106,15 @@ export default function WalletPage() {
               </div>
             ) : (
               <div className="space-y-1">
-                {transactions.map((tx) => (
-                  <TransactionRow key={tx.id} tx={tx} />
-                ))}
+                {transactions.length === 0 ? (
+                  <p className="text-sm text-white/30 text-center py-6 font-[family-name:var(--font-body)]">
+                    No transactions yet.
+                  </p>
+                ) : (
+                  transactions.map((tx) => (
+                    <TransactionRow key={tx.id} tx={tx} />
+                  ))
+                )}
               </div>
             )}
           </div>

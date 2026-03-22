@@ -118,9 +118,15 @@ export default function SecurityPage() {
               </h2>
             </div>
             <div className="space-y-3">
-              {securityAlerts.map((alert) => (
-                <SecurityAlertComponent key={alert.id} alert={alert} />
-              ))}
+              {securityAlerts.length === 0 ? (
+                <p className="text-sm text-white/30 text-center py-6 font-[family-name:var(--font-body)]">
+                  No security alerts.
+                </p>
+              ) : (
+                securityAlerts.map((alert) => (
+                  <SecurityAlertComponent key={alert.id} alert={alert} />
+                ))
+              )}
             </div>
           </div>
 
@@ -138,6 +144,11 @@ export default function SecurityPage() {
                   <span>Target</span>
                   <span>Result</span>
                 </div>
+                {auditLog.length === 0 && (
+                  <div className="px-3 py-6 text-center">
+                    <p className="text-sm text-white/30 font-[family-name:var(--font-body)]">No audit entries yet.</p>
+                  </div>
+                )}
                 {auditLog.map((entry, i) => (
                   <div
                     key={i}
