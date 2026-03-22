@@ -12,6 +12,7 @@ export function toAgent(row: DbAgent): Agent {
     pricePerTask: row.price_per_task,
     status: row.status,
     type: row.type,
+    ownerId: row.owner_id ?? undefined,
   };
 }
 

@@ -17,6 +17,7 @@ export interface Agent {
   pricePerTask: string;
   status: 'online' | 'busy' | 'offline';
   type: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
+  ownerId?: string;
 }
 
 export type TaskStep = 'Submitted' | 'Decomposed' | 'Assigned' | 'Executing' | 'ZK Verifying' | 'Complete';
