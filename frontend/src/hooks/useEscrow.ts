@@ -32,7 +32,7 @@ export function useEscrowLock() {
       abi: ESCROW_ABI,
       functionName: 'lockFunds',
       args: [toBytes32(taskId), toBytes32(agentId)],
-      value: parseEther(ethAmount.toString()),
+      value: parseEther(ethAmount.toFixed(18)),
     });
   }
 
