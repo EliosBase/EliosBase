@@ -3,10 +3,14 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { toAgent } from '@/lib/transforms';
 import { logAudit, logActivity, generateId } from '@/lib/audit';
+import { validateOrigin } from '@/lib/csrf';
 
 const VALID_TYPES = ['sentinel', 'analyst', 'executor', 'auditor', 'optimizer'];
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateOrigin(req);
+  if (csrfError) return csrfError;
+
   const session = await getSession();
   if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

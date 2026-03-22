@@ -11,6 +11,12 @@ export interface DashboardStats {
   tvlTrend: string;
   zkProofs: number;
   zkProofsTrend: string;
+  sparklines?: {
+    agents: number[];
+    tasks: number[];
+    tvl: number[];
+    proofs: number[];
+  };
 }
 
 async function fetchDashboardStats(): Promise<DashboardStats> {

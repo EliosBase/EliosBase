@@ -3,10 +3,14 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { logAudit, logActivity, generateId } from '@/lib/audit';
 import { publicClient } from '@/lib/viemClient';
+import { validateOrigin } from '@/lib/csrf';
 import { ESCROW_CONTRACT_ADDRESS } from '@/lib/contracts';
 
 // POST /api/agents/[id]/hire — hire an agent with a verified on-chain escrow tx
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const csrfError = validateOrigin(req);
+  if (csrfError) return csrfError;
+
   const { id: agentId } = await params;
   const session = await getSession();
   if (!session.userId) {

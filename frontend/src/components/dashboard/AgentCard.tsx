@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { type Agent } from '@/lib/types';
 import { Bot, Star, CheckCircle, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEscrowLock } from '@/hooks/useEscrow';
 import { useAuthContext } from '@/providers/AuthProvider';
+import TaskPickerModal from './TaskPickerModal';
 
 interface AgentCardProps {
   agent: Agent;
@@ -22,6 +23,8 @@ type HireStep = 'idle' | 'signing' | 'mining' | 'confirming' | 'hired' | 'error'
 export default function AgentCard({ agent }: AgentCardProps) {
   const [step, setStep] = useState<HireStep>('idle');
   const [error, setError] = useState('');
+  const [showTaskPicker, setShowTaskPicker] = useState(false);
+  const selectedTaskId = useRef<string>('');
   const queryClient = useQueryClient();
   const { isAuthenticated } = useAuthContext();
   const { lock, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useEscrowLock();
@@ -60,11 +63,16 @@ export default function AgentCard({ agent }: AgentCardProps) {
       return;
     }
     setError('');
-    setStep('idle');
     reset();
+    setShowTaskPicker(true);
+  }
 
+  function handleTaskSelected(taskId: string) {
+    selectedTaskId.current = taskId;
+    setShowTaskPicker(false);
+    setStep('idle');
     // Phase 1: On-chain — lock funds via smart contract
-    lock('pending-task', agent.id, agent.pricePerTask);
+    lock(taskId, agent.id, agent.pricePerTask);
   }
 
   async function registerHire(hash: string) {
@@ -73,7 +81,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
       const res = await fetch(`/api/agents/${agent.id}/hire`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ txHash: hash }),
+        body: JSON.stringify({ txHash: hash, taskId: selectedTaskId.current }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: 'Failed to register hire' }));
@@ -188,6 +196,13 @@ export default function AgentCard({ agent }: AgentCardProps) {
           )}
         </button>
       </div>
+
+      {showTaskPicker && (
+        <TaskPickerModal
+          onSelect={handleTaskSelected}
+          onClose={() => setShowTaskPicker(false)}
+        />
+      )}
 
       {error && (
         <p className="text-[10px] text-red-400 mt-2">{error}</p>

@@ -3,7 +3,7 @@
 import StatCard from '@/components/dashboard/StatCard';
 import ActivityFeed from '@/components/dashboard/ActivityFeed';
 import ProofBadge from '@/components/dashboard/ProofBadge';
-import { sparklineData } from '@/lib/constants';
+import { sparklineData as defaultSparklines } from '@/lib/constants';
 import { useTasks } from '@/hooks/useTasks';
 import { useAgents } from '@/hooks/useAgents';
 import { useActivity } from '@/hooks/useActivity';
@@ -14,7 +14,7 @@ import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useBatchTaskAdvancement } from '@/hooks/useTaskAdvancement';
 import { Bot, Star } from 'lucide-react';
 
-const chartDataMap = [sparklineData.agents, sparklineData.tasks, sparklineData.tvl, sparklineData.proofs];
+// empty — computed below from stats
 
 export default function DashboardPage() {
   const { data: tasks = [] } = useTasks();
@@ -25,6 +25,14 @@ export default function DashboardPage() {
   useRealtimeTasks();
   useRealtimeAgents();
   useBatchTaskAdvancement();
+
+  const sp = stats?.sparklines;
+  const chartDataMap = [
+    sp?.agents ?? defaultSparklines.agents,
+    sp?.tasks ?? defaultSparklines.tasks,
+    sp?.tvl ?? defaultSparklines.tvl,
+    sp?.proofs ?? defaultSparklines.proofs,
+  ];
 
   const activeTasks = tasks.filter((t) => t.status === 'active');
   const topAgents = [...agents].sort((a, b) => b.reputation - a.reputation).slice(0, 5);
@@ -73,30 +81,36 @@ export default function DashboardPage() {
               Recent Tasks
             </h2>
             <div className="space-y-3">
-              {activeTasks.map((task) => {
-                const proofStatus = task.currentStep === 'ZK Verifying'
-                  ? 'verifying' as const
-                  : 'pending' as const;
-                return (
-                  <div key={task.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-white/3 transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white/80 font-[family-name:var(--font-body)] truncate">
-                        {task.title}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Bot size={11} className="text-white/30" />
-                        <span className="text-[11px] text-white/40">{task.assignedAgent}</span>
+              {activeTasks.length === 0 ? (
+                <p className="text-sm text-white/30 text-center py-6 font-[family-name:var(--font-body)]">
+                  No active tasks yet.
+                </p>
+              ) : (
+                activeTasks.map((task) => {
+                  const proofStatus = task.currentStep === 'ZK Verifying'
+                    ? 'verifying' as const
+                    : 'pending' as const;
+                  return (
+                    <div key={task.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-white/3 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white/80 font-[family-name:var(--font-body)] truncate">
+                          {task.title}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Bot size={11} className="text-white/30" />
+                          <span className="text-[11px] text-white/40">{task.assignedAgent}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                        <ProofBadge status={proofStatus} />
+                        <span className="text-xs text-white/50 font-[family-name:var(--font-mono)]">
+                          {task.reward}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0 ml-3">
-                      <ProofBadge status={proofStatus} />
-                      <span className="text-xs text-white/50 font-[family-name:var(--font-mono)]">
-                        {task.reward}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
@@ -108,6 +122,11 @@ export default function DashboardPage() {
               Top Agents
             </h2>
             <div className="space-y-2">
+              {topAgents.length === 0 && (
+                <p className="text-sm text-white/30 text-center py-6 font-[family-name:var(--font-body)]">
+                  No agents registered yet.
+                </p>
+              )}
               {topAgents.map((agent, i) => (
                 <div key={agent.id} className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-white/3 transition-colors">
                   <span className="text-xs text-white/25 w-4 text-center font-[family-name:var(--font-mono)]">

@@ -70,6 +70,46 @@ export async function GET() {
   const totalTasks = activeTasks + completedTasks;
   const taskPct = totalTasks > 0 ? ((activeTasks / totalTasks) * 100).toFixed(0) : '0';
 
+  // Compute 12-day sparkline data from DB
+  const days = 12;
+  const now = new Date();
+  const sparklines = { agents: [] as number[], tasks: [] as number[], tvl: [] as number[], proofs: [] as number[] };
+
+  // Fetch data for sparklines (created_at / submitted_at bucketed by day)
+  const startDate = new Date(now);
+  startDate.setDate(startDate.getDate() - days);
+  const startIso = startDate.toISOString();
+
+  const [agentsByDay, tasksByDay, locksByDay, releasesByDay, proofsByDay] = await Promise.all([
+    supabase.from('agents').select('created_at').gte('created_at', startIso),
+    supabase.from('tasks').select('submitted_at').gte('submitted_at', startIso),
+    supabase.from('transactions').select('amount, timestamp').eq('type', 'escrow_lock').eq('status', 'confirmed').gte('timestamp', startIso),
+    supabase.from('transactions').select('amount, timestamp').eq('type', 'escrow_release').eq('status', 'confirmed').gte('timestamp', startIso),
+    supabase.from('tasks').select('completed_at').not('zk_proof_id', 'is', null).gte('completed_at', startIso),
+  ]);
+
+  for (let d = 0; d < days; d++) {
+    const dayStart = new Date(now);
+    dayStart.setDate(dayStart.getDate() - (days - 1 - d));
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(dayStart);
+    dayEnd.setDate(dayEnd.getDate() + 1);
+
+    const inRange = (dateStr: string) => {
+      const dt = new Date(dateStr);
+      return dt >= dayStart && dt < dayEnd;
+    };
+
+    sparklines.agents.push((agentsByDay.data ?? []).filter((r) => inRange(r.created_at)).length);
+    sparklines.tasks.push((tasksByDay.data ?? []).filter((r) => inRange(r.submitted_at)).length);
+
+    const dayLocked = (locksByDay.data ?? []).filter((r) => inRange(r.timestamp)).reduce((s, r) => s + parseAmount(r.amount), 0);
+    const dayReleased = (releasesByDay.data ?? []).filter((r) => inRange(r.timestamp)).reduce((s, r) => s + parseAmount(r.amount), 0);
+    sparklines.tvl.push(parseFloat((dayLocked - dayReleased).toFixed(4)));
+
+    sparklines.proofs.push((proofsByDay.data ?? []).filter((r) => r.completed_at && inRange(r.completed_at)).length);
+  }
+
   return NextResponse.json({
     activeAgents,
     activeAgentsTrend: `${agentPct}% online`,
@@ -79,5 +119,6 @@ export async function GET() {
     tvlTrend: `${lockedTotal.toFixed(2)} locked`,
     zkProofs,
     zkProofsTrend: zkProofs > 0 ? '100% valid' : 'none yet',
+    sparklines,
   });
 }

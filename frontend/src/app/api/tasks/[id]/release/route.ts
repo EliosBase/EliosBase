@@ -1,0 +1,114 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { getSession } from '@/lib/session';
+import { logAudit, logActivity, generateId } from '@/lib/audit';
+import { publicClient } from '@/lib/viemClient';
+import { ESCROW_CONTRACT_ADDRESS } from '@/lib/contracts';
+import { validateOrigin } from '@/lib/csrf';
+
+// POST /api/tasks/[id]/release — release escrowed funds after task completion
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const csrfError = validateOrigin(req);
+  if (csrfError) return csrfError;
+
+  const { id: taskId } = await params;
+  const session = await getSession();
+  if (!session.userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await req.json();
+  const { txHash } = body;
+
+  if (!txHash || typeof txHash !== 'string' || !txHash.startsWith('0x')) {
+    return NextResponse.json({ error: 'Valid txHash is required' }, { status: 400 });
+  }
+
+  const supabase = createServiceClient();
+
+  // Fetch task with agent operator info
+  const { data: task, error: taskError } = await supabase
+    .from('tasks')
+    .select('*, agents(name, owner_id, users:owner_id(wallet_address))')
+    .eq('id', taskId)
+    .single();
+
+  if (taskError || !task) {
+    return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+  }
+
+  // Only the task submitter can release funds
+  if (task.submitter_id !== session.userId) {
+    return NextResponse.json({ error: 'Only the task submitter can release funds' }, { status: 403 });
+  }
+
+  // Task must be completed
+  if (task.status !== 'completed' || task.current_step !== 'Complete') {
+    return NextResponse.json({ error: 'Task must be completed before releasing funds' }, { status: 400 });
+  }
+
+  // Verify the release transaction on-chain
+  const actor = session.walletAddress ?? session.userId;
+  let txStatus: 'confirmed' | 'pending' = 'pending';
+  let blockNumber: bigint | null = null;
+
+  try {
+    const receipt = await publicClient.getTransactionReceipt({
+      hash: txHash as `0x${string}`,
+    });
+
+    if (receipt.to?.toLowerCase() !== ESCROW_CONTRACT_ADDRESS.toLowerCase()) {
+      return NextResponse.json({ error: 'Transaction is not to the escrow contract' }, { status: 400 });
+    }
+
+    if (session.walletAddress && receipt.from.toLowerCase() !== session.walletAddress.toLowerCase()) {
+      return NextResponse.json({ error: 'Transaction sender does not match your wallet' }, { status: 400 });
+    }
+
+    if (receipt.status === 'success') {
+      txStatus = 'confirmed';
+      blockNumber = receipt.blockNumber;
+    } else {
+      return NextResponse.json({ error: 'Transaction reverted on-chain' }, { status: 400 });
+    }
+  } catch {
+    txStatus = 'pending';
+  }
+
+  // Record escrow_release transaction
+  const txId = generateId('tx');
+  const agentOperator = task.agents?.users?.wallet_address ?? task.assigned_agent ?? '';
+
+  await supabase.from('transactions').insert({
+    id: txId,
+    type: 'escrow_release',
+    from: actor,
+    to: agentOperator,
+    amount: task.reward,
+    token: 'ETH',
+    status: txStatus,
+    tx_hash: txHash,
+    user_id: session.userId,
+    block_number: blockNumber ? Number(blockNumber) : null,
+  });
+
+  // Audit + activity logging
+  await logAudit({
+    action: 'ESCROW_RELEASE',
+    actor,
+    target: taskId,
+    result: 'ALLOW',
+  });
+  await logActivity({
+    type: 'payment',
+    message: `Escrow released for task: ${task.title}`,
+    userId: session.userId,
+  });
+
+  return NextResponse.json({
+    success: true,
+    taskId,
+    transactionId: txId,
+    txStatus,
+  });
+}

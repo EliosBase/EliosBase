@@ -3,11 +3,15 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { logAudit, logActivity } from '@/lib/audit';
 import { toGuardrail } from '@/lib/transforms';
+import { validateOrigin } from '@/lib/csrf';
 
 const VALID_STATUSES = ['active', 'paused', 'triggered'];
 
 // PATCH /api/security/guardrails/[id] — toggle guardrail status (operator/admin only)
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const csrfError = validateOrigin(req);
+  if (csrfError) return csrfError;
+
   const { id } = await params;
   const session = await getSession();
   if (!session.userId) {
