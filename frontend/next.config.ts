@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // snarkjs uses file:// URLs that Turbopack can't trace
+  serverExternalPackages: ['snarkjs'],
+  turbopack: {},
 };
 
 export default nextConfig;

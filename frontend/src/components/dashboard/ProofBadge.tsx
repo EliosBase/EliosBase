@@ -1,4 +1,4 @@
-import { ShieldCheck, Clock, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Clock, AlertTriangle, ExternalLink } from 'lucide-react';
 
 interface ProofBadgeProps {
   status: 'verified' | 'verifying' | 'pending' | 'failed';
@@ -14,14 +14,24 @@ const config = {
 
 export default function ProofBadge({ status, proofId }: ProofBadgeProps) {
   const { icon: Icon, label, className } = config[status];
+  const isOnChainTx = proofId?.startsWith('0x') && proofId.length === 66;
+  const baseScanUrl = isOnChainTx ? `https://basescan.org/tx/${proofId}` : undefined;
 
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${className}`}>
+  const badge = (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${className} ${baseScanUrl ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}>
       <Icon size={12} />
       {label}
-      {proofId && (
-        <span className="text-[10px] opacity-60 font-[family-name:var(--font-mono)]">{proofId}</span>
-      )}
+      {baseScanUrl && <ExternalLink size={10} />}
     </span>
   );
+
+  if (baseScanUrl) {
+    return (
+      <a href={baseScanUrl} target="_blank" rel="noopener noreferrer">
+        {badge}
+      </a>
+    );
+  }
+
+  return badge;
 }

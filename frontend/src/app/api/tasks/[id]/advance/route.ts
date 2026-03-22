@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { toTask } from '@/lib/transforms';
-import { logAudit, logActivity, generateId } from '@/lib/audit';
+import { logAudit, logActivity } from '@/lib/audit';
+import { generateTaskProof } from '@/lib/zkProof';
+import { submitProofOnChain } from '@/lib/proofSubmitter';
 
 // Step transition rules: [currentStep, nextStep, minSecondsElapsed]
 const STEP_TRANSITIONS: [string, string, number][] = [
@@ -59,11 +61,35 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     step_changed_at: new Date().toISOString(),
   };
 
-  // If completing the task
+  // If completing the task — generate and verify ZK proof on-chain
   if (nextStep === 'Complete') {
-    updates.status = 'completed';
-    updates.completed_at = new Date().toISOString();
-    updates.zk_proof_id = `zk-${generateId('proof')}`;
+    try {
+      // Generate real Groth16 proof
+      const resultData = JSON.stringify({
+        taskId: id,
+        agentId: task.assigned_agent,
+        title: task.title,
+        completedAt: new Date().toISOString(),
+      });
+      const proofResult = await generateTaskProof(id, task.assigned_agent ?? '', resultData);
+
+      // Submit proof to on-chain verifier
+      const verifyTxHash = await submitProofOnChain(id, proofResult);
+
+      updates.status = 'completed';
+      updates.completed_at = new Date().toISOString();
+      updates.zk_proof_id = verifyTxHash;
+      updates.zk_commitment = proofResult.commitment;
+      updates.zk_verify_tx_hash = verifyTxHash;
+    } catch (err) {
+      // If proof generation/submission fails, stay at ZK Verifying step
+      console.error('ZK proof failed:', err);
+      return NextResponse.json({
+        advanced: false,
+        reason: 'ZK proof generation or on-chain verification failed',
+        currentStep: task.current_step,
+      });
+    }
   }
 
   const { data: updated, error: updateError } = await supabase

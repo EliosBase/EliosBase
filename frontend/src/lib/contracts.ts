@@ -100,3 +100,46 @@ export const ESCROW_ABI = [
 ] as const;
 
 export const ESCROW_CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_ESCROW_ADDRESS ?? '0x') as `0x${string}`;
+
+// ─── ZK Proof Verifier Contract ────────────────────────────────────
+
+export const VERIFIER_CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_VERIFIER_ADDRESS ?? '0x') as `0x${string}`;
+
+export const VERIFIER_ABI = [
+  {
+    type: 'function',
+    name: 'verifyTaskProof',
+    inputs: [
+      { name: 'taskId', type: 'bytes32' },
+      { name: '_pA', type: 'uint256[2]' },
+      { name: '_pB', type: 'uint256[2][2]' },
+      { name: '_pC', type: 'uint256[2]' },
+      { name: '_pubSignals', type: 'uint256[1]' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'isVerified',
+    inputs: [{ name: 'taskId', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'taskCommitment',
+    inputs: [{ name: 'taskId', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    name: 'ProofVerified',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', indexed: true },
+      { name: 'commitment', type: 'uint256', indexed: false },
+      { name: 'submitter', type: 'address', indexed: false },
+    ],
+  },
+] as const;
