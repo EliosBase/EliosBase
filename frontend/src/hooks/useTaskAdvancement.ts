@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTasks } from './useTasks';
 
 /**
  * Polls the task advance endpoint every `intervalMs` for a specific task.
@@ -42,25 +43,33 @@ export function useTaskAdvancement(taskId: string | null, enabled = true, interv
  */
 export function useBatchTaskAdvancement(enabled = true, intervalMs = 15000) {
   const queryClient = useQueryClient();
+  const { data: tasks = [] } = useTasks();
 
   useEffect(() => {
     if (!enabled) return;
 
+    const activeTasks = tasks.filter((t) => t.status === 'active' && t.currentStep !== 'Complete');
+    if (activeTasks.length === 0) return;
+
     const interval = setInterval(async () => {
-      try {
-        const res = await fetch('/api/cron/advance-tasks');
-        const data = await res.json();
-        if (data.advanced > 0) {
-          queryClient.invalidateQueries({ queryKey: ['tasks'] });
-          queryClient.invalidateQueries({ queryKey: ['activity'] });
-          queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-          queryClient.invalidateQueries({ queryKey: ['agents'] });
+      let anyAdvanced = false;
+      for (const task of activeTasks) {
+        try {
+          const res = await fetch(`/api/tasks/${task.id}/advance`, { method: 'POST' });
+          const data = await res.json();
+          if (data.advanced) anyAdvanced = true;
+        } catch {
+          // Skip failed tasks
         }
-      } catch {
-        // Silently retry
+      }
+      if (anyAdvanced) {
+        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        queryClient.invalidateQueries({ queryKey: ['activity'] });
+        queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+        queryClient.invalidateQueries({ queryKey: ['agents'] });
       }
     }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [enabled, intervalMs, queryClient]);
+  }, [enabled, intervalMs, queryClient, tasks]);
 }
