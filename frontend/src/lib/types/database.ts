@@ -32,6 +32,8 @@ export interface DbTask {
   submitted_at: string;
   completed_at: string | null;
   zk_proof_id: string | null;
+  zk_commitment: string | null;
+  zk_verify_tx_hash: string | null;
   agents?: { name: string; owner_id?: string | null; users?: { wallet_address: string } | null };
 }
 

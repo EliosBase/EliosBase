@@ -33,6 +33,8 @@ export interface Task {
   submittedAt: string;
   completedAt?: string;
   zkProofId?: string;
+  zkCommitment?: string;
+  zkVerifyTxHash?: string;
   submitterId?: string;
   agentOperatorAddress?: string;
 }

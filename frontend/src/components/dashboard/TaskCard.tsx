@@ -6,6 +6,7 @@ import { type Task } from '@/lib/types';
 import { TASK_STEPS } from '@/lib/constants';
 import { Bot, CheckCircle, Loader2 } from 'lucide-react';
 import { useEscrowRelease } from '@/hooks/useEscrow';
+import { useProofVerification } from '@/hooks/useProofVerification';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface TaskCardProps {
@@ -21,8 +22,9 @@ export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
   const { release, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useEscrowRelease();
   const [releaseStep, setReleaseStep] = useState<ReleaseStep>('idle');
   const [releaseError, setReleaseError] = useState('');
+  const { isVerified: onChainVerified } = useProofVerification(task.id);
 
-  const canRelease = isSubmitter && task.currentStep === 'Complete' && task.agentOperatorAddress;
+  const canRelease = isSubmitter && task.currentStep === 'Complete' && task.agentOperatorAddress && onChainVerified;
 
   // Track release contract state
   useEffect(() => {
@@ -98,11 +100,13 @@ export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
     }
   }
 
-  const proofStatus = task.status === 'completed'
+  const proofStatus = onChainVerified
     ? 'verified' as const
     : task.currentStep === 'ZK Verifying'
       ? 'verifying' as const
-      : 'pending' as const;
+      : task.status === 'completed'
+        ? 'verifying' as const
+        : 'pending' as const;
 
   const releaseLabel = {
     idle: 'Release Funds',

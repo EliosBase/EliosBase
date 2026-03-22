@@ -3,8 +3,9 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { logAudit, logActivity, generateId } from '@/lib/audit';
 import { publicClient } from '@/lib/viemClient';
-import { ESCROW_CONTRACT_ADDRESS } from '@/lib/contracts';
+import { ESCROW_CONTRACT_ADDRESS, VERIFIER_ABI, VERIFIER_CONTRACT_ADDRESS } from '@/lib/contracts';
 import { validateOrigin } from '@/lib/csrf';
+import { stringToHex } from 'viem';
 
 // POST /api/tasks/[id]/release — release escrowed funds after task completion
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -45,6 +46,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Task must be completed
   if (task.status !== 'completed' || task.current_step !== 'Complete') {
     return NextResponse.json({ error: 'Task must be completed before releasing funds' }, { status: 400 });
+  }
+
+  // Check ZK proof is verified on-chain
+  try {
+    const taskIdBytes32 = stringToHex(taskId, { size: 32 });
+    const isVerified = await publicClient.readContract({
+      address: VERIFIER_CONTRACT_ADDRESS,
+      abi: VERIFIER_ABI,
+      functionName: 'isVerified',
+      args: [taskIdBytes32],
+    });
+    if (!isVerified) {
+      return NextResponse.json({ error: 'ZK proof has not been verified on-chain' }, { status: 400 });
+    }
+  } catch {
+    return NextResponse.json({ error: 'Failed to check ZK proof verification status' }, { status: 500 });
   }
 
   // Verify the release transaction on-chain
