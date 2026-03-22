@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       capabilities: (body.capabilities || []).map((c: string) => String(c).trim().slice(0, 50)),
       price_per_task: body.pricePerTask || '0.01 ETH',
       type: body.type || 'executor',
-      status: 'offline',
+      status: 'online',
       owner_id: session.userId,
     })
     .select()
