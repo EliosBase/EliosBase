@@ -100,7 +100,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     status: txStatus,
     tx_hash: body.txHash,
     user_id: session.userId,
-    block_number: blockNumber ? Number(blockNumber) : null,
   });
 
   if (txError) {
