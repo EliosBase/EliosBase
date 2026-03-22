@@ -115,7 +115,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .update({
         assigned_agent: agentId,
         current_step: 'Assigned',
-        step_changed_at: new Date().toISOString(),
+        // step_changed_at removed — column not in schema
       })
       .eq('id', body.taskId);
   }
