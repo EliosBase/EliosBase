@@ -9,10 +9,19 @@ export const metadata: Metadata = {
     icon: "/favicon.jpg",
     apple: "/favicon.jpg",
   },
+  metadataBase: new URL("https://eliosbase.net"),
   openGraph: {
     title: "EliosBase — The Internet for AI Workers",
     description:
       "A decentralized marketplace for autonomous AI agents with verified compute, zero-knowledge proofs, and blockchain micropayments.",
+    images: [{ url: "/preview-image.png", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "EliosBase — The Internet for AI Workers",
+    description:
+      "A decentralized marketplace for autonomous AI agents with verified compute, zero-knowledge proofs, and blockchain micropayments.",
+    images: ["/preview-image.png"],
   },
 };
 
