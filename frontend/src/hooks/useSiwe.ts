@@ -75,6 +75,21 @@ export function useSiwe() {
     await refreshSession();
   }, [disconnect, refreshSession]);
 
+  // Auto-logout when wallet address changes (user switched accounts)
+  const { session } = useAuthContext();
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      address &&
+      session?.walletAddress &&
+      address.toLowerCase() !== session.walletAddress.toLowerCase()
+    ) {
+      // Wallet changed — invalidate old session
+      hasAutoTriggered.current = false;
+      fetch('/api/auth/logout', { method: 'POST' }).then(() => refreshSession());
+    }
+  }, [address, isAuthenticated, session?.walletAddress, refreshSession]);
+
   // Auto-trigger SIWE after fresh wallet connect
   useEffect(() => {
     if (
