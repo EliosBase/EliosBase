@@ -4,19 +4,32 @@ import { Github, Twitter } from "lucide-react";
 const footerLinks = [
   {
     title: "Platform",
-    links: ["Overview", "Technology", "Security", "Roadmap"],
+    links: [
+      { label: "Overview", href: "#platform" },
+      { label: "Technology", href: "#technology" },
+      { label: "Security", href: "#security" },
+      { label: "Agents", href: "#agents" },
+    ],
   },
   {
     title: "Developers",
-    links: ["Documentation", "API Reference", "SDK", "GitHub"],
+    links: [
+      { label: "How It Works", href: "#how-it-works" },
+      { label: "GitHub", href: "#" },
+    ],
   },
   {
     title: "Community",
-    links: ["Discord", "Twitter", "Blog", "Newsletter"],
+    links: [
+      { label: "Twitter", href: "https://x.com/EliosBase", external: true },
+    ],
   },
   {
-    title: "Company",
-    links: ["About", "Careers", "Press", "Contact"],
+    title: "Product",
+    links: [
+      { label: "Launch App", href: "/app" },
+      { label: "Marketplace", href: "/app/marketplace" },
+    ],
   },
 ];
 
@@ -44,7 +57,7 @@ export default function Footer() {
             </p>
             <div className="flex gap-3">
               <a
-                href="https://x.com/eliosbase"
+                href="https://x.com/EliosBase"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors duration-200 text-white/50 hover:text-white cursor-pointer"
@@ -69,12 +82,13 @@ export default function Footer() {
               </h4>
               <ul className="space-y-2.5">
                 {group.links.map((link) => (
-                  <li key={link}>
+                  <li key={link.label}>
                     <a
-                      href="#"
+                      href={link.href}
+                      {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                       className="text-sm text-white/40 hover:text-white transition-colors duration-200 cursor-pointer"
                     >
-                      {link}
+                      {link.label}
                     </a>
                   </li>
                 ))}
