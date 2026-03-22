@@ -43,9 +43,19 @@ export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
   useEffect(() => {
     if (contractError && releaseStep !== 'idle' && releaseStep !== 'released') {
       setReleaseStep('error');
-      const msg = contractError.message?.includes('User rejected')
-        ? 'Transaction rejected'
-        : contractError.message?.slice(0, 100) || 'Release failed';
+      const raw = contractError.message ?? '';
+      let msg = 'Something went wrong. Please try again.';
+      if (raw.includes('User rejected') || raw.includes('user rejected')) {
+        msg = 'You cancelled the transaction.';
+      } else if (raw.includes('reverted') || raw.includes('InvalidState')) {
+        msg = 'Funds have already been released or refunded for this task.';
+      } else if (raw.includes('NotAuthorized')) {
+        msg = 'Only the task submitter can release funds.';
+      } else if (raw.includes('insufficient funds') || raw.includes('exceeds balance')) {
+        msg = 'Insufficient funds for gas fees.';
+      } else if (raw.includes('chain') || raw.includes('network')) {
+        msg = 'Please switch to Base network and try again.';
+      }
       setReleaseError(msg);
     }
   }, [contractError, releaseStep]);
@@ -66,8 +76,13 @@ export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
         body: JSON.stringify({ txHash: hash }),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: 'Failed to register release' }));
-        setReleaseError(data.error || 'Failed to register release');
+        const data = await res.json().catch(() => ({ error: '' }));
+        const apiErr = data.error || '';
+        let msg = 'Failed to complete release. Please try again.';
+        if (apiErr.includes('submitter')) msg = 'Only the task creator can release funds.';
+        else if (apiErr.includes('completed')) msg = 'Task must be completed before releasing funds.';
+        else if (apiErr.includes('not to the escrow')) msg = 'Transaction verification failed. Please try again.';
+        setReleaseError(msg);
         setReleaseStep('error');
         return;
       }
@@ -78,7 +93,7 @@ export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
       queryClient.invalidateQueries({ queryKey: ['wallet-stats'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
     } catch {
-      setReleaseError('Network error');
+      setReleaseError('Network error. Check your connection and try again.');
       setReleaseStep('error');
     }
   }

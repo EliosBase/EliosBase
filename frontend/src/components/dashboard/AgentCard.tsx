@@ -48,9 +48,19 @@ export default function AgentCard({ agent }: AgentCardProps) {
   useEffect(() => {
     if (contractError && step !== 'idle' && step !== 'hired') {
       setStep('error');
-      const msg = contractError.message?.includes('User rejected')
-        ? 'Transaction rejected'
-        : contractError.message?.slice(0, 100) || 'Transaction failed';
+      const raw = contractError.message ?? '';
+      let msg = 'Something went wrong. Please try again.';
+      if (raw.includes('User rejected') || raw.includes('user rejected')) {
+        msg = 'You cancelled the transaction.';
+      } else if (raw.includes('reverted') || raw.includes('InvalidState')) {
+        msg = 'This task already has funds locked. Please create a new task and try again.';
+      } else if (raw.includes('InvalidAmount')) {
+        msg = 'Invalid amount. The agent price may be incorrect.';
+      } else if (raw.includes('insufficient funds') || raw.includes('exceeds balance')) {
+        msg = 'Insufficient funds in your wallet.';
+      } else if (raw.includes('chain') || raw.includes('network')) {
+        msg = 'Please switch to Base network and try again.';
+      }
       setError(msg);
     }
   }, [contractError, step]);
@@ -84,8 +94,16 @@ export default function AgentCard({ agent }: AgentCardProps) {
         body: JSON.stringify({ txHash: hash, taskId: selectedTaskId.current }),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: 'Failed to register hire' }));
-        setError(data.error || 'Failed to register hire');
+        const data = await res.json().catch(() => ({ error: '' }));
+        const apiErr = data.error || '';
+        let msg = 'Failed to complete hire. Please try again.';
+        if (apiErr.includes('no longer available')) msg = 'This agent was just hired by someone else.';
+        else if (apiErr.includes('already busy')) msg = 'This agent is currently busy with another task.';
+        else if (apiErr.includes('offline')) msg = 'This agent is currently offline.';
+        else if (apiErr.includes('not to the escrow')) msg = 'Transaction verification failed. Please try again.';
+        else if (apiErr.includes('does not match')) msg = 'Wallet mismatch. Please reconnect and try again.';
+        else if (apiErr.includes('record transaction')) msg = 'Hire recorded on-chain but failed to save. Contact support.';
+        setError(msg);
         setStep('error');
         return;
       }
@@ -98,7 +116,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
       queryClient.invalidateQueries({ queryKey: ['security-stats'] });
     } catch {
-      setError('Network error');
+      setError('Network error. Check your connection and try again.');
       setStep('error');
     }
   }
