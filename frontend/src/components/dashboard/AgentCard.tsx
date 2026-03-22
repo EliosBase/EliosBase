@@ -26,7 +26,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
   const [showTaskPicker, setShowTaskPicker] = useState(false);
   const selectedTaskId = useRef<string>('');
   const queryClient = useQueryClient();
-  const { isAuthenticated } = useAuthContext();
+  const { isAuthenticated, session } = useAuthContext();
   const { lock, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useEscrowLock();
 
   // Track contract interaction state
@@ -118,6 +118,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
     error: 'Retry',
   }[step];
 
+  const isOwner = session?.userId === agent.ownerId;
   const isDisabled = ['signing', 'mining', 'confirming'].includes(step) || agent.status === 'offline';
 
   return (
@@ -134,6 +135,11 @@ export default function AgentCard({ agent }: AgentCardProps) {
             <div className="flex items-center gap-2 mt-0.5">
               <span className={`w-1.5 h-1.5 rounded-full ${statusColors[agent.status]}`} />
               <span className="text-[11px] text-white/40 capitalize">{agent.status}</span>
+              {isOwner && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/8 text-white/50 border border-white/10">
+                  Your Agent
+                </span>
+              )}
             </div>
           </div>
         </div>
