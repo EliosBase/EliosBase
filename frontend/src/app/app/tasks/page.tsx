@@ -4,6 +4,7 @@ import { useState } from 'react';
 import TaskCard from '@/components/dashboard/TaskCard';
 import TaskSubmitModal from '@/components/dashboard/TaskSubmitModal';
 import { useTasks } from '@/hooks/useTasks';
+import { useBatchTaskAdvancement } from '@/hooks/useTaskAdvancement';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { Plus } from 'lucide-react';
 
@@ -12,6 +13,7 @@ export default function TasksPage() {
   const [tab, setTab] = useState<'active' | 'completed'>('active');
   const { data: tasks = [], isLoading, isError, refetch } = useTasks();
   const { session } = useAuthContext();
+  useBatchTaskAdvancement();
 
   const activeTasks = tasks.filter((t) => t.status === 'active');
   const completedTasks = tasks.filter((t) => t.status === 'completed');
