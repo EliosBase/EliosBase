@@ -15,7 +15,7 @@ export default function TaskPickerModal({ onSelect, onClose }: TaskPickerModalPr
   const { data: tasks = [], isLoading } = useTasks();
 
   const eligibleTasks = useMemo(
-    () => tasks.filter((t) => t.status === 'active' && ASSIGNABLE_STEPS.includes(t.currentStep)),
+    () => tasks.filter((t) => t.status === 'active' && ASSIGNABLE_STEPS.includes(t.currentStep) && !t.assignedAgent),
     [tasks]
   );
 
