@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import ProofBadge from './ProofBadge';
+import TaskResultModal from './TaskResultModal';
 import { type Task } from '@/lib/types';
 import { TASK_STEPS } from '@/lib/constants';
 import { Bot, CheckCircle, Loader2 } from 'lucide-react';
@@ -12,19 +13,22 @@ import { useQueryClient } from '@tanstack/react-query';
 interface TaskCardProps {
   task: Task;
   isSubmitter?: boolean;
+  canViewResult?: boolean;
 }
 
 type ReleaseStep = 'idle' | 'signing' | 'mining' | 'confirming' | 'released' | 'error';
 
-export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
+export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardProps) {
   const currentStepIndex = TASK_STEPS.indexOf(task.currentStep);
   const queryClient = useQueryClient();
   const { release, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useEscrowRelease();
   const [releaseStep, setReleaseStep] = useState<ReleaseStep>('idle');
   const [releaseError, setReleaseError] = useState('');
+  const [showResult, setShowResult] = useState(false);
   const { isVerified: onChainVerified } = useProofVerification(task.id);
 
   const canRelease = isSubmitter && task.currentStep === 'Complete' && task.agentOperatorAddress && onChainVerified;
+  const canOpenResult = !!canViewResult && !!task.hasExecutionResult && task.status === 'completed';
 
   // Track release contract state
   useEffect(() => {
@@ -173,6 +177,14 @@ export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          {canOpenResult && (
+            <button
+              onClick={() => setShowResult(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 text-white hover:bg-white/15 transition-colors"
+            >
+              View Result
+            </button>
+          )}
           {canRelease && (
             <button
               onClick={releaseStep === 'error' ? handleRelease : handleRelease}
@@ -202,6 +214,14 @@ export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
 
       {releaseError && (
         <p className="text-[10px] text-red-400 mt-2">{releaseError}</p>
+      )}
+
+      {showResult && (
+        <TaskResultModal
+          taskId={task.id}
+          taskTitle={task.title}
+          onClose={() => setShowResult(false)}
+        />
       )}
     </div>
   );

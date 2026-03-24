@@ -1,5 +1,11 @@
 // ─── Frontend Interfaces ─────────────────────────────────────────
 
+export type {
+  AgentExecutionSeverity,
+  AgentExecutionFinding,
+  AgentExecutionResult,
+} from './agentExecution';
+
 export interface StatItem {
   label: string;
   value: string;
@@ -35,6 +41,7 @@ export interface Task {
   zkProofId?: string;
   zkCommitment?: string;
   zkVerifyTxHash?: string;
+  hasExecutionResult?: boolean;
   submitterId?: string;
   agentOperatorAddress?: string;
 }

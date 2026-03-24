@@ -3,6 +3,24 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTasks } from './useTasks';
+import { useAuthContext } from '@/providers/AuthProvider';
+
+const inFlightAdvances = new Set<string>();
+
+async function advanceTask(taskId: string) {
+  if (inFlightAdvances.has(taskId)) {
+    return null;
+  }
+
+  inFlightAdvances.add(taskId);
+
+  try {
+    const res = await fetch(`/api/tasks/${taskId}/advance`, { method: 'POST' });
+    return await res.json();
+  } finally {
+    inFlightAdvances.delete(taskId);
+  }
+}
 
 /**
  * Polls the task advance endpoint every `intervalMs` for a specific task.
@@ -16,8 +34,9 @@ export function useTaskAdvancement(taskId: string | null, enabled = true, interv
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/tasks/${taskId}/advance`, { method: 'POST' });
-        const data = await res.json();
+        const data = await advanceTask(taskId);
+        if (!data) return;
+
         if (data.advanced) {
           queryClient.invalidateQueries({ queryKey: ['tasks'] });
           queryClient.invalidateQueries({ queryKey: ['activity'] });
@@ -44,19 +63,26 @@ export function useTaskAdvancement(taskId: string | null, enabled = true, interv
 export function useBatchTaskAdvancement(enabled = true, intervalMs = 15000) {
   const queryClient = useQueryClient();
   const { data: tasks = [] } = useTasks();
+  const { session } = useAuthContext();
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !session?.userId) return;
 
-    const activeTasks = tasks.filter((t) => t.status === 'active' && t.currentStep !== 'Complete');
+    const canManageAll = session.role === 'admin';
+    const activeTasks = tasks.filter(
+      (t) =>
+        t.status === 'active'
+        && t.currentStep !== 'Complete'
+        && (canManageAll || t.submitterId === session.userId),
+    );
     if (activeTasks.length === 0) return;
 
     const interval = setInterval(async () => {
       let anyAdvanced = false;
       for (const task of activeTasks) {
         try {
-          const res = await fetch(`/api/tasks/${task.id}/advance`, { method: 'POST' });
-          const data = await res.json();
+          const data = await advanceTask(task.id);
+          if (!data) continue;
           if (data.advanced) anyAdvanced = true;
         } catch {
           // Skip failed tasks
@@ -71,5 +97,5 @@ export function useBatchTaskAdvancement(enabled = true, intervalMs = 15000) {
     }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [enabled, intervalMs, queryClient, tasks]);
+  }, [enabled, intervalMs, queryClient, session, tasks]);
 }

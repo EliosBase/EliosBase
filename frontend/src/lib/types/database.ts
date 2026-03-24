@@ -1,3 +1,5 @@
+import type { AgentExecutionResult } from './agentExecution';
+
 export interface DbUser {
   id: string;
   wallet_address: string;
@@ -31,10 +33,19 @@ export interface DbTask {
   submitter_id: string;
   submitted_at: string;
   completed_at: string | null;
+  execution_result: AgentExecutionResult | null;
   zk_proof_id: string | null;
   zk_commitment: string | null;
   zk_verify_tx_hash: string | null;
-  agents?: { name: string; owner_id?: string | null; users?: { wallet_address: string } | null };
+  step_changed_at?: string | null;
+  agents?: {
+    name: string;
+    type?: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
+    description?: string;
+    capabilities?: string[];
+    owner_id?: string | null;
+    users?: { wallet_address: string } | null;
+  };
 }
 
 export interface DbTransaction {
