@@ -53,6 +53,8 @@ export interface Task {
   zkCommitment?: string;
   zkVerifyTxHash?: string;
   hasExecutionResult?: boolean;
+  executionFailureMessage?: string;
+  executionFailureRetryable?: boolean;
   submitterId?: string;
   agentOperatorAddress?: string;
 }

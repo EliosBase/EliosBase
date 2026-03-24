@@ -17,6 +17,7 @@ const STEP_TRANSITIONS: [string, string, number][] = [
   ['Executing', 'ZK Verifying', 60],
   ['ZK Verifying', 'Complete', 20],
 ];
+const RETRYABLE_EXECUTION_COOLDOWN_SECONDS = 60;
 
 function isCronAuthorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
@@ -106,6 +107,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         currentStep: task.current_step,
         retryable: false,
       });
+    }
+
+    if (existingFailure?.retryable) {
+      const failedAt = new Date(existingFailure.failedAt).getTime();
+      const retryElapsedSeconds = Math.floor((Date.now() - failedAt) / 1000);
+
+      if (retryElapsedSeconds < RETRYABLE_EXECUTION_COOLDOWN_SECONDS) {
+        return NextResponse.json({
+          advanced: false,
+          reason: `Retry cooldown active for ${RETRYABLE_EXECUTION_COOLDOWN_SECONDS - retryElapsedSeconds}s`,
+          currentStep: task.current_step,
+          retryable: true,
+        });
+      }
     }
 
     const claimedAt = new Date().toISOString();
