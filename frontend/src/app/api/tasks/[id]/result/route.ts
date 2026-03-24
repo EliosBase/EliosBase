@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { logAudit } from '@/lib/audit';
+import { getExecutionResult } from '@/lib/types';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -27,7 +28,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  if (!task.execution_result) {
+  const executionResult = getExecutionResult(task.execution_result);
+
+  if (!executionResult) {
     return NextResponse.json({ error: 'Task result not available' }, { status: 404 });
   }
 
@@ -38,7 +41,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     result: 'ALLOW',
   });
 
-  return NextResponse.json(task.execution_result, {
+  return NextResponse.json(executionResult, {
     headers: { 'Cache-Control': 'no-store' },
   });
 }

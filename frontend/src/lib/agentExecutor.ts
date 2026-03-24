@@ -1,7 +1,18 @@
 import 'server-only';
 
-import Anthropic from '@anthropic-ai/sdk';
-import type { Agent, AgentExecutionFinding, AgentExecutionResult } from '@/lib/types';
+import Anthropic, {
+  APIConnectionError,
+  APIConnectionTimeoutError,
+  APIUserAbortError,
+  AuthenticationError,
+  BadRequestError,
+  InternalServerError,
+  PermissionDeniedError,
+  RateLimitError,
+  UnprocessableEntityError,
+} from '@anthropic-ai/sdk';
+import { getExecutionResult } from '@/lib/types';
+import type { Agent, AgentExecutionFinding, AgentExecutionResult, TaskExecutionState } from '@/lib/types';
 
 export const DEFAULT_AGENT_EXECUTION_MODEL = 'claude-sonnet-4-20250514';
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -27,6 +38,24 @@ interface AgentRuntime {
   type: Agent['type'];
   description: string;
   capabilities: string[];
+}
+
+interface AgentExecutionErrorOptions {
+  code: string;
+  retryable: boolean;
+  cause?: unknown;
+}
+
+export class AgentExecutionError extends Error {
+  readonly code: string;
+  readonly retryable: boolean;
+
+  constructor(message: string, { code, retryable, cause }: AgentExecutionErrorOptions) {
+    super(message, cause ? { cause } : undefined);
+    this.name = 'AgentExecutionError';
+    this.code = code;
+    this.retryable = retryable;
+  }
 }
 
 function getTimeoutMs() {
@@ -63,10 +92,23 @@ function normalizeResult(
   executionTimeMs: number,
   tokensUsed: number,
 ): AgentExecutionResult {
-  const parsed = JSON.parse(stripFence(raw)) as Partial<AgentExecutionResult>;
+  let parsed: Partial<AgentExecutionResult>;
+
+  try {
+    parsed = JSON.parse(stripFence(raw)) as Partial<AgentExecutionResult>;
+  } catch (error) {
+    throw new AgentExecutionError('Agent output was not valid JSON', {
+      code: 'invalid_output_json',
+      retryable: false,
+      cause: error,
+    });
+  }
 
   if (!parsed.summary || typeof parsed.summary !== 'string') {
-    throw new Error('Agent output is missing a summary');
+    throw new AgentExecutionError('Agent output is missing a summary', {
+      code: 'invalid_output_schema',
+      retryable: false,
+    });
   }
 
   const findings = Array.isArray(parsed.findings)
@@ -118,49 +160,123 @@ function buildPrompt(task: TaskRuntime, agent: AgentRuntime) {
   ].join('\n');
 }
 
-export function serializeExecutionResult(result: AgentExecutionResult) {
-  return JSON.stringify(result);
+function classifyExecutionError(error: unknown): AgentExecutionError {
+  if (error instanceof AgentExecutionError) {
+    return error;
+  }
+
+  if (error instanceof APIUserAbortError || error instanceof APIConnectionTimeoutError) {
+    return new AgentExecutionError('Agent execution timed out', {
+      code: 'anthropic_timeout',
+      retryable: true,
+      cause: error,
+    });
+  }
+
+  if (error instanceof APIConnectionError || error instanceof RateLimitError || error instanceof InternalServerError) {
+    return new AgentExecutionError('Anthropic request failed temporarily', {
+      code: 'anthropic_unavailable',
+      retryable: true,
+      cause: error,
+    });
+  }
+
+  if (error instanceof AuthenticationError || error instanceof PermissionDeniedError) {
+    return new AgentExecutionError('Anthropic credentials are invalid', {
+      code: 'anthropic_auth',
+      retryable: false,
+      cause: error,
+    });
+  }
+
+  if (error instanceof BadRequestError || error instanceof UnprocessableEntityError) {
+    return new AgentExecutionError('Anthropic rejected the execution request', {
+      code: 'anthropic_invalid_request',
+      retryable: false,
+      cause: error,
+    });
+  }
+
+  return new AgentExecutionError(
+    error instanceof Error ? error.message : 'Agent execution failed',
+    { code: 'agent_execution_failed', retryable: false, cause: error },
+  );
+}
+
+export function serializeExecutionResult(result: TaskExecutionState | AgentExecutionResult) {
+  const normalized = getExecutionResult(result);
+  if (!normalized) {
+    throw new AgentExecutionError('Task execution result is not available', {
+      code: 'missing_execution_result',
+      retryable: false,
+    });
+  }
+
+  return JSON.stringify(normalized);
 }
 
 export async function executeAgentTask(task: TaskRuntime, agent: AgentRuntime): Promise<AgentExecutionResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    throw new Error('ANTHROPIC_API_KEY not configured');
+    throw new AgentExecutionError('ANTHROPIC_API_KEY not configured', {
+      code: 'anthropic_not_configured',
+      retryable: false,
+    });
   }
 
   const systemPrompt = SYSTEM_PROMPTS[agent.type];
   if (!systemPrompt) {
-    throw new Error(`Unsupported agent type: ${agent.type}`);
+    throw new AgentExecutionError(`Unsupported agent type: ${agent.type}`, {
+      code: 'unsupported_agent_type',
+      retryable: false,
+    });
   }
 
   const client = new Anthropic({ apiKey });
   const startedAt = Date.now();
+  const timeoutMs = getTimeoutMs();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  const response = await Promise.race([
-    client.messages.create({
-      model: DEFAULT_AGENT_EXECUTION_MODEL,
-      max_tokens: 1400,
-      temperature: 0.2,
-      system: `${systemPrompt}\nOutput must be strict JSON and contain no prose outside the JSON object.`,
-      messages: [
-        {
-          role: 'user',
-          content: buildPrompt(task, agent),
-        },
-      ],
-    }),
-    new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error(`Agent execution timed out after ${getTimeoutMs()}ms`)), getTimeoutMs());
-    }),
-  ]);
+  try {
+    const response = await client.messages.create(
+      {
+        model: DEFAULT_AGENT_EXECUTION_MODEL,
+        max_tokens: 1400,
+        temperature: 0.2,
+        system: `${systemPrompt}\nOutput must be strict JSON and contain no prose outside the JSON object.`,
+        messages: [
+          {
+            role: 'user',
+            content: buildPrompt(task, agent),
+          },
+        ],
+      },
+      {
+        maxRetries: 0,
+        signal: controller.signal,
+        timeout: timeoutMs,
+      },
+    );
 
-  const text = response.content
-    .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-    .map((block) => block.text)
-    .join('\n')
-    .trim();
+    const text = response.content
+      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
+      .map((block) => block.text)
+      .join('\n')
+      .trim();
 
-  const tokensUsed = (response.usage.input_tokens ?? 0) + (response.usage.output_tokens ?? 0);
+    if (!text) {
+      throw new AgentExecutionError('Agent returned an empty response', {
+        code: 'empty_output',
+        retryable: false,
+      });
+    }
 
-  return normalizeResult(text, agent, Date.now() - startedAt, tokensUsed);
+    const tokensUsed = (response.usage.input_tokens ?? 0) + (response.usage.output_tokens ?? 0);
+    return normalizeResult(text, agent, Date.now() - startedAt, tokensUsed);
+  } catch (error) {
+    throw classifyExecutionError(error);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
