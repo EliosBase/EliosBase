@@ -14,6 +14,7 @@ This branch is materially safer after the audit. The task execution path now rec
 - Switched the Anthropic request path to an abortable timeout instead of leaving the upstream call running after the request deadline.
 - Added a retry cooldown for retryable execution failures so upstream outages do not trigger a new model call every 15 seconds.
 - Blocked repeated proof submission when a task already has `zk_verify_tx_hash`.
+- Added route-level automated coverage for execution failure handling, execution persistence, proof submission, and proof idempotency.
 - Added contract tests plus a GitHub Actions workflow that runs `forge test`, `npm run lint`, and `npm run build`.
 
 ## Remaining Risks
@@ -29,6 +30,7 @@ Retryable execution failures now cool down, but they still retry on a fixed inte
 ## Validation
 
 - `forge test`
+- `cd frontend && npm test`
 - `cd frontend && npm run lint`
 - `cd frontend && npm run build`
 
