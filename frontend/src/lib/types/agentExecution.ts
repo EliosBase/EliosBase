@@ -29,16 +29,22 @@ export interface RunningTaskExecution {
   capabilities: string[];
 }
 
+export interface TaskExecutionFailure {
+  code: string;
+  message: string;
+  retryable: boolean;
+  failedAt: string;
+  model: string;
+  agentType: string;
+  attempts?: number;
+  maxRetries?: number;
+  nextRetryAt?: string | null;
+  terminal?: boolean;
+}
+
 export interface FailedTaskExecution {
   status: 'failed';
-  failure: {
-    code: string;
-    message: string;
-    retryable: boolean;
-    failedAt: string;
-    model: string;
-    agentType: string;
-  };
+  failure: TaskExecutionFailure;
 }
 
 export interface SucceededTaskExecution {
@@ -87,7 +93,7 @@ export function getExecutionFailure(value: unknown): FailedTaskExecution['failur
     && typeof value.failure.code === 'string'
     && typeof value.failure.retryable === 'boolean'
   ) {
-    return value.failure as FailedTaskExecution['failure'];
+    return value.failure as unknown as FailedTaskExecution['failure'];
   }
 
   return null;

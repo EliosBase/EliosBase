@@ -1,7 +1,10 @@
 import { NextRequest } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AgentExecutionError } from '@/lib/agentExecutor';
+import { AgentExecutionError } from '@/lib/agentExecutor';
 
 const mocks = vi.hoisted(() => ({
+  createSecurityAlert: vi.fn(),
   createServiceClient: vi.fn(),
   executeAgentTask: vi.fn(),
   generateTaskProof: vi.fn(),
@@ -26,6 +29,7 @@ vi.mock('@/lib/session', () => ({
 }));
 
 vi.mock('@/lib/audit', () => ({
+  createSecurityAlert: mocks.createSecurityAlert,
   logAudit: mocks.logAudit,
   logActivity: mocks.logActivity,
 }));
@@ -171,10 +175,22 @@ describe('POST /api/tasks/[id]/advance', () => {
         },
       },
     });
+    let terminalPayload: Record<string, unknown> | undefined;
+    let agentPayload: Record<string, unknown> | undefined;
 
     mocks.createServiceClient.mockReturnValue(
       makeSupabaseClient({
-        tasks: [makeSupabaseBuilder({ data: task, error: null })],
+        tasks: [
+          makeSupabaseBuilder({ data: task, error: null }),
+          makeSupabaseBuilder({ data: null, error: null }, {
+            onUpdate: (payload) => { terminalPayload = payload; },
+          }),
+        ],
+        agents: [
+          makeSupabaseBuilder({ data: null, error: null }, {
+            onUpdate: (payload) => { agentPayload = payload; },
+          }),
+        ],
       }),
     );
 
@@ -187,11 +203,30 @@ describe('POST /api/tasks/[id]/advance', () => {
       currentStep: 'Assigned',
       retryable: false,
       reason: 'ANTHROPIC_API_KEY not configured',
+      status: 'failed',
     });
     expect(mocks.executeAgentTask).not.toHaveBeenCalled();
+    expect(terminalPayload).toMatchObject({
+      status: 'failed',
+      current_step: 'Assigned',
+      execution_result: {
+        status: 'failed',
+        failure: {
+          code: 'anthropic_not_configured',
+          retryable: false,
+          terminal: true,
+          attempts: 1,
+          maxRetries: 3,
+        },
+      },
+    });
+    expect(agentPayload).toEqual({ status: 'online' });
+    expect(mocks.createSecurityAlert).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Task execution failed permanently',
+    }));
   });
 
-  it('applies a cooldown before retrying a transient execution failure', async () => {
+  it('applies exponential backoff before retrying a transient execution failure', async () => {
     const task = makeTask({
       execution_result: {
         status: 'failed',
@@ -199,9 +234,11 @@ describe('POST /api/tasks/[id]/advance', () => {
           code: 'anthropic_unavailable',
           message: 'Anthropic request failed temporarily',
           retryable: true,
-          failedAt: isoSecondsAgo(5),
+          failedAt: isoSecondsAgo(30),
           model: 'claude-sonnet-4-20250514',
           agentType: 'auditor',
+          attempts: 2,
+          nextRetryAt: isoSecondsAgo(-90),
         },
       },
     });
@@ -219,8 +256,85 @@ describe('POST /api/tasks/[id]/advance', () => {
     expect(body.advanced).toBe(false);
     expect(body.currentStep).toBe('Assigned');
     expect(body.retryable).toBe(true);
+    expect(body.attempts).toBe(2);
+    expect(body.maxRetries).toBe(3);
     expect(String(body.reason)).toContain('Retry cooldown active');
     expect(mocks.executeAgentTask).not.toHaveBeenCalled();
+  });
+
+  it('marks a task failed and raises an alert after the retry budget is exhausted', async () => {
+    const task = makeTask({
+      execution_result: {
+        status: 'failed',
+        failure: {
+          code: 'anthropic_unavailable',
+          message: 'Anthropic request failed temporarily',
+          retryable: true,
+          failedAt: isoSecondsAgo(180),
+          model: 'claude-sonnet-4-20250514',
+          agentType: 'auditor',
+          attempts: 2,
+          nextRetryAt: isoSecondsAgo(30),
+        },
+      },
+    });
+    const claimedTask = makeTask({ current_step: 'Executing' });
+    let failurePayload: Record<string, unknown> | undefined;
+    let agentPayload: Record<string, unknown> | undefined;
+
+    mocks.executeAgentTask.mockRejectedValue(new AgentExecutionError('Anthropic request failed temporarily', {
+      code: 'anthropic_unavailable',
+      retryable: true,
+    }));
+    mocks.createServiceClient.mockReturnValue(
+      makeSupabaseClient({
+        tasks: [
+          makeSupabaseBuilder({ data: task, error: null }),
+          makeSupabaseBuilder({ data: claimedTask, error: null }),
+          makeSupabaseBuilder({ data: null, error: null }, {
+            onUpdate: (payload) => { failurePayload = payload; },
+          }),
+        ],
+        agents: [
+          makeSupabaseBuilder({ data: null, error: null }, {
+            onUpdate: (payload) => { agentPayload = payload; },
+          }),
+        ],
+      }),
+    );
+
+    const response = await POST(makeRequest(), { params: Promise.resolve({ id: 'task-1' }) });
+    const body = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      advanced: false,
+      currentStep: 'Assigned',
+      retryable: false,
+      status: 'failed',
+      attempts: 3,
+      maxRetries: 3,
+    });
+    expect(String(body.reason)).toContain('Retry budget exhausted after 3 attempts');
+    expect(failurePayload).toMatchObject({
+      status: 'failed',
+      current_step: 'Assigned',
+      execution_result: {
+        status: 'failed',
+        failure: {
+          code: 'anthropic_unavailable',
+          retryable: false,
+          terminal: true,
+          attempts: 3,
+          maxRetries: 3,
+          nextRetryAt: null,
+        },
+      },
+    });
+    expect(agentPayload).toEqual({ status: 'online' });
+    expect(mocks.createSecurityAlert).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Task execution retry budget exhausted',
+    }));
   });
 
   it('stores a succeeded execution payload when the agent run completes', async () => {
