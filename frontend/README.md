@@ -29,9 +29,11 @@ npm run dev
 ```bash
 npm run lint
 npm run build
+npm run smoke:real
 ```
 
 These checks now run in CI together with `forge test`.
+Set `SMOKE_BASE_URL` before running the real-environment smoke script, and optionally provide `SMOKE_CRON_SECRET`, `SMOKE_SESSION_COOKIE`, and `SMOKE_TASK_ID` for deeper coverage.
 
 ## Key Runtime Areas
 

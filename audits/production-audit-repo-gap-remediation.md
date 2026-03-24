@@ -11,6 +11,7 @@ This branch now closes the main repo-readiness gaps it set out to address. The o
 - Moved the operational runbooks into committed `runbooks/` files so setup and deployment guidance survives a fresh checkout.
 - Updated the status docs and frontend README to point at the committed runbooks instead of a working-tree-only location.
 - Added a GitHub Actions workflow that runs `forge test`, `npm run lint`, and `npm run build`.
+- Added a real-environment smoke runner plus a manual GitHub Actions workflow for deployed URL checks.
 - Kept the new Foundry coverage for `EliosEscrow` and `EliosProofVerifier` as part of the branch validation baseline.
 - Cleared the remaining frontend lint warnings so the branch validates cleanly without known baseline noise.
 
@@ -31,6 +32,7 @@ There is still no browser or end-to-end test coverage for the marketplace, task 
 ## Validation
 
 - `forge test`
+- `cd frontend && SMOKE_BASE_URL=... npm run smoke:real`
 - `cd frontend && npm run lint`
 - `cd frontend && npm run build`
 
