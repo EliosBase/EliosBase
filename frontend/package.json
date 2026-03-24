@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "smoke:real": "node scripts/smoke-real-env.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",
@@ -35,5 +36,8 @@
     "eslint-config-next": "16.1.7",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "bfj": "9.1.3"
   }
 }
