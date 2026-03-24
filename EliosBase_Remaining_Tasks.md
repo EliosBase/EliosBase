@@ -1,7 +1,7 @@
 # EliosBase Current Status
 
 **Date:** March 24, 2026  
-**Status:** Core marketplace flows are implemented. The remaining work is now concentrated in execution realism, test coverage, and deployment readiness.
+**Status:** Core marketplace flows are implemented. The remaining work is now concentrated in execution realism, secret ownership, and production deployment readiness.
 
 ## What The Repo Already Has
 
@@ -12,6 +12,7 @@
 - Live dashboard, wallet, and security stats endpoints.
 - Contracts for escrow and proof verification plus compiled circuit artifacts.
 - Vercel cron wiring for task advancement.
+- CI enforcement for `forge test`, `npm run lint`, and `npm run build`.
 
 ## What Still Needs Work
 
@@ -24,14 +25,14 @@
 ### 2. Repo Readiness
 
 - Schema drift can reappear if `supabase/seed.sql` is not kept aligned with app writes.
-- The repo had no contract tests before this remediation branch.
-- Local setup and deployment instructions were incomplete or stale.
+- Secret rotation and operator ownership are documented, but not automated.
+- The production deployment path still depends on manual promotion steps.
 
 ### 3. Production Readiness
 
-- The project still needs a documented Sepolia-to-production deployment path.
+- The project still needs a documented Sepolia-to-production deployment handoff.
 - Secrets management and rotation are not automated.
-- CI enforcement for lint, build, and contract tests is still missing.
+- End-to-end app behavior still depends on manual smoke validation after deploys.
 
 ## Do Not Rebuild These Items
 

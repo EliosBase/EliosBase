@@ -31,6 +31,8 @@ npm run lint
 npm run build
 ```
 
+These checks now run in CI together with `forge test`.
+
 ## Key Runtime Areas
 
 - `src/app/api/` for API routes
@@ -40,7 +42,7 @@ npm run build
 
 ## Additional Docs
 
-- `../docs/local-setup.md`
-- `../docs/deployment-runbook.md`
-- `../docs/contracts-circuits-runbook.md`
-- `../docs/manual-smoke-checklist.md`
+- `../runbooks/local-setup.md`
+- `../runbooks/deployment-runbook.md`
+- `../runbooks/contracts-circuits-runbook.md`
+- `../runbooks/manual-smoke-checklist.md`
