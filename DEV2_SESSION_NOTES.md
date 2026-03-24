@@ -1,6 +1,6 @@
 # EliosBase Status Notes
 
-This file replaces the older session snapshot that had become misleading. Treat this file and the runbooks under `docs/` as the current status reference.
+This file replaces the older session snapshot that had become misleading. Treat this file and the runbooks under `runbooks/` as the current status reference.
 
 ## Shipped In The Codebase
 
@@ -10,12 +10,12 @@ This file replaces the older session snapshot that had become misleading. Treat 
 - Live dashboard, wallet, and security stats
 - Security alert resolution and guardrail toggling
 - Cron-triggered task advancement
+- CI coverage for `forge test`, `npm run lint`, and `npm run build`
 
 ## Still Open
 
 - Real AI execution
 - Durable execution result viewing
-- CI coverage for frontend and contracts
 - Production deployment automation and operational ownership
 
 ## Rule Going Forward
