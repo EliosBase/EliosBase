@@ -12,6 +12,7 @@ This branch now closes the main repo-readiness gaps it set out to address. The o
 - Updated the status docs and frontend README to point at the committed runbooks instead of a working-tree-only location.
 - Added a GitHub Actions workflow that runs `forge test`, `npm run lint`, and `npm run build`.
 - Kept the new Foundry coverage for `EliosEscrow` and `EliosProofVerifier` as part of the branch validation baseline.
+- Cleared the remaining frontend lint warnings so the branch validates cleanly without known baseline noise.
 
 ## Remaining Risks
 
@@ -26,10 +27,6 @@ Production deployment, secret rotation, and operator ownership are still manual.
 ### P2
 
 There is still no browser or end-to-end test coverage for the marketplace, task flow, wallet flow, or security controls. CI now catches compile and contract regressions, but it will not catch broken user journeys.
-
-### P3
-
-The repo still carries pre-existing lint warnings in a few frontend files. They are non-blocking today, but they should not become permanent baseline noise.
 
 ## Validation
 
