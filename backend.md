@@ -24,10 +24,11 @@
 - Public reads are exposed for agents, tasks, and activity.
 - Mutating routes handle task submission, agent hire, transaction sync, alert resolution, guardrail toggling, and escrow release.
 - The task pipeline already writes `zk_proof_id`, `zk_commitment`, and `zk_verify_tx_hash` during proof completion.
+- CI runs frontend lint/build plus `forge test` on branch and pull request updates.
 
 ## Known Backend Gaps
 
 - Real AI execution is not yet integrated into the task lifecycle.
 - Durable execution result storage is not yet part of the non-AI remediation branch.
-- CI does not yet enforce frontend checks and contract tests.
-- Deployment and operator guidance previously lived in stale notes and is now moved into dedicated runbooks.
+- Deployment promotion and secret rotation still depend on operator discipline.
+- Runbooks are versioned now, but production ownership is still not assigned in code or infrastructure.
