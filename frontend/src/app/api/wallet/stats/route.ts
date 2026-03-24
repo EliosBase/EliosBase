@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { createPublicClient, http, formatEther } from 'viem';
 import { base } from 'viem/chains';
 
 // GET /api/wallet/stats — live wallet statistics for the authenticated user
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const session = await getSession();
   if (!session.userId || !session.walletAddress) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
