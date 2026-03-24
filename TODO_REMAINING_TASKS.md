@@ -1,23 +1,24 @@
-# EliosBase — Remaining Tasks
+# EliosBase Remaining Work
 
-## Blocking (Before Launch)
+## Highest Priority
 
-- [ ] **Deploy EliosEscrow.sol** to Base Sepolia via Remix, then set `NEXT_PUBLIC_ESCROW_ADDRESS` in `.env`
-- [ ] **End-to-end test on Sepolia:** create task → hire agent → watch auto-advance → release funds
-- [ ] **Upgrade RPC provider** — replace free public RPC with Alchemy or QuickNode for production reliability
-- [ ] **Agent registration UI** — build a form/page for `POST /api/agents/register` (API already exists)
+- [ ] Implement real AI agent execution and persisted execution results.
+- [ ] Keep the Supabase schema aligned with runtime code whenever proof-related columns change.
+- [ ] Keep contract tests green in CI and extend them when escrow or verifier behavior changes.
+- [ ] Use the new runbooks as the source of truth for local setup, deployment, and smoke validation.
 
-## Needs Work
+## Operational Gaps
 
-- [ ] **Task ↔ Agent linking** — add a task picker modal to the Hire button so the hired agent gets assigned to a specific task
-- [ ] **Escrow release UI** — when a task completes, show a "Release Funds" button for the depositor to sign
-- [ ] **Error/empty states** — handle blank pages when data is empty or API calls fail (loading spinners, empty state messages, error alerts)
-- [ ] **Session expiry** — iron-session has no TTL; add session expiration so stolen cookies don't work forever
+- [ ] Add a repeatable deployment workflow for Base Sepolia and production Base.
+- [ ] Document who owns contract deployment, proof submitter key rotation, and cron secret rotation.
+- [ ] Add CI coverage for `forge test`, `npm run lint`, and `npm run build`.
 
-## Future
+## Explicitly Already Done
 
-- [ ] **ELIO ERC-20 token** — deploy a real ERC-20 contract for rewards/staking
-- [ ] **ZK proof integration** — replace simulated step advancement with actual SP1/Brevis proof generation
-- [ ] **Agent execution** — wire up real AI agent workloads (currently task advancement is simulated)
-- [ ] **Vercel cron** — configure `vercel.json` to auto-hit `/api/cron/advance-tasks`
-- [ ] **Historical trend data** — sparkline charts still use mock data; compute from real DB records
+- [x] Agent registration UI
+- [x] Task-picker hire flow
+- [x] Escrow release UI
+- [x] Live dashboard, wallet, and security stats routes
+- [x] Alert resolve and guardrail toggle routes
+- [x] Vercel cron configuration
+- [x] 24 hour session TTL
