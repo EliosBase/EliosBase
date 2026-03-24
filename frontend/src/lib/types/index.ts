@@ -3,7 +3,18 @@
 export type {
   AgentExecutionSeverity,
   AgentExecutionFinding,
+  AgentExecutionMetadata,
   AgentExecutionResult,
+  RunningTaskExecution,
+  FailedTaskExecution,
+  SucceededTaskExecution,
+  TaskExecutionState,
+} from './agentExecution';
+
+export {
+  getExecutionFailure,
+  getExecutionResult,
+  isAgentExecutionResult,
 } from './agentExecution';
 
 export interface StatItem {
