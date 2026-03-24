@@ -77,7 +77,12 @@ export default function TasksPage() {
       {/* Task List */}
       <div className="space-y-4">
         {displayedTasks.map((task) => (
-          <TaskCard key={task.id} task={task} isSubmitter={session?.userId === task.submitterId} />
+          <TaskCard
+            key={task.id}
+            task={task}
+            isSubmitter={session?.userId === task.submitterId}
+            canViewResult={session?.userId === task.submitterId || session?.role === 'admin'}
+          />
         ))}
       </div>
 
