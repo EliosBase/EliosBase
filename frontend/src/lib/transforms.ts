@@ -30,6 +30,7 @@ export function toTask(row: DbTask): Task {
     zkProofId: row.zk_proof_id ?? undefined,
     zkCommitment: row.zk_commitment ?? undefined,
     zkVerifyTxHash: row.zk_verify_tx_hash ?? undefined,
+    hasExecutionResult: row.execution_result?.summary !== undefined,
     submitterId: row.submitter_id,
     agentOperatorAddress: row.agents?.users?.wallet_address ?? undefined,
   };

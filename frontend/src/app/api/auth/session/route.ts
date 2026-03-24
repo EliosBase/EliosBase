@@ -16,5 +16,6 @@ export async function GET() {
     userId: session.userId,
     walletAddress: session.walletAddress,
     chainId: session.chainId,
+    role: session.role,
   });
 }
