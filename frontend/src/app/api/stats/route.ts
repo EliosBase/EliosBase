@@ -67,8 +67,6 @@ export async function GET() {
 
   // Compute trend strings from actual data
   const agentPct = totalAgents > 0 ? ((activeAgents / totalAgents) * 100).toFixed(0) : '0';
-  const totalTasks = activeTasks + completedTasks;
-  const taskPct = totalTasks > 0 ? ((activeTasks / totalTasks) * 100).toFixed(0) : '0';
 
   // Compute 12-day sparkline data from DB
   const days = 12;
