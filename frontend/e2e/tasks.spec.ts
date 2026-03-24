@@ -37,6 +37,19 @@ const tasks = [
     hasExecutionResult: true,
     zkProofId: 'proof-42',
   },
+  {
+    id: 'task-failed',
+    title: 'Stalled execution task',
+    description: 'Track the terminal execution failure path.',
+    status: 'failed',
+    currentStep: 'Assigned',
+    assignedAgent: 'Audit Matrix',
+    reward: '0.20 ETH',
+    submittedAt: '2026-03-24T07:30:00.000Z',
+    submitterId: 'user-1',
+    executionFailureMessage: 'Anthropic request failed temporarily. Retry budget exhausted after 3 attempts.',
+    executionFailureRetryable: false,
+  },
 ];
 
 const taskResult = {
@@ -78,6 +91,11 @@ test('shows execution failures and opens a stored task result', async ({ page })
   await expect(page.getByRole('heading', { name: 'Task Management' })).toBeVisible();
   await expect(page.getByText('Execution Blocked')).toBeVisible();
   await expect(page.getByText('Anthropic credentials are missing for this agent.')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Failed (1)' }).click();
+  await expect(page.getByText('Stalled execution task')).toBeVisible();
+  await expect(page.getByText('Execution Failed')).toBeVisible();
+  await expect(page.getByText('Automatic retries have stopped for this task and an operator alert has been raised for manual intervention.')).toBeVisible();
 
   await page.getByRole('button', { name: 'Completed (1)' }).click();
   await expect(page.getByText('Contract audit report')).toBeVisible();

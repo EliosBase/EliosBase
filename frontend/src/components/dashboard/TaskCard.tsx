@@ -29,7 +29,8 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
 
   const canRelease = isSubmitter && task.currentStep === 'Complete' && task.agentOperatorAddress && onChainVerified;
   const canOpenResult = !!canViewResult && !!task.hasExecutionResult && task.status === 'completed';
-  const showsExecutionFailure = task.currentStep === 'Assigned' && !!task.executionFailureMessage;
+  const showsExecutionFailure = (task.currentStep === 'Assigned' || task.status === 'failed') && !!task.executionFailureMessage;
+  const isTerminalExecutionFailure = task.status === 'failed' && showsExecutionFailure;
 
   // Track release contract state
   useEffect(() => {
@@ -107,6 +108,8 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
 
   const proofStatus = onChainVerified
     ? 'verified' as const
+    : task.status === 'failed'
+      ? 'failed' as const
     : task.currentStep === 'ZK Verifying'
       ? 'verifying' as const
       : task.status === 'completed'
@@ -179,7 +182,11 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
             <AlertTriangle size={14} className="mt-0.5 shrink-0" />
             <div>
               <p className="text-[11px] uppercase tracking-[0.2em]">
-                {task.executionFailureRetryable ? 'Execution Retry Pending' : 'Execution Blocked'}
+                {task.executionFailureRetryable
+                  ? 'Execution Retry Pending'
+                  : isTerminalExecutionFailure
+                    ? 'Execution Failed'
+                    : 'Execution Blocked'}
               </p>
               <p className="mt-1 text-xs leading-5">
                 {task.executionFailureMessage}
@@ -187,7 +194,9 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
               <p className="mt-1 text-[11px] opacity-75">
                 {task.executionFailureRetryable
                   ? 'The next advancement attempt can retry automatically once the upstream dependency recovers.'
-                  : 'This task will not retry automatically until the agent configuration or runtime issue is fixed.'}
+                  : isTerminalExecutionFailure
+                    ? 'Automatic retries have stopped for this task and an operator alert has been raised for manual intervention.'
+                    : 'This task will not retry automatically until the agent configuration or runtime issue is fixed.'}
               </p>
             </div>
           </div>
