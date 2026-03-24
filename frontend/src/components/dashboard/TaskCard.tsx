@@ -5,7 +5,7 @@ import ProofBadge from './ProofBadge';
 import TaskResultModal from './TaskResultModal';
 import { type Task } from '@/lib/types';
 import { TASK_STEPS } from '@/lib/constants';
-import { Bot, CheckCircle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Bot, CheckCircle, Loader2 } from 'lucide-react';
 import { useEscrowRelease } from '@/hooks/useEscrow';
 import { useProofVerification } from '@/hooks/useProofVerification';
 import { useQueryClient } from '@tanstack/react-query';
@@ -29,6 +29,7 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
 
   const canRelease = isSubmitter && task.currentStep === 'Complete' && task.agentOperatorAddress && onChainVerified;
   const canOpenResult = !!canViewResult && !!task.hasExecutionResult && task.status === 'completed';
+  const showsExecutionFailure = task.currentStep === 'Assigned' && !!task.executionFailureMessage;
 
   // Track release contract state
   useEffect(() => {
@@ -167,6 +168,31 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
           );
         })}
       </div>
+
+      {showsExecutionFailure && (
+        <div className={`mb-4 rounded-2xl border px-3 py-3 ${
+          task.executionFailureRetryable
+            ? 'border-amber-500/25 bg-amber-500/10 text-amber-200'
+            : 'border-red-500/25 bg-red-500/10 text-red-200'
+        }`}>
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.2em]">
+                {task.executionFailureRetryable ? 'Execution Retry Pending' : 'Execution Blocked'}
+              </p>
+              <p className="mt-1 text-xs leading-5">
+                {task.executionFailureMessage}
+              </p>
+              <p className="mt-1 text-[11px] opacity-75">
+                {task.executionFailureRetryable
+                  ? 'The next advancement attempt can retry automatically once the upstream dependency recovers.'
+                  : 'This task will not retry automatically until the agent configuration or runtime issue is fixed.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-white/6">

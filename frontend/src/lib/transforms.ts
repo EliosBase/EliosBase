@@ -1,6 +1,6 @@
 import type { DbAgent, DbTask, DbTransaction, DbSecurityAlert, DbGuardrail, DbAuditLogEntry, DbActivityEvent } from './types/database';
 import type { Agent, Task, Transaction, SecurityAlert, Guardrail, AuditLogEntry, ActivityEvent } from './types';
-import { getExecutionResult } from './types/agentExecution';
+import { getExecutionFailure, getExecutionResult } from './types/agentExecution';
 
 export function toAgent(row: DbAgent): Agent {
   return {
@@ -18,6 +18,9 @@ export function toAgent(row: DbAgent): Agent {
 }
 
 export function toTask(row: DbTask): Task {
+  const executionResult = getExecutionResult(row.execution_result);
+  const executionFailure = getExecutionFailure(row.execution_result);
+
   return {
     id: row.id,
     title: row.title,
@@ -31,7 +34,9 @@ export function toTask(row: DbTask): Task {
     zkProofId: row.zk_proof_id ?? undefined,
     zkCommitment: row.zk_commitment ?? undefined,
     zkVerifyTxHash: row.zk_verify_tx_hash ?? undefined,
-    hasExecutionResult: getExecutionResult(row.execution_result) !== null,
+    hasExecutionResult: executionResult !== null,
+    executionFailureMessage: executionFailure?.message,
+    executionFailureRetryable: executionFailure?.retryable,
     submitterId: row.submitter_id,
     agentOperatorAddress: row.agents?.users?.wallet_address ?? undefined,
   };
