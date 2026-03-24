@@ -1,4 +1,4 @@
-import type { AgentExecutionResult } from './agentExecution';
+import type { TaskExecutionState } from './agentExecution';
 
 export interface DbUser {
   id: string;
@@ -33,7 +33,7 @@ export interface DbTask {
   submitter_id: string;
   submitted_at: string;
   completed_at: string | null;
-  execution_result: AgentExecutionResult | null;
+  execution_result: TaskExecutionState | null;
   zk_proof_id: string | null;
   zk_commitment: string | null;
   zk_verify_tx_hash: string | null;
