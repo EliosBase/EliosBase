@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { toTask } from '@/lib/transforms';
-import { logAudit, logActivity } from '@/lib/audit';
+import { createSecurityAlert, logAudit, logActivity } from '@/lib/audit';
 import { validateOrigin } from '@/lib/csrf';
 import { AgentExecutionError, DEFAULT_AGENT_EXECUTION_MODEL, executeAgentTask, serializeExecutionResult } from '@/lib/agentExecutor';
 import { generateTaskProof } from '@/lib/zkProof';
@@ -17,11 +17,114 @@ const STEP_TRANSITIONS: [string, string, number][] = [
   ['Executing', 'ZK Verifying', 60],
   ['ZK Verifying', 'Complete', 20],
 ];
-const RETRYABLE_EXECUTION_COOLDOWN_SECONDS = 60;
+const RETRYABLE_EXECUTION_BASE_COOLDOWN_SECONDS = 60;
+const MAX_RETRYABLE_EXECUTION_COOLDOWN_SECONDS = 15 * 60;
+const MAX_RETRYABLE_EXECUTION_ATTEMPTS = 3;
 
 function isCronAuthorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   return !!secret && req.headers.get('authorization') === `Bearer ${secret}`;
+}
+
+function getFailureAttempts(failure: ReturnType<typeof getExecutionFailure>) {
+  if (!failure) {
+    return 0;
+  }
+
+  return Number.isFinite(failure.attempts) && (failure.attempts ?? 0) > 0
+    ? Number(failure.attempts)
+    : 1;
+}
+
+function getRetryCooldownSeconds(attempts: number) {
+  const exponent = Math.max(0, attempts - 1);
+  return Math.min(
+    RETRYABLE_EXECUTION_BASE_COOLDOWN_SECONDS * (2 ** exponent),
+    MAX_RETRYABLE_EXECUTION_COOLDOWN_SECONDS,
+  );
+}
+
+function getNextRetryAt(failure: ReturnType<typeof getExecutionFailure>) {
+  if (!failure?.retryable) {
+    return null;
+  }
+
+  const attempts = getFailureAttempts(failure);
+  const fallback = new Date(
+    new Date(failure.failedAt).getTime() + getRetryCooldownSeconds(attempts) * 1000,
+  ).toISOString();
+
+  return failure.nextRetryAt ?? fallback;
+}
+
+function buildTerminalFailureReason(message: string, attempts: number) {
+  return `${message} Retry budget exhausted after ${attempts} attempts.`;
+}
+
+async function releaseAssignedAgent(supabase: ReturnType<typeof createServiceClient>, agentId: string | null) {
+  if (!agentId) {
+    return;
+  }
+
+  await supabase
+    .from('agents')
+    .update({ status: 'online' })
+    .eq('id', agentId);
+}
+
+async function persistExecutionFailure(params: {
+  supabase: ReturnType<typeof createServiceClient>;
+  taskId: string;
+  expectedStep: string;
+  assignedAgent: string | null;
+  agentType: string;
+  failure: AgentExecutionError;
+  attempts: number;
+  terminal: boolean;
+}) {
+  const failedAt = new Date().toISOString();
+  const nextRetryAt = !params.terminal && params.failure.retryable
+    ? new Date(Date.now() + getRetryCooldownSeconds(params.attempts) * 1000).toISOString()
+    : null;
+
+  await params.supabase
+    .from('tasks')
+    .update({
+      status: params.terminal ? 'failed' : 'active',
+      current_step: 'Assigned',
+      step_changed_at: failedAt,
+      execution_result: {
+        status: 'failed',
+        failure: {
+          code: params.failure.code,
+          message: params.terminal && params.failure.retryable
+            ? buildTerminalFailureReason(params.failure.message, params.attempts)
+            : params.failure.message,
+          retryable: params.failure.retryable && !params.terminal,
+          failedAt,
+          model: DEFAULT_AGENT_EXECUTION_MODEL,
+          agentType: params.agentType,
+          attempts: params.attempts,
+          maxRetries: MAX_RETRYABLE_EXECUTION_ATTEMPTS,
+          nextRetryAt,
+          terminal: params.terminal,
+        },
+      },
+    })
+    .eq('id', params.taskId)
+    .eq('current_step', params.expectedStep);
+
+  if (params.terminal) {
+    await releaseAssignedAgent(params.supabase, params.assignedAgent);
+  }
+
+  return {
+    failedAt,
+    nextRetryAt,
+    reason: params.terminal && params.failure.retryable
+      ? buildTerminalFailureReason(params.failure.message, params.attempts)
+      : params.failure.message,
+  };
 }
 
 // POST /api/tasks/[id]/advance — auto-advance a task to the next step if eligible
@@ -101,24 +204,91 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const existingFailure = getExecutionFailure(task.execution_result);
     if (existingFailure && !existingFailure.retryable) {
+      if (!existingFailure.terminal) {
+        const nonRetryableFailure = new AgentExecutionError(existingFailure.message, {
+          code: existingFailure.code,
+          retryable: false,
+        });
+
+        await persistExecutionFailure({
+          supabase,
+          taskId: id,
+          expectedStep: task.current_step,
+          assignedAgent: task.assigned_agent,
+          agentType,
+          failure: nonRetryableFailure,
+          attempts: getFailureAttempts(existingFailure),
+          terminal: true,
+        });
+
+        await createSecurityAlert({
+          severity: 'critical',
+          title: 'Task execution failed permanently',
+          description: `Task "${task.title}" cannot run for agent "${task.agents.name}". ${existingFailure.message}`,
+          source: 'agent-execution',
+          actor,
+        });
+      }
+
       return NextResponse.json({
         advanced: false,
         reason: existingFailure.message,
         currentStep: task.current_step,
         retryable: false,
+        status: 'failed',
       });
     }
 
     if (existingFailure?.retryable) {
-      const failedAt = new Date(existingFailure.failedAt).getTime();
-      const retryElapsedSeconds = Math.floor((Date.now() - failedAt) / 1000);
+      const attempts = getFailureAttempts(existingFailure);
+      if (attempts >= MAX_RETRYABLE_EXECUTION_ATTEMPTS) {
+        const exhaustedFailure = new AgentExecutionError(existingFailure.message, {
+          code: existingFailure.code,
+          retryable: true,
+        });
 
-      if (retryElapsedSeconds < RETRYABLE_EXECUTION_COOLDOWN_SECONDS) {
+        const persistedFailure = await persistExecutionFailure({
+          supabase,
+          taskId: id,
+          expectedStep: task.current_step,
+          assignedAgent: task.assigned_agent,
+          agentType,
+          failure: exhaustedFailure,
+          attempts,
+          terminal: true,
+        });
+
+        await createSecurityAlert({
+          severity: 'high',
+          title: 'Task execution retry budget exhausted',
+          description: `Task "${task.title}" failed ${attempts} times for agent "${task.agents.name}". ${existingFailure.message}`,
+          source: 'agent-execution',
+          actor,
+        });
+
         return NextResponse.json({
           advanced: false,
-          reason: `Retry cooldown active for ${RETRYABLE_EXECUTION_COOLDOWN_SECONDS - retryElapsedSeconds}s`,
+          reason: persistedFailure.reason,
+          currentStep: task.current_step,
+          retryable: false,
+          status: 'failed',
+        });
+      }
+
+      const nextRetryAt = getNextRetryAt(existingFailure);
+      const retryRemainingSeconds = nextRetryAt
+        ? Math.max(0, Math.ceil((new Date(nextRetryAt).getTime() - Date.now()) / 1000))
+        : 0;
+
+      if (retryRemainingSeconds > 0) {
+        return NextResponse.json({
+          advanced: false,
+          reason: `Retry cooldown active for ${retryRemainingSeconds}s`,
           currentStep: task.current_step,
           retryable: true,
+          attempts,
+          maxRetries: MAX_RETRYABLE_EXECUTION_ATTEMPTS,
+          nextRetryAt,
         });
       }
     }
@@ -212,35 +382,56 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             executionError instanceof Error ? executionError.message : 'Agent execution failed',
             { code: 'agent_execution_failed', retryable: false, cause: executionError },
           );
+      const attempts = getFailureAttempts(existingFailure) + 1;
+      const terminal = !failure.retryable || attempts >= MAX_RETRYABLE_EXECUTION_ATTEMPTS;
+      const persistedFailure = await persistExecutionFailure({
+        supabase,
+        taskId: id,
+        expectedStep: 'Executing',
+        assignedAgent: task.assigned_agent,
+        agentType,
+        failure,
+        attempts,
+        terminal,
+      });
 
-      await supabase
-        .from('tasks')
-        .update({
-          current_step: 'Assigned',
-          step_changed_at: new Date().toISOString(),
-          execution_result: {
-            status: 'failed',
-            failure: {
-              code: failure.code,
-              message: failure.message,
-              retryable: failure.retryable,
-              failedAt: new Date().toISOString(),
-              model: DEFAULT_AGENT_EXECUTION_MODEL,
-              agentType,
-            },
-          },
-        })
-        .eq('id', id)
-        .eq('current_step', 'Executing');
+      if (terminal) {
+        await createSecurityAlert({
+          severity: failure.retryable ? 'high' : 'critical',
+          title: failure.retryable
+            ? 'Task execution retry budget exhausted'
+            : 'Task execution failed permanently',
+          description: failure.retryable
+            ? `Task "${task.title}" failed ${attempts} times for agent "${task.agents.name}". ${failure.message}`
+            : `Task "${task.title}" cannot run for agent "${task.agents.name}". ${failure.message}`,
+          source: 'agent-execution',
+          actor,
+        });
+      }
 
       await logAudit({ action: 'AGENT_EXECUTE', actor, target: id, result: 'FLAG' });
-      await logActivity({ type: 'task', message: `Agent execution failed for task: ${task.title}` });
+      await logActivity({
+        type: 'task',
+        message: terminal
+          ? `Task failed after agent execution: ${task.title}`
+          : `Agent execution failed for task: ${task.title}`,
+      });
+      if (terminal) {
+        await logActivity({
+          type: 'agent',
+          message: `Agent available: ${task.agents.name}`,
+        });
+      }
 
       return NextResponse.json({
         advanced: false,
-        reason: failure.message,
+        reason: persistedFailure.reason,
         currentStep: 'Assigned',
-        retryable: failure.retryable,
+        retryable: failure.retryable && !terminal,
+        status: terminal ? 'failed' : 'active',
+        attempts,
+        maxRetries: MAX_RETRYABLE_EXECUTION_ATTEMPTS,
+        nextRetryAt: persistedFailure.nextRetryAt,
       });
     }
   }
