@@ -10,14 +10,19 @@ import { Plus } from 'lucide-react';
 
 export default function TasksPage() {
   const [showModal, setShowModal] = useState(false);
-  const [tab, setTab] = useState<'active' | 'completed'>('active');
+  const [tab, setTab] = useState<'active' | 'failed' | 'completed'>('active');
   const { data: tasks = [], isLoading, isError, refetch } = useTasks();
   const { session } = useAuthContext();
   useBatchTaskAdvancement();
 
   const activeTasks = tasks.filter((t) => t.status === 'active');
+  const failedTasks = tasks.filter((t) => t.status === 'failed');
   const completedTasks = tasks.filter((t) => t.status === 'completed');
-  const displayedTasks = tab === 'active' ? activeTasks : completedTasks;
+  const displayedTasks = tab === 'active'
+    ? activeTasks
+    : tab === 'failed'
+      ? failedTasks
+      : completedTasks;
 
   if (isLoading) {
     return (
@@ -63,6 +68,16 @@ export default function TasksPage() {
           >
             Completed ({completedTasks.length})
           </button>
+          <button
+            onClick={() => setTab('failed')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === 'failed'
+                ? 'bg-red-500/15 text-red-200'
+                : 'text-white/40 hover:text-white/60'
+            }`}
+          >
+            Failed ({failedTasks.length})
+          </button>
         </div>
 
         <button
@@ -77,7 +92,12 @@ export default function TasksPage() {
       {/* Task List */}
       <div className="space-y-4">
         {displayedTasks.map((task) => (
-          <TaskCard key={task.id} task={task} isSubmitter={session?.userId === task.submitterId} />
+          <TaskCard
+            key={task.id}
+            task={task}
+            isSubmitter={session?.userId === task.submitterId}
+            canViewResult={session?.userId === task.submitterId || session?.role === 'admin'}
+          />
         ))}
       </div>
 
