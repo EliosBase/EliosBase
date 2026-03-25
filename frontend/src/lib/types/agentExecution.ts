@@ -8,6 +8,7 @@ export interface AgentExecutionFinding {
 
 export interface AgentExecutionMetadata {
   model: string;
+  promptVersion?: string;
   tokensUsed: number;
   executionTimeMs: number;
   agentType: string;
