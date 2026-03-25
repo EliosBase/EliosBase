@@ -15,7 +15,7 @@ export default function CyberBackground() {
     let animationId: number;
     let width = window.innerWidth;
     let height = window.innerHeight;
-    let mouse = { x: -1000, y: -1000 };
+    const mouse = { x: -1000, y: -1000 };
     let time = 0;
 
     canvas.width = width;

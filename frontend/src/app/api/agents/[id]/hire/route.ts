@@ -47,7 +47,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Verify the transaction on-chain
   let txStatus: 'confirmed' | 'pending' = 'pending';
-  let blockNumber: bigint | null = null;
 
   try {
     const receipt = await publicClient.getTransactionReceipt({
@@ -66,7 +65,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (receipt.status === 'success') {
       txStatus = 'confirmed';
-      blockNumber = receipt.blockNumber;
     } else {
       return NextResponse.json({ error: 'Transaction reverted on-chain' }, { status: 400 });
     }

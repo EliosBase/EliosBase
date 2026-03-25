@@ -7,6 +7,7 @@ interface SessionData {
   userId?: string;
   walletAddress?: string;
   chainId?: number;
+  role?: 'submitter' | 'operator' | 'admin';
 }
 
 interface AuthContextType {
