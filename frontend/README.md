@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EliosBase Frontend
 
-## Getting Started
+## Requirements
 
-First, run the development server:
+- Node.js 20+
+- npm 10+
+- A configured Supabase project
+- Base or Base Sepolia RPC access
+
+## Local Setup
+
+1. Copy the root `.env.example` and fill in the required values.
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+3. Start the app:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Validation
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run lint
+npm run build
+npm run smoke:real
+```
 
-## Learn More
+These checks now run in CI together with `forge test`.
+Set `SMOKE_BASE_URL` before running the real-environment smoke script, and optionally provide `SMOKE_CRON_SECRET`, `SMOKE_SESSION_COOKIE`, and `SMOKE_TASK_ID` for deeper coverage.
 
-To learn more about Next.js, take a look at the following resources:
+## Key Runtime Areas
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `src/app/api/` for API routes
+- `src/app/app/` for the authenticated dashboard pages
+- `src/lib/` for Supabase, proof, contract, and session code
+- `src/components/dashboard/` for task, agent, wallet, and security UI
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Additional Docs
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `../runbooks/local-setup.md`
+- `../runbooks/deployment-runbook.md`
+- `../runbooks/contracts-circuits-runbook.md`
+- `../runbooks/manual-smoke-checklist.md`
