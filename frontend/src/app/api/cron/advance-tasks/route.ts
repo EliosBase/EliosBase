@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
       const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
       const res = await fetch(`${baseUrl}/api/tasks/${task.id}/advance`, {
         method: 'POST',
+        headers: cronSecret ? { authorization: `Bearer ${cronSecret}` } : undefined,
       });
       const data = await res.json();
       results.push({ taskId: task.id, ...data });
