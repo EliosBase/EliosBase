@@ -40,12 +40,16 @@ CREATE TABLE IF NOT EXISTS tasks (
   submitted_at TIMESTAMPTZ DEFAULT now(),
   completed_at TIMESTAMPTZ,
   zk_proof_id TEXT,
+  zk_commitment TEXT,
+  zk_verify_tx_hash TEXT,
   step_changed_at TIMESTAMPTZ DEFAULT now(),
   execution_result JSONB
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status);
 CREATE INDEX IF NOT EXISTS idx_tasks_submitter ON tasks (submitter_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_agent ON tasks (assigned_agent);
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS zk_commitment TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS zk_verify_tx_hash TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS execution_result JSONB;
 
 -- Transactions
