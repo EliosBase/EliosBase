@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/advance-tasks",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/check-signer-balance",
+      "schedule": "0 */6 * * *"
+    }
+  ]
+}
