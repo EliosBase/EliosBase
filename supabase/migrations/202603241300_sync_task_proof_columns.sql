@@ -1,0 +1,5 @@
+ALTER TABLE tasks
+ADD COLUMN IF NOT EXISTS zk_commitment TEXT;
+
+ALTER TABLE tasks
+ADD COLUMN IF NOT EXISTS zk_verify_tx_hash TEXT;
