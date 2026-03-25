@@ -21,7 +21,10 @@ export type AuditAction =
   | 'ALERT_CREATE'
   | 'ALERT_RESOLVE'
   | 'GUARDRAIL_TOGGLE'
-  | 'TASK_RESULT_VIEW';
+  | 'TASK_RESULT_VIEW'
+  | 'TASK_RETRY'
+  | 'TASK_REASSIGN'
+  | 'TASK_CANCEL';
 
 export type AuditResult = 'ALLOW' | 'DENY' | 'FLAG';
 
@@ -112,6 +115,18 @@ export async function createSecurityAlert(params: {
       type: 'security',
       message: `Security alert: ${params.title}`,
     });
+
+    // Fire webhook for critical/high alerts (Discord/Slack compatible)
+    const webhookUrl = process.env.ALERT_WEBHOOK_URL;
+    if (webhookUrl && ['critical', 'high'].includes(params.severity)) {
+      fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: `[${params.severity.toUpperCase()}] ${params.title}: ${params.description}`,
+        }),
+      }).catch(() => {}); // best-effort, non-blocking
+    }
   }
 
   return { id, error };

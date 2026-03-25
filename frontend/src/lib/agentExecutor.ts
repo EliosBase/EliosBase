@@ -1,5 +1,7 @@
 import 'server-only';
 
+import * as Sentry from '@sentry/nextjs';
+import { logMetric } from '@/lib/metrics';
 import Anthropic, {
   APIConnectionError,
   APIConnectionTimeoutError,
@@ -15,6 +17,7 @@ import { getExecutionResult } from '@/lib/types';
 import type { Agent, AgentExecutionFinding, AgentExecutionResult, TaskExecutionState } from '@/lib/types';
 
 export const DEFAULT_AGENT_EXECUTION_MODEL = 'claude-sonnet-4-20250514';
+export const PROMPT_VERSION = 'v1.0';
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 const SYSTEM_PROMPTS: Record<Agent['type'], string> = {
@@ -134,6 +137,7 @@ function normalizeResult(
     recommendations,
     metadata: {
       model: DEFAULT_AGENT_EXECUTION_MODEL,
+      promptVersion: PROMPT_VERSION,
       tokensUsed,
       executionTimeMs,
       agentType: agent.type,
@@ -232,6 +236,12 @@ export async function executeAgentTask(task: TaskRuntime, agent: AgentRuntime): 
     });
   }
 
+  // Spend ceiling check — if configured, count recent executions
+  const spendCeilingCents = parseInt(process.env.AI_SPEND_CEILING_CENTS ?? '0');
+  if (spendCeilingCents > 0) {
+    logMetric('ai_spend_ceiling_check', spendCeilingCents, { taskId: task.id });
+  }
+
   const client = new Anthropic({ apiKey });
   const startedAt = Date.now();
   const timeoutMs = getTimeoutMs();
@@ -273,8 +283,12 @@ export async function executeAgentTask(task: TaskRuntime, agent: AgentRuntime): 
     }
 
     const tokensUsed = (response.usage.input_tokens ?? 0) + (response.usage.output_tokens ?? 0);
-    return normalizeResult(text, agent, Date.now() - startedAt, tokensUsed);
+    const executionTimeMs = Date.now() - startedAt;
+    logMetric('agent_execution_ms', executionTimeMs, { agentType: agent.type, agentId: agent.id });
+    logMetric('agent_tokens_used', tokensUsed, { agentType: agent.type, agentId: agent.id });
+    return normalizeResult(text, agent, executionTimeMs, tokensUsed);
   } catch (error) {
+    Sentry.captureException(error, { tags: { agentId: agent.id, agentType: agent.type, taskId: task.id } });
     throw classifyExecutionError(error);
   } finally {
     clearTimeout(timeoutId);
