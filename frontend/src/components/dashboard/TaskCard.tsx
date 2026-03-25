@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import ProofBadge from './ProofBadge';
+import TaskResultModal from './TaskResultModal';
 import { type Task } from '@/lib/types';
 import { TASK_STEPS } from '@/lib/constants';
-import { Bot, CheckCircle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Bot, CheckCircle, Loader2 } from 'lucide-react';
 import { useEscrowRelease } from '@/hooks/useEscrow';
 import { useProofVerification } from '@/hooks/useProofVerification';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,19 +13,24 @@ import { useQueryClient } from '@tanstack/react-query';
 interface TaskCardProps {
   task: Task;
   isSubmitter?: boolean;
+  canViewResult?: boolean;
 }
 
 type ReleaseStep = 'idle' | 'signing' | 'mining' | 'confirming' | 'released' | 'error';
 
-export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
+export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardProps) {
   const currentStepIndex = TASK_STEPS.indexOf(task.currentStep);
   const queryClient = useQueryClient();
   const { release, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useEscrowRelease();
   const [releaseStep, setReleaseStep] = useState<ReleaseStep>('idle');
   const [releaseError, setReleaseError] = useState('');
+  const [showResult, setShowResult] = useState(false);
   const { isVerified: onChainVerified } = useProofVerification(task.id);
 
   const canRelease = isSubmitter && task.currentStep === 'Complete' && task.agentOperatorAddress && onChainVerified;
+  const canOpenResult = !!canViewResult && !!task.hasExecutionResult && task.status === 'completed';
+  const showsExecutionFailure = (task.currentStep === 'Assigned' || task.status === 'failed') && !!task.executionFailureMessage;
+  const isTerminalExecutionFailure = task.status === 'failed' && showsExecutionFailure;
 
   // Track release contract state
   useEffect(() => {
@@ -102,6 +108,8 @@ export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
 
   const proofStatus = onChainVerified
     ? 'verified' as const
+    : task.status === 'failed'
+      ? 'failed' as const
     : task.currentStep === 'ZK Verifying'
       ? 'verifying' as const
       : task.status === 'completed'
@@ -164,6 +172,37 @@ export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
         })}
       </div>
 
+      {showsExecutionFailure && (
+        <div className={`mb-4 rounded-2xl border px-3 py-3 ${
+          task.executionFailureRetryable
+            ? 'border-amber-500/25 bg-amber-500/10 text-amber-200'
+            : 'border-red-500/25 bg-red-500/10 text-red-200'
+        }`}>
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.2em]">
+                {task.executionFailureRetryable
+                  ? 'Execution Retry Pending'
+                  : isTerminalExecutionFailure
+                    ? 'Execution Failed'
+                    : 'Execution Blocked'}
+              </p>
+              <p className="mt-1 text-xs leading-5">
+                {task.executionFailureMessage}
+              </p>
+              <p className="mt-1 text-[11px] opacity-75">
+                {task.executionFailureRetryable
+                  ? 'The next advancement attempt can retry automatically once the upstream dependency recovers.'
+                  : isTerminalExecutionFailure
+                    ? 'Automatic retries have stopped for this task and an operator alert has been raised for manual intervention.'
+                    : 'This task will not retry automatically until the agent configuration or runtime issue is fixed.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-white/6">
         <div className="flex items-center gap-2">
@@ -173,6 +212,14 @@ export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          {canOpenResult && (
+            <button
+              onClick={() => setShowResult(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 text-white hover:bg-white/15 transition-colors"
+            >
+              View Result
+            </button>
+          )}
           {canRelease && (
             <button
               onClick={releaseStep === 'error' ? handleRelease : handleRelease}
@@ -202,6 +249,14 @@ export default function TaskCard({ task, isSubmitter }: TaskCardProps) {
 
       {releaseError && (
         <p className="text-[10px] text-red-400 mt-2">{releaseError}</p>
+      )}
+
+      {showResult && (
+        <TaskResultModal
+          taskId={task.id}
+          taskTitle={task.title}
+          onClose={() => setShowResult(false)}
+        />
       )}
     </div>
   );

@@ -4,3 +4,7 @@ node_modules/
 *.pem
 .env*
 .vercel
+cache/
+contracts/out/
+frontend/output/
+frontend/playwright-report/

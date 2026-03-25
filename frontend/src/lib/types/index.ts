@@ -1,5 +1,22 @@
 // ─── Frontend Interfaces ─────────────────────────────────────────
 
+export type {
+  AgentExecutionSeverity,
+  AgentExecutionFinding,
+  AgentExecutionMetadata,
+  AgentExecutionResult,
+  RunningTaskExecution,
+  FailedTaskExecution,
+  SucceededTaskExecution,
+  TaskExecutionState,
+} from './agentExecution';
+
+export {
+  getExecutionFailure,
+  getExecutionResult,
+  isAgentExecutionResult,
+} from './agentExecution';
+
 export interface StatItem {
   label: string;
   value: string;
@@ -35,6 +52,9 @@ export interface Task {
   zkProofId?: string;
   zkCommitment?: string;
   zkVerifyTxHash?: string;
+  hasExecutionResult?: boolean;
+  executionFailureMessage?: string;
+  executionFailureRetryable?: boolean;
   submitterId?: string;
   agentOperatorAddress?: string;
 }
