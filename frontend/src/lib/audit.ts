@@ -17,9 +17,11 @@ export type AuditAction =
   | 'RATE_LIMIT'
   | 'PROOF_SUBMIT'
   | 'PROOF_VERIFY'
+  | 'AGENT_EXECUTE'
   | 'ALERT_CREATE'
   | 'ALERT_RESOLVE'
-  | 'GUARDRAIL_TOGGLE';
+  | 'GUARDRAIL_TOGGLE'
+  | 'TASK_RESULT_VIEW';
 
 export type AuditResult = 'ALLOW' | 'DENY' | 'FLAG';
 
