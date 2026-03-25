@@ -15,7 +15,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid nonce' }, { status: 422 });
     }
 
-    if (fields.chainId !== 8453) {
+    const expectedChainId = parseInt(process.env.NEXT_PUBLIC_BASE_CHAIN_ID || '8453');
+    if (fields.chainId !== expectedChainId) {
       return NextResponse.json({ error: 'Wrong chain. Please switch to Base network.' }, { status: 422 });
     }
 
