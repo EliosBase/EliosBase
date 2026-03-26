@@ -15,7 +15,7 @@ const footerLinks = [
     title: "Developers",
     links: [
       { label: "How It Works", href: "#how-it-works" },
-      { label: "GitHub", href: "#" },
+      { label: "GitHub", href: "https://github.com/EliosBase/EliosBase", external: true },
     ],
   },
   {
@@ -66,7 +66,9 @@ export default function Footer() {
                 <Twitter size={18} />
               </a>
               <a
-                href="#"
+                href="https://github.com/EliosBase/EliosBase"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors duration-200 text-white/50 hover:text-white cursor-pointer"
                 aria-label="GitHub"
               >
