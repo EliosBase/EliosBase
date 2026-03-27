@@ -1,0 +1,41 @@
+name: identity-guard
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - run: chmod +x scripts/identity_guard.sh .githooks/pre-commit .githooks/prepare-commit-msg .githooks/commit-msg .githooks/pre-push
+
+      - run: scripts/identity_guard.sh scan-tree
+
+      - env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base_sha="$PR_BASE_SHA"
+            head_sha="$PR_HEAD_SHA"
+          elif [ "$EVENT_NAME" = "push" ]; then
+            base_sha="$PUSH_BEFORE_SHA"
+            head_sha="$PUSH_HEAD_SHA"
+          else
+            base_sha='0000000000000000000000000000000000000000'
+            head_sha="$(git rev-parse HEAD)"
+          fi
+
+          scripts/identity_guard.sh scan-range "$base_sha" "$head_sha"
