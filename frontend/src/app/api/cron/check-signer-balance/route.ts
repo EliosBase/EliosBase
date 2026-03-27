@@ -3,14 +3,15 @@ import { createPublicClient, http, formatEther } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { base, baseSepolia } from 'viem/chains';
 import { createSecurityAlert } from '@/lib/audit';
+import { readEnv, readFloatEnv } from '@/lib/env';
 
-const isTestnet = process.env.NEXT_PUBLIC_CHAIN === 'testnet';
+const isTestnet = readEnv(process.env.NEXT_PUBLIC_CHAIN) === 'testnet';
 const chain = isTestnet ? baseSepolia : base;
-const rpcUrl = process.env.BASE_RPC_URL || (isTestnet ? 'https://sepolia.base.org' : 'https://mainnet.base.org');
+const rpcUrl = readEnv(process.env.BASE_RPC_URL) || (isTestnet ? 'https://sepolia.base.org' : 'https://mainnet.base.org');
 
 // GET /api/cron/check-signer-balance — monitor proof submitter signer balance
 export async function GET(req: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
+  const cronSecret = readEnv(process.env.CRON_SECRET);
   if (cronSecret) {
     const authHeader = req.headers.get('authorization');
     if (authHeader !== `Bearer ${cronSecret}`) {
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const privateKey = process.env.PROOF_SUBMITTER_PRIVATE_KEY;
+  const privateKey = readEnv(process.env.PROOF_SUBMITTER_PRIVATE_KEY);
   if (!privateKey) {
     return NextResponse.json({ error: 'PROOF_SUBMITTER_PRIVATE_KEY not configured' }, { status: 500 });
   }
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
 
   const balance = await client.getBalance({ address: account.address });
   const balanceEth = parseFloat(formatEther(balance));
-  const threshold = parseFloat(process.env.SIGNER_MIN_BALANCE_ETH ?? '0.01');
+  const threshold = readFloatEnv(process.env.SIGNER_MIN_BALANCE_ETH, 0.01);
   const belowThreshold = balanceEth < threshold;
 
   if (belowThreshold) {

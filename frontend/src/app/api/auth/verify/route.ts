@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SiweMessage } from 'siwe';
+import { readIntEnv } from '@/lib/env';
 import { getSession } from '@/lib/session';
 import { createServiceClient } from '@/lib/supabase/server';
 
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid nonce' }, { status: 422 });
     }
 
-    const expectedChainId = parseInt(process.env.NEXT_PUBLIC_BASE_CHAIN_ID || '8453');
+    const expectedChainId = readIntEnv(process.env.NEXT_PUBLIC_BASE_CHAIN_ID, 8453);
     if (fields.chainId !== expectedChainId) {
       return NextResponse.json({ error: 'Wrong chain. Please switch to Base network.' }, { status: 422 });
     }
