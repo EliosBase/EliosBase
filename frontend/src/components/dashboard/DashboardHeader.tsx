@@ -1,7 +1,8 @@
 'use client';
 
-import { Menu, LogOut } from 'lucide-react';
-import { usePhantom } from '@/hooks/usePhantom';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, ExternalLink, LogOut, Menu } from 'lucide-react';
+import { useWallet, type WalletId } from '@/hooks/useWallet';
 import { useSiweContext } from '@/components/dashboard/AuthGate';
 import { useMounted } from '@/hooks/useMounted';
 
@@ -11,9 +12,58 @@ interface DashboardHeaderProps {
 }
 
 export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderProps) {
-  const { isConnected, isConnecting, shortAddress, connect } = usePhantom();
+  const {
+    isConnected,
+    isConnecting,
+    shortAddress,
+    installedWallets,
+    installableWallets,
+    connect,
+  } = useWallet();
   const { signOut } = useSiweContext();
   const mounted = useMounted();
+  const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false);
+  const walletMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isWalletMenuOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!walletMenuRef.current?.contains(event.target as Node)) {
+        setIsWalletMenuOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsWalletMenuOpen(false);
+      }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+
+    return () => {
+      window.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [isWalletMenuOpen]);
+
+  function handleConnectClick() {
+    if (installedWallets.length === 1) {
+      connect(installedWallets[0].id);
+      return;
+    }
+
+    setIsWalletMenuOpen((open) => !open);
+  }
+
+  function handleWalletChoice(walletId: WalletId) {
+    setIsWalletMenuOpen(false);
+    connect(walletId);
+  }
+
+  const needsWalletMenu = installedWallets.length !== 1;
 
   return (
     <header className="sticky top-0 z-30 glass border-b border-white/6 px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -45,13 +95,73 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
           </button>
         </div>
       ) : (
-        <button
-          onClick={connect}
-          disabled={!mounted || isConnecting}
-          className="px-4 py-2 rounded-xl bg-white text-black text-sm font-semibold hover:bg-white/90 transition-colors disabled:opacity-50"
-        >
-          {isConnecting ? 'Connecting...' : 'Connect Phantom'}
-        </button>
+        <div className="relative" ref={walletMenuRef}>
+          <button
+            type="button"
+            onClick={handleConnectClick}
+            disabled={!mounted || isConnecting}
+            aria-expanded={isWalletMenuOpen}
+            aria-haspopup="dialog"
+            className="px-4 py-2 rounded-xl bg-white text-black text-sm font-semibold hover:bg-white/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+          >
+            <span>{isConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
+            {needsWalletMenu && !isConnecting ? <ChevronDown size={16} /> : null}
+          </button>
+
+          {isWalletMenuOpen ? (
+            <div className="absolute right-0 top-[calc(100%+0.75rem)] z-20 w-80 rounded-2xl border border-white/10 bg-[#0b0b10] p-4 shadow-2xl shadow-black/40">
+              <div className="mb-3">
+                <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)]">
+                  {installedWallets.length > 0 ? 'Choose a wallet' : 'Install a wallet'}
+                </h2>
+                <p className="mt-1 text-xs text-white/45">
+                  {installedWallets.length > 0
+                    ? 'Use any supported EVM wallet on Base.'
+                    : 'No compatible browser wallet was detected.'}
+                </p>
+              </div>
+
+              {installedWallets.length > 0 ? (
+                <div className="space-y-2">
+                  {installedWallets.map((wallet) => (
+                    <button
+                      key={wallet.id}
+                      type="button"
+                      onClick={() => handleWalletChoice(wallet.id)}
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-left transition-colors hover:bg-white/10"
+                    >
+                      <span className="block text-sm font-medium text-white">{wallet.name}</span>
+                      <span className="mt-1 block text-xs text-white/45">Connect and sign in on Base</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {installableWallets.length > 0 ? (
+                <div className={`${installedWallets.length > 0 ? 'mt-4 border-t border-white/8 pt-4' : ''} space-y-2`}>
+                  {installedWallets.length > 0 ? (
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-white/25">Need another wallet?</p>
+                  ) : null}
+                  {installableWallets.map((wallet) => (
+                    <a
+                      key={wallet.id}
+                      href={wallet.downloadUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center justify-between rounded-xl border border-white/10 bg-white/3 px-3 py-3 text-left transition-colors hover:bg-white/8"
+                    >
+                      <span>
+                        <span className="block text-sm font-medium text-white">{wallet.name}</span>
+                        <span className="mt-1 block text-xs text-white/45">Install wallet</span>
+                      </span>
+                      <ExternalLink size={14} className="text-white/35" />
+                    </a>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       )}
     </header>
   );

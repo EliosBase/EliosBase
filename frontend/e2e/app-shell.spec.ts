@@ -60,11 +60,11 @@ test('renders dashboard data, connects the e2e wallet, and signs out cleanly', a
   await expect(page.getByText('Audit release path')).toBeVisible();
   await expect(page.getByText('Task assigned to Audit Sentinel')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Connect Phantom' }).click();
+  await page.getByRole('button', { name: 'Connect Wallet' }).click();
   await expect(page.getByText('0x1234...abcd').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Disconnect wallet' }).click();
-  await expect(page.getByRole('button', { name: 'Connect Phantom' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Connect Wallet' })).toBeVisible();
 });
 
 test('supports mobile sidebar navigation between app sections', async ({ page }) => {
