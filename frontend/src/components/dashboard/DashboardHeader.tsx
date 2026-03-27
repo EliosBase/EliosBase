@@ -64,6 +64,8 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
   }
 
   const needsWalletMenu = installedWallets.length !== 1;
+  const showConnecting = mounted && isConnecting;
+  const showWalletMenuChevron = mounted && needsWalletMenu && !showConnecting;
 
   return (
     <header className="sticky top-0 z-30 glass border-b border-white/6 px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -99,13 +101,13 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
           <button
             type="button"
             onClick={handleConnectClick}
-            disabled={!mounted || isConnecting}
+            disabled={!mounted || showConnecting}
             aria-expanded={isWalletMenuOpen}
             aria-haspopup="dialog"
             className="px-4 py-2 rounded-xl bg-white text-black text-sm font-semibold hover:bg-white/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
           >
-            <span>{isConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
-            {needsWalletMenu && !isConnecting ? <ChevronDown size={16} /> : null}
+            <span>{showConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
+            {showWalletMenuChevron ? <ChevronDown size={16} /> : null}
           </button>
 
           {isWalletMenuOpen ? (
