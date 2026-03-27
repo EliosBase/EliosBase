@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { readEnv } from '@/lib/env';
 import { getSession } from '@/lib/session';
 import { toTask } from '@/lib/transforms';
 import { createSecurityAlert, logAudit, logActivity } from '@/lib/audit';
@@ -22,7 +23,7 @@ const MAX_RETRYABLE_EXECUTION_COOLDOWN_SECONDS = 15 * 60;
 const MAX_RETRYABLE_EXECUTION_ATTEMPTS = 3;
 
 function isCronAuthorized(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
+  const secret = readEnv(process.env.CRON_SECRET);
   return !!secret && req.headers.get('authorization') === `Bearer ${secret}`;
 }
 

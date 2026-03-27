@@ -2,6 +2,7 @@
  * EliosEscrow contract ABI and address configuration.
  * ABI matches contracts/src/EliosEscrow.sol
  */
+import { readEnv } from '@/lib/env';
 
 export const ESCROW_ABI = [
   {
@@ -99,11 +100,11 @@ export const ESCROW_ABI = [
   { type: 'fallback', stateMutability: 'payable' },
 ] as const;
 
-export const ESCROW_CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_ESCROW_ADDRESS ?? '0x') as `0x${string}`;
+export const ESCROW_CONTRACT_ADDRESS = (readEnv(process.env.NEXT_PUBLIC_ESCROW_ADDRESS) ?? '0x') as `0x${string}`;
 
 // ─── ZK Proof Verifier Contract ────────────────────────────────────
 
-export const VERIFIER_CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_VERIFIER_ADDRESS ?? '0x') as `0x${string}`;
+export const VERIFIER_CONTRACT_ADDRESS = (readEnv(process.env.NEXT_PUBLIC_VERIFIER_ADDRESS) ?? '0x') as `0x${string}`;
 
 export const VERIFIER_ABI = [
   {

@@ -1,8 +1,10 @@
 'use client';
 
+import { readEnv, readIntEnv } from '@/lib/env';
+
 const isBrowser = typeof window !== 'undefined';
 
-export const isE2EMode = process.env.NEXT_PUBLIC_E2E_MODE === '1';
+export const isE2EMode = readEnv(process.env.NEXT_PUBLIC_E2E_MODE) === '1';
 
 const walletStorageKey = 'elios:e2e:wallet';
 const proofStorageKey = 'elios:e2e:verifiedTasks';
@@ -24,7 +26,7 @@ export interface E2EWalletState {
 const defaultWalletState: E2EWalletState = {
   connected: false,
   address: '0x123400000000000000000000000000000000abcd',
-  chainId: parseInt(process.env.NEXT_PUBLIC_BASE_CHAIN_ID || '8453', 10),
+  chainId: readIntEnv(process.env.NEXT_PUBLIC_BASE_CHAIN_ID, 8453),
 };
 
 function dispatch(name: string) {
