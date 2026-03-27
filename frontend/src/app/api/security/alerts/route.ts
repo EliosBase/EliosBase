@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { toSecurityAlert } from '@/lib/transforms';
 import { createSecurityAlert, type AlertSeverity } from '@/lib/audit';
+import { dedupeSignerBalanceAlerts } from '@/lib/productionData';
 
 export async function GET() {
   const session = await getSession();
@@ -21,7 +22,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 
-  return NextResponse.json(data.map(toSecurityAlert));
+  return NextResponse.json(dedupeSignerBalanceAlerts(data).map(toSecurityAlert));
 }
 
 // POST /api/security/alerts — create a new alert
