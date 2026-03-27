@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, Store, ListChecks, Wallet, ShieldCheck, X } from 'lucide-react';
-import { usePhantom } from '@/hooks/usePhantom';
+import { useWallet } from '@/hooks/useWallet';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useMounted } from '@/hooks/useMounted';
 
@@ -22,7 +22,7 @@ interface SidebarProps {
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { isConnected, shortAddress } = usePhantom();
+  const { isConnected, shortAddress, walletName } = useWallet();
   const { isAuthenticated } = useAuthContext();
   const mounted = useMounted();
 
@@ -90,7 +90,9 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                 <p className="text-xs text-white/70 font-[family-name:var(--font-mono)] truncate">
                   {shortAddress}
                 </p>
-                <p className="text-[10px] text-white/40">Base Network</p>
+                <p className="text-[10px] text-white/40 truncate">
+                  {walletName ? `${walletName} · Base` : 'Base'}
+                </p>
               </div>
               <div className={`w-2 h-2 rounded-full ${isAuthenticated ? 'bg-green-500' : 'bg-yellow-500'}`} />
             </div>
