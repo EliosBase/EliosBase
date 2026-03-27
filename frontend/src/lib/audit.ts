@@ -1,4 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server';
+import { readEnv } from '@/lib/env';
 
 // ─── Audit Log Actions ──────────────────────────────────────────
 export type AuditAction =
@@ -117,7 +118,7 @@ export async function createSecurityAlert(params: {
     });
 
     // Fire webhook for critical/high alerts (Discord/Slack compatible)
-    const webhookUrl = process.env.ALERT_WEBHOOK_URL;
+    const webhookUrl = readEnv(process.env.ALERT_WEBHOOK_URL);
     if (webhookUrl && ['critical', 'high'].includes(params.severity)) {
       fetch(webhookUrl, {
         method: 'POST',
