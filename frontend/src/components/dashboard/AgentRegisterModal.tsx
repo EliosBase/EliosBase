@@ -65,6 +65,7 @@ export default function AgentRegisterModal({ onClose }: AgentRegisterModalProps)
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
+            aria-label="Close agent registration"
           >
             <X size={20} />
           </button>

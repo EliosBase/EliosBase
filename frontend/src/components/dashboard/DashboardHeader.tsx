@@ -21,6 +21,7 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
         <button
           onClick={onMenuClick}
           className="lg:hidden p-2 -ml-2 text-white/50 hover:text-white rounded-lg hover:bg-white/5"
+          aria-label="Open navigation"
         >
           <Menu size={20} />
         </button>
@@ -38,6 +39,7 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
             onClick={() => signOut()}
             className="p-2 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-colors"
             title="Disconnect"
+            aria-label="Disconnect wallet"
           >
             <LogOut size={16} />
           </button>
