@@ -12,7 +12,7 @@ const navItems = [
   { href: '/app/marketplace', label: 'Marketplace', icon: Store },
   { href: '/app/tasks', label: 'Tasks', icon: ListChecks },
   { href: '/app/wallet', label: 'Wallet', icon: Wallet },
-  { href: '/app/security', label: 'Security', icon: ShieldCheck },
+  { href: '/app/security', label: 'Security', icon: ShieldCheck, privileged: true },
 ];
 
 interface SidebarProps {
@@ -23,8 +23,10 @@ interface SidebarProps {
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { isConnected, shortAddress, walletName } = useWallet();
-  const { isAuthenticated } = useAuthContext();
+  const { isAuthenticated, session } = useAuthContext();
   const mounted = useMounted();
+  const canAccessSecurity = session?.role === 'admin' || session?.role === 'operator';
+  const visibleNavItems = navItems.filter((item) => !item.privileged || canAccessSecurity);
 
   const isActive = (href: string) => {
     if (href === '/app') return pathname === '/app';
@@ -62,7 +64,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
         {/* Nav links */}
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => (
+          {visibleNavItems.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}

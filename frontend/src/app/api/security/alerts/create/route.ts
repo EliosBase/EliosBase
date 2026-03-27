@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSession } from '@/lib/session';
+import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { createSecurityAlert, type AlertSeverity } from '@/lib/audit';
 import { createServiceClient } from '@/lib/supabase/server';
 import { toSecurityAlert } from '@/lib/transforms';
 
 // POST /api/security/alerts/create — programmatically create an alert
 export async function POST(req: NextRequest) {
-  const session = await getSession();
-  if (!session.userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdminOrOperator(req);
+  if (auth.error) return auth.error;
 
   const body = await req.json();
 
@@ -25,7 +23,7 @@ export async function POST(req: NextRequest) {
     title: body.title,
     description: body.description,
     source: body.source,
-    actor: session.walletAddress ?? session.userId,
+    actor: auth.session.walletAddress ?? auth.session.userId,
   });
 
   if (error) {

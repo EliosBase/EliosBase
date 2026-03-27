@@ -10,7 +10,24 @@ test('shows the auth gate when security data is unavailable', async ({ page }) =
   await expect(page.getByText('Connect your wallet and sign in to view security data.')).toBeVisible();
 });
 
-test('resolves alerts and toggles guardrails for authenticated users', async ({ page }) => {
+test('shows the role gate for authenticated submitters', async ({ page }) => {
+  await mockAppApi(page, {
+    session: {
+      authenticated: true,
+      userId: 'submitter-1',
+      walletAddress: '0xfeed00000000000000000000000000000000beef',
+      chainId: 8453,
+      role: 'submitter',
+    },
+  });
+
+  await page.goto('/app/security');
+
+  await expect(page.getByText('Security Center is limited to operator and admin accounts.')).toBeVisible();
+  await expect(page.getByText('Threats Blocked')).not.toBeVisible();
+});
+
+test('resolves alerts and toggles guardrails for operators', async ({ page }) => {
   await mockAppApi(page, {
     session: {
       authenticated: true,
