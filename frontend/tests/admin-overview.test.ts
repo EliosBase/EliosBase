@@ -35,7 +35,7 @@ describe('GET /api/admin/overview', () => {
   it('returns aggregate stats for admin', async () => {
     mocks.getSession.mockResolvedValue({ userId: 'u1', role: 'admin' });
 
-    const mockFrom = (table: string) => ({
+    const mockFrom = () => ({
       select: (_sel: string, opts?: { count?: string; head?: boolean }) => {
         if (opts?.head) {
           return {

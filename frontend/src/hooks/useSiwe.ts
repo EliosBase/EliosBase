@@ -6,6 +6,7 @@ import { base } from 'wagmi/chains';
 import { SiweMessage } from 'siwe';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { clearE2EWalletState, isE2EMode } from '@/lib/e2e';
 
 export function useSiwe() {
   const { address, isConnected, isReconnecting } = useAccount();
@@ -23,6 +24,11 @@ export function useSiwe() {
   const hasAutoTriggered = useRef(false);
 
   const signIn = useCallback(async () => {
+    if (isE2EMode) {
+      await refreshSession();
+      return;
+    }
+
     if (!address || isSigningIn) return;
     setIsSigningIn(true);
     try {
@@ -70,7 +76,11 @@ export function useSiwe() {
 
   const signOut = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
-    disconnect();
+    if (isE2EMode) {
+      clearE2EWalletState();
+    } else {
+      disconnect();
+    }
     hasAutoTriggered.current = false;
     await refreshSession();
   }, [disconnect, refreshSession]);

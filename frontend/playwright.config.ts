@@ -26,6 +26,7 @@ export default defineConfig({
       ANTHROPIC_API_KEY: 'playwright-anthropic-key',
       BASE_RPC_URL: 'http://127.0.0.1:8545',
       CRON_SECRET: 'playwright-cron-secret',
+      NEXT_PUBLIC_E2E_MODE: '1',
       NEXT_PUBLIC_CHAIN: 'testnet',
       NEXT_PUBLIC_ESCROW_ADDRESS: '0x0000000000000000000000000000000000000001',
       NEXT_PUBLIC_SITE_URL: baseURL,

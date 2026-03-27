@@ -21,6 +21,7 @@ interface TransactionRowProps {
 
 export default function TransactionRow({ tx }: TransactionRowProps) {
   const { icon: Icon, label, color } = typeConfig[tx.type];
+  const amountLabel = tx.amount.endsWith(` ${tx.token}`) ? tx.amount : `${tx.amount} ${tx.token}`;
 
   return (
     <div className="flex items-center gap-4 px-4 py-3 hover:bg-white/3 transition-colors rounded-lg">
@@ -37,7 +38,7 @@ export default function TransactionRow({ tx }: TransactionRowProps) {
 
       <div className="text-right flex-shrink-0">
         <p className="text-sm font-medium text-white font-[family-name:var(--font-mono)]">
-          {tx.amount} {tx.token}
+          {amountLabel}
         </p>
         <div className="flex items-center gap-2 justify-end mt-0.5">
           <span className={`text-[10px] px-1.5 py-0.5 rounded ${statusStyles[tx.status]}`}>

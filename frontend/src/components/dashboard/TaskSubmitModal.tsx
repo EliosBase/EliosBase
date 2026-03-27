@@ -35,6 +35,7 @@ export default function TaskSubmitModal({ onClose }: TaskSubmitModalProps) {
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
+            aria-label="Close task submission"
           >
             <X size={20} />
           </button>
