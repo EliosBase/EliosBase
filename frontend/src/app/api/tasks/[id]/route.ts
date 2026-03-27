@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { getSession } from '@/lib/session';
+import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { toTask } from '@/lib/transforms';
 import { logAudit, logActivity, checkRateLimit } from '@/lib/audit';
-import { validateOrigin } from '@/lib/csrf';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,14 +22,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const csrfError = validateOrigin(req);
-  if (csrfError) return csrfError;
-
   const { id } = await params;
-  const session = await getSession();
-  if (!session.userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdminOrOperator(req);
+  if (auth.error) return auth.error;
 
   const body = await req.json();
   const supabase = createServiceClient();
@@ -54,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!allowed) {
       await logAudit({
         action: 'RATE_LIMIT',
-        actor: session.walletAddress ?? session.userId!,
+        actor: auth.session.walletAddress ?? auth.session.userId,
         target: `agent:${body.assignedAgent}`,
         result: 'DENY',
       });
@@ -78,22 +72,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   // Determine audit action based on what changed
-  const actor = session.walletAddress ?? session.userId!;
+  const actor = auth.session.walletAddress ?? auth.session.userId;
   if (body.assignedAgent) {
     await logAudit({ action: 'TASK_ASSIGN', actor, target: id, result: 'ALLOW' });
-    await logActivity({ type: 'task', message: `Task assigned to agent: ${data.agents?.name ?? body.assignedAgent}`, userId: session.userId });
+    await logActivity({ type: 'task', message: `Task assigned to agent: ${data.agents?.name ?? body.assignedAgent}`, userId: auth.session.userId });
   }
   if (body.status === 'completed') {
     await logAudit({ action: 'TASK_COMPLETE', actor, target: id, result: 'ALLOW' });
-    await logActivity({ type: 'task', message: `Task completed: ${data.title}`, userId: session.userId });
+    await logActivity({ type: 'task', message: `Task completed: ${data.title}`, userId: auth.session.userId });
   }
   if (body.currentStep && body.currentStep !== 'Complete') {
     await logAudit({ action: 'TASK_UPDATE', actor, target: id, result: 'ALLOW' });
-    await logActivity({ type: 'task', message: `Task "${data.title}" moved to ${body.currentStep}`, userId: session.userId });
+    await logActivity({ type: 'task', message: `Task "${data.title}" moved to ${body.currentStep}`, userId: auth.session.userId });
   }
   if (body.zkProofId) {
     await logAudit({ action: 'PROOF_SUBMIT', actor, target: id, result: 'ALLOW' });
-    await logActivity({ type: 'proof', message: `ZK proof submitted for task: ${data.title}`, userId: session.userId });
+    await logActivity({ type: 'proof', message: `ZK proof submitted for task: ${data.title}`, userId: auth.session.userId });
   }
 
   return NextResponse.json(toTask(data));

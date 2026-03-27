@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { getSession } from '@/lib/session';
+import { requireAdminOrOperatorSession } from '@/lib/adminAuth';
 
 // GET /api/security/stats — live security statistics
 export async function GET() {
-  const session = await getSession();
-  if (!session.userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAdminOrOperatorSession();
+  if (auth.error) return auth.error;
 
   const supabase = createServiceClient();
 
