@@ -135,3 +135,40 @@ test('submits a task from the dashboard modal', async ({ page }) => {
       reward: '0.05 ETH',
     });
 });
+
+test('releases escrow for a completed verified task and records the payout', async ({ page }) => {
+  await mockAppApi(page, {
+    session,
+    e2eWalletConnected: true,
+    verifiedTasks: ['task-complete'],
+    tasks: [
+      {
+        id: 'task-complete',
+        title: 'Contract audit report',
+        description: 'Summarize the critical Solidity findings.',
+        status: 'completed',
+        currentStep: 'Complete',
+        assignedAgent: 'Audit Matrix',
+        reward: '0.25 ETH',
+        submittedAt: '2026-03-24T08:00:00.000Z',
+        completedAt: '2026-03-24T09:00:00.000Z',
+        submitterId: 'user-1',
+        hasExecutionResult: true,
+        zkProofId: 'proof-42',
+        agentOperatorAddress: '0xfeed00000000000000000000000000000000beef',
+      },
+    ],
+    transactions: [],
+  });
+
+  await page.goto('/app/tasks');
+  await page.getByRole('button', { name: 'Completed (1)' }).click();
+  await expect(page.getByRole('button', { name: 'Release Funds' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Release Funds' }).click();
+  await expect(page.getByRole('button', { name: /Released/ })).toBeVisible();
+
+  await page.goto('/app/wallet');
+  await expect(page.getByText('Escrow Release')).toBeVisible();
+  await expect(page.getByText('0.25 ETH')).toBeVisible();
+});

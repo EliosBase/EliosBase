@@ -15,12 +15,20 @@ interface MockAppOptions {
   tasks?: JsonRecord[];
   taskResult?: JsonRecord | null;
   agents?: JsonRecord[];
+  stats?: JsonRecord;
+  activity?: JsonRecord[];
+  walletStats?: JsonRecord;
+  transactions?: JsonRecord[];
   securityStats?: JsonRecord;
   alerts?: JsonRecord[];
   guardrails?: JsonRecord[];
   auditLog?: JsonRecord[];
+  verifiedTasks?: string[];
+  e2eWalletConnected?: boolean;
   onTaskCreate?: (body: JsonRecord) => void;
   onAgentRegister?: (body: JsonRecord) => void;
+  onAgentHire?: (body: JsonRecord) => void;
+  onTaskRelease?: (body: JsonRecord) => void;
 }
 
 const defaultSecurityStats = {
@@ -33,6 +41,28 @@ const defaultSecurityStats = {
   proofsTrend: '+8%',
   uptime: '99.98%',
   uptimeTrend: '+0.02%',
+};
+
+const defaultDashboardStats = {
+  activeAgents: 18,
+  activeAgentsTrend: '+12%',
+  activeTasks: 7,
+  activeTasksTrend: '+3',
+  tvl: 12.42,
+  tvlTrend: '+0.8 ETH',
+  zkProofs: 241,
+  zkProofsTrend: '+19%',
+};
+
+const defaultWalletStats = {
+  balance: '3.21 ETH',
+  balanceTrend: '+0.12 ETH',
+  inEscrow: '0.45 ETH',
+  inEscrowTrend: '+0.05 ETH',
+  totalEarned: '8.80 ETH',
+  totalEarnedTrend: '+0.20 ETH',
+  staked: '1.50 ETH',
+  stakedTrend: 'Stable',
 };
 
 function clone<T>(value: T): T {
@@ -57,16 +87,40 @@ function fulfillJson(route: Route, body: unknown, status = 200) {
 }
 
 export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
-  const session = options.session ?? { authenticated: false };
+  let session = clone(options.session ?? { authenticated: false });
   const tasks = clone(options.tasks ?? []);
   const agents = clone(options.agents ?? []);
   const taskResult = options.taskResult ?? null;
+  const stats = clone(options.stats ?? defaultDashboardStats);
+  const activity = clone(options.activity ?? []);
+  let walletStats = clone(options.walletStats ?? defaultWalletStats);
+  const transactions = clone(options.transactions ?? []);
   const securityStats = clone(options.securityStats ?? defaultSecurityStats);
   let alerts = clone(options.alerts ?? []);
   let guardrails = clone(options.guardrails ?? []);
   let auditLog = clone(options.auditLog ?? []);
 
+  await page.addInitScript(
+    ({ connected, verifiedTasks, chainId }) => {
+      window.sessionStorage.setItem('elios:e2e:wallet', JSON.stringify({
+        connected,
+        address: '0x123400000000000000000000000000000000abcd',
+        chainId,
+      }));
+      window.sessionStorage.setItem('elios:e2e:verifiedTasks', JSON.stringify(verifiedTasks));
+    },
+    {
+      connected: options.e2eWalletConnected ?? false,
+      verifiedTasks: options.verifiedTasks ?? [],
+      chainId: options.session?.chainId ?? 8453,
+    },
+  );
+
   await page.route('**/api/auth/session', (route) => fulfillJson(route, session));
+  await page.route('**/api/auth/logout', (route) => {
+    session = { authenticated: false };
+    return fulfillJson(route, { authenticated: false });
+  });
 
   await page.route('**/api/tasks/*/result', (route) => {
     if (!taskResult) {
@@ -75,6 +129,11 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
 
     return fulfillJson(route, taskResult);
   });
+
+  await page.route('**/api/stats', (route) => fulfillJson(route, stats));
+  await page.route('**/api/activity', (route) => fulfillJson(route, activity));
+  await page.route('**/api/transactions', (route) => fulfillJson(route, transactions));
+  await page.route('**/api/wallet/stats', (route) => fulfillJson(route, walletStats));
 
   await page.route('**/api/tasks', (route) => {
     if (route.request().method() === 'POST') {
@@ -100,6 +159,41 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
     return fulfillJson(route, tasks);
   });
 
+  await page.route('**/api/tasks/*/release', (route) => {
+    const taskId = route.request().url().split('/').at(-2);
+    const body = parseBody(route);
+    options.onTaskRelease?.(body);
+
+    const task = tasks.find((entry) => entry.id === taskId);
+    if (!task) {
+      return fulfillJson(route, { error: 'Task not found' }, 404);
+    }
+
+    transactions.unshift({
+      id: `tx-release-${taskId}`,
+      type: 'escrow_release',
+      from: session.walletAddress ?? '0x1234',
+      to: task.agentOperatorAddress ?? task.assignedAgent ?? 'agent-operator',
+      amount: task.reward,
+      token: 'ETH',
+      status: 'confirmed',
+      timestamp: '2026-03-24T12:10:00.000Z',
+      txHash: String(body.txHash ?? '0xrelease'),
+    });
+    walletStats = {
+      ...walletStats,
+      inEscrow: '0.00 ETH',
+      inEscrowTrend: '-0.45 ETH',
+    };
+
+    return fulfillJson(route, {
+      success: true,
+      taskId,
+      transactionId: `tx-release-${taskId}`,
+      txStatus: 'confirmed',
+    });
+  });
+
   await page.route('**/api/agents/register', (route) => {
     const body = parseBody(route);
     options.onAgentRegister?.(body);
@@ -115,6 +209,51 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
 
     agents.unshift(createdAgent);
     return fulfillJson(route, createdAgent, 201);
+  });
+
+  await page.route('**/api/agents/*/hire', (route) => {
+    const agentId = route.request().url().split('/').at(-2);
+    const body = parseBody(route);
+    options.onAgentHire?.(body);
+
+    const agent = agents.find((entry) => entry.id === agentId);
+    if (!agent) {
+      return fulfillJson(route, { error: 'Agent not found' }, 404);
+    }
+
+    agent.status = 'busy';
+
+    const task = tasks.find((entry) => entry.id === body.taskId);
+    if (task) {
+      task.assignedAgent = String(agent.name ?? agentId);
+      task.currentStep = 'Assigned';
+    }
+
+    transactions.unshift({
+      id: `tx-hire-${agentId}`,
+      type: 'escrow_lock',
+      from: session.walletAddress ?? '0x1234',
+      to: agentId ?? 'agent',
+      amount: agent.pricePerTask ?? '0.00 ETH',
+      token: 'ETH',
+      status: 'confirmed',
+      timestamp: '2026-03-24T12:05:00.000Z',
+      txHash: String(body.txHash ?? '0xhire'),
+    });
+    walletStats = {
+      ...walletStats,
+      inEscrow: agent.pricePerTask ?? walletStats.inEscrow,
+      inEscrowTrend: '+0.12 ETH',
+    };
+
+    return fulfillJson(route, {
+      success: true,
+      agentId,
+      transactionId: `tx-hire-${agentId}`,
+      agentName: agent.name,
+      txHash: body.txHash,
+      txStatus: 'confirmed',
+    }, 201);
   });
 
   await page.route(/\/api\/agents(?:\?.*)?$/, (route) => fulfillJson(route, agents));

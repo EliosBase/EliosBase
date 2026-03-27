@@ -55,7 +55,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               <span className="text-white/60">BASE</span>
             </span>
           </Link>
-          <button onClick={onClose} className="lg:hidden text-white/50 hover:text-white">
+          <button onClick={onClose} className="lg:hidden text-white/50 hover:text-white" aria-label="Close navigation">
             <X size={20} />
           </button>
         </div>
