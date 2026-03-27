@@ -28,7 +28,10 @@ interface MockAppOptions {
   onTaskCreate?: (body: JsonRecord) => void;
   onAgentRegister?: (body: JsonRecord) => void;
   onAgentHire?: (body: JsonRecord) => void;
+  onTaskDispute?: (body: JsonRecord) => void;
+  onTaskRefund?: (body: JsonRecord) => void;
   onTaskRelease?: (body: JsonRecord) => void;
+  onTransactionSync?: (body: JsonRecord) => void;
 }
 
 const defaultSecurityStats = {
@@ -133,6 +136,25 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
   await page.route('**/api/stats', (route) => fulfillJson(route, stats));
   await page.route('**/api/activity', (route) => fulfillJson(route, activity));
   await page.route('**/api/transactions', (route) => fulfillJson(route, transactions));
+  await page.route('**/api/transactions/sync', (route) => {
+    const body = parseBody(route);
+    options.onTransactionSync?.(body);
+
+    const syncedTransaction = {
+      id: 'tx-payment-new',
+      type: body.type ?? 'payment',
+      from: body.from ?? session.walletAddress ?? '0x1234',
+      to: body.to ?? '0xrecipient',
+      amount: body.amount ?? '0.00 ETH',
+      token: body.token ?? 'ETH',
+      status: 'confirmed',
+      timestamp: '2026-03-24T12:15:00.000Z',
+      txHash: body.txHash ?? '0xpayment',
+    };
+
+    transactions.unshift(syncedTransaction);
+    return fulfillJson(route, syncedTransaction, 201);
+  });
   await page.route('**/api/wallet/stats', (route) => fulfillJson(route, walletStats));
 
   await page.route('**/api/tasks', (route) => {
@@ -192,6 +214,71 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
       transactionId: `tx-release-${taskId}`,
       txStatus: 'confirmed',
     });
+  });
+
+  await page.route('**/api/tasks/*/refund', (route) => {
+    const taskId = route.request().url().split('/').at(-2);
+    const body = parseBody(route);
+    options.onTaskRefund?.(body);
+
+    const task = tasks.find((entry) => entry.id === taskId);
+    if (!task) {
+      return fulfillJson(route, { error: 'Task not found' }, 404);
+    }
+
+    task.hasOpenDispute = false;
+    transactions.unshift({
+      id: `tx-refund-${taskId}`,
+      type: 'escrow_refund',
+      from: session.walletAddress ?? '0x1234',
+      to: session.walletAddress ?? '0x1234',
+      amount: task.reward,
+      token: 'ETH',
+      status: 'confirmed',
+      timestamp: '2026-03-24T12:12:00.000Z',
+      txHash: String(body.txHash ?? '0xrefund'),
+    });
+    walletStats = {
+      ...walletStats,
+      inEscrow: '0.00 ETH',
+      inEscrowTrend: '-0.20 ETH',
+    };
+
+    return fulfillJson(route, {
+      success: true,
+      taskId,
+      transactionId: `tx-refund-${taskId}`,
+      txStatus: 'confirmed',
+    });
+  });
+
+  await page.route('**/api/tasks/*/dispute', (route) => {
+    const taskId = route.request().url().split('/').at(-2);
+    const body = parseBody(route);
+    options.onTaskDispute?.(body);
+
+    const task = tasks.find((entry) => entry.id === taskId);
+    if (!task) {
+      return fulfillJson(route, { error: 'Task not found' }, 404);
+    }
+
+    task.hasOpenDispute = true;
+    alerts.unshift({
+      id: `alert-dispute-${taskId}`,
+      severity: 'medium',
+      title: `Dispute opened for ${task.title ?? taskId}`,
+      description: String(body.reason ?? ''),
+      source: `Task Dispute · ${taskId}`,
+      timestamp: 'just now',
+      resolved: false,
+    });
+
+    return fulfillJson(route, {
+      success: true,
+      alertId: `alert-dispute-${taskId}`,
+      taskId,
+      hasOpenDispute: true,
+    }, 201);
   });
 
   await page.route('**/api/agents/register', (route) => {

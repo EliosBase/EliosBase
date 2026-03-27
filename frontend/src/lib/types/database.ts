@@ -38,6 +38,7 @@ export interface DbTask {
   zk_commitment: string | null;
   zk_verify_tx_hash: string | null;
   step_changed_at?: string | null;
+  has_open_dispute?: boolean;
   agents?: {
     name: string;
     type?: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
@@ -50,7 +51,7 @@ export interface DbTask {
 
 export interface DbTransaction {
   id: string;
-  type: 'escrow_lock' | 'escrow_release' | 'payment' | 'reward' | 'stake';
+  type: 'escrow_lock' | 'escrow_release' | 'escrow_refund' | 'payment' | 'reward' | 'stake';
   from: string;
   to: string;
   amount: string;

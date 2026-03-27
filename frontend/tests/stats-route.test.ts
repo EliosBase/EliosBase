@@ -125,4 +125,21 @@ describe('GET /api/stats', () => {
     expect(json.sparklines.tvl.at(-1)).toBeCloseTo(0.85, 5);
     expect(json.sparklines.tvl.every((point: number) => point >= 0)).toBe(true);
   });
+
+  it('subtracts refunded escrow from tvl and sparkline calculations', async () => {
+    mocks.createServiceClient.mockReturnValue(makeSupabase({
+      agents: [],
+      tasks: [],
+      transactions: [
+        { type: 'escrow_lock', status: 'confirmed', amount: '1.00 ETH', timestamp: isoDaysAgo(13) },
+        { type: 'escrow_refund', status: 'confirmed', amount: '0.35 ETH', timestamp: isoDaysAgo(2) },
+      ],
+    }));
+
+    const res = await GET();
+    const json = await res.json();
+
+    expect(json.tvl).toBeCloseTo(0.65, 5);
+    expect(json.sparklines.tvl.at(-1)).toBeCloseTo(0.65, 5);
+  });
 });

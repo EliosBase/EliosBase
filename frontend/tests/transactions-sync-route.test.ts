@@ -130,6 +130,24 @@ describe('transactions sync routes', () => {
     });
   });
 
+  it('rejects a transaction sync when the sender does not match the session wallet', async () => {
+    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
+
+    const response = await route.POST(makePostRequest({
+      type: 'payment',
+      from: '0xdef',
+      to: '0x123',
+      amount: '0.15 ETH',
+      token: 'ETH',
+      txHash: '0x1234',
+    }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Transaction sender does not match your wallet',
+    });
+  });
+
   it('returns 401 for unauthenticated batch sync requests', async () => {
     mocks.getSession.mockResolvedValue({});
 
