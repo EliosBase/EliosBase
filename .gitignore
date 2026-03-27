@@ -8,3 +8,4 @@ cache/
 contracts/out/
 frontend/output/
 frontend/playwright-report/
+docs/
