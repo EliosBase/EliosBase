@@ -29,7 +29,7 @@ export async function GET() {
   }
 
   // Calculate "In Escrow" — active escrow_lock minus released for this user
-  const [locksRes, releasesRes, rewardsRes, stakesRes] = await Promise.all([
+  const [locksRes, releasesRes, refundsRes, rewardsRes, stakesRes, activeLocksRes, activeReleasesRes, activeRefundsRes] = await Promise.all([
     supabase
       .from('transactions')
       .select('amount')
@@ -41,6 +41,12 @@ export async function GET() {
       .select('amount')
       .eq('user_id', session.userId)
       .eq('type', 'escrow_release')
+      .eq('status', 'confirmed'),
+    supabase
+      .from('transactions')
+      .select('amount')
+      .eq('user_id', session.userId)
+      .eq('type', 'escrow_refund')
       .eq('status', 'confirmed'),
     // Total Earned — reward transactions for this user
     supabase
@@ -56,6 +62,24 @@ export async function GET() {
       .eq('user_id', session.userId)
       .eq('type', 'stake')
       .eq('status', 'confirmed'),
+    supabase
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', session.userId)
+      .eq('type', 'escrow_lock')
+      .eq('status', 'confirmed'),
+    supabase
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', session.userId)
+      .eq('type', 'escrow_release')
+      .eq('status', 'confirmed'),
+    supabase
+      .from('transactions')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', session.userId)
+      .eq('type', 'escrow_refund')
+      .eq('status', 'confirmed'),
   ]);
 
   const parseAmounts = (rows: { amount: string }[] | null) =>
@@ -66,24 +90,22 @@ export async function GET() {
 
   const lockedTotal = parseAmounts(locksRes.data);
   const releasedTotal = parseAmounts(releasesRes.data);
-  const inEscrow = Math.max(0, lockedTotal - releasedTotal);
+  const refundedTotal = parseAmounts(refundsRes.data);
+  const inEscrow = Math.max(0, lockedTotal - releasedTotal - refundedTotal);
 
   const totalEarned = parseAmounts(rewardsRes.data);
   const staked = parseAmounts(stakesRes.data);
 
-  // Count active escrow locks for trend
-  const { count: activeLocks } = await supabase
-    .from('transactions')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', session.userId)
-    .eq('type', 'escrow_lock')
-    .eq('status', 'confirmed');
+  const activeLocks = Math.max(
+    0,
+    (activeLocksRes.count ?? 0) - (activeReleasesRes.count ?? 0) - (activeRefundsRes.count ?? 0),
+  );
 
   return NextResponse.json({
     balance: `${ethBalance} ETH`,
     balanceTrend: '',
     inEscrow: `${inEscrow.toFixed(2)} ETH`,
-    inEscrowTrend: `${activeLocks ?? 0} active locks`,
+    inEscrowTrend: `${activeLocks} active locks`,
     totalEarned: `${totalEarned.toFixed(1)} ELIO`,
     totalEarnedTrend: '',
     staked: `${staked.toFixed(0)} ELIO`,

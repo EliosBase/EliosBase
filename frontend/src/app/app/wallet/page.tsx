@@ -2,6 +2,7 @@
 
 import StatCard from '@/components/dashboard/StatCard';
 import TransactionRow from '@/components/dashboard/TransactionRow';
+import WalletTransferCard from '@/components/dashboard/WalletTransferCard';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useWalletStats } from '@/hooks/useWalletStats';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -68,28 +69,32 @@ export default function WalletPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Smart Wallet Features */}
         <div>
-          <div className="glass p-5 rounded-2xl">
-            <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)] tracking-wide mb-1">
-              ERC-7579 Smart Wallet
-            </h2>
-            <p className="text-[11px] text-white/30 mb-4 font-[family-name:var(--font-body)]">
-              Modular account abstraction with built-in safety
-            </p>
-            <div className="space-y-3">
-              {smartWalletFeatures.map(({ icon: Icon, name, description, active }) => (
-                <div key={name} className="flex items-start gap-3 p-2.5 rounded-lg bg-white/3">
-                  <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Icon size={14} className="text-white/50" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm text-white/80 font-[family-name:var(--font-body)]">{name}</p>
-                      <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-green-500' : 'bg-white/20'}`} />
+          <div className="space-y-6">
+            <WalletTransferCard />
+
+            <div className="glass p-5 rounded-2xl">
+              <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)] tracking-wide mb-1">
+                ERC-7579 Smart Wallet
+              </h2>
+              <p className="text-[11px] text-white/30 mb-4 font-[family-name:var(--font-body)]">
+                Modular account abstraction with built-in safety
+              </p>
+              <div className="space-y-3">
+                {smartWalletFeatures.map(({ icon: Icon, name, description, active }) => (
+                  <div key={name} className="flex items-start gap-3 p-2.5 rounded-lg bg-white/3">
+                    <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Icon size={14} className="text-white/50" />
                     </div>
-                    <p className="text-[11px] text-white/35 mt-0.5">{description}</p>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-white/80 font-[family-name:var(--font-body)]">{name}</p>
+                        <span className={`w-1.5 h-1.5 rounded-full ${active ? 'bg-green-500' : 'bg-white/20'}`} />
+                      </div>
+                      <p className="text-[11px] text-white/35 mt-0.5">{description}</p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>

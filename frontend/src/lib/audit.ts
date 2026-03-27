@@ -9,6 +9,7 @@ export type AuditAction =
   | 'TASK_UPDATE'
   | 'ESCROW_LOCK'
   | 'ESCROW_RELEASE'
+  | 'ESCROW_REFUND'
   | 'PAYMENT'
   | 'REWARD'
   | 'STAKE'
@@ -25,7 +26,8 @@ export type AuditAction =
   | 'TASK_RESULT_VIEW'
   | 'TASK_RETRY'
   | 'TASK_REASSIGN'
-  | 'TASK_CANCEL';
+  | 'TASK_CANCEL'
+  | 'TASK_DISPUTE';
 
 export type AuditResult = 'ALLOW' | 'DENY' | 'FLAG';
 
@@ -245,6 +247,7 @@ export function txTypeToAuditAction(type: string): AuditAction {
   switch (type) {
     case 'escrow_lock': return 'ESCROW_LOCK';
     case 'escrow_release': return 'ESCROW_RELEASE';
+    case 'escrow_refund': return 'ESCROW_REFUND';
     case 'payment': return 'PAYMENT';
     case 'reward': return 'REWARD';
     case 'stake': return 'STAKE';

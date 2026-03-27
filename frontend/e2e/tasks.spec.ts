@@ -172,3 +172,73 @@ test('releases escrow for a completed verified task and records the payout', asy
   await expect(page.getByText('Escrow Release')).toBeVisible();
   await expect(page.getByText('0.25 ETH')).toBeVisible();
 });
+
+test('opens a dispute for a completed task and exposes the refund path', async ({ page }) => {
+  await mockAppApi(page, {
+    session,
+    e2eWalletConnected: true,
+    tasks: [
+      {
+        id: 'task-dispute',
+        title: 'Questionable audit result',
+        description: 'Review the agent output before funds are released.',
+        status: 'completed',
+        currentStep: 'Complete',
+        assignedAgent: 'Audit Matrix',
+        reward: '0.18 ETH',
+        submittedAt: '2026-03-24T08:00:00.000Z',
+        completedAt: '2026-03-24T09:00:00.000Z',
+        submitterId: 'user-1',
+        hasExecutionResult: true,
+        zkProofId: 'proof-99',
+        agentOperatorAddress: '0xfeed00000000000000000000000000000000beef',
+      },
+    ],
+  });
+
+  await page.goto('/app/tasks');
+  await page.getByRole('button', { name: 'Completed (1)' }).click();
+  await page.getByRole('button', { name: 'Open Dispute' }).click();
+  await page.getByPlaceholder('Describe what went wrong and why the task should be reviewed.').fill(
+    'The output skipped the core authorization review and needs operator intervention.',
+  );
+  await page.getByRole('button', { name: 'Submit Dispute' }).click();
+
+  await expect(page.getByText('Dispute Open')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Refund Escrow' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Release Funds' })).toHaveCount(0);
+});
+
+test('refunds escrow for a failed task and records the refund', async ({ page }) => {
+  await mockAppApi(page, {
+    session,
+    e2eWalletConnected: true,
+    tasks: [
+      {
+        id: 'task-failed',
+        title: 'Stalled execution task',
+        description: 'Track the terminal execution failure path.',
+        status: 'failed',
+        currentStep: 'Assigned',
+        assignedAgent: 'Audit Matrix',
+        reward: '0.20 ETH',
+        submittedAt: '2026-03-24T07:30:00.000Z',
+        submitterId: 'user-1',
+        executionFailureMessage: 'Anthropic request failed temporarily. Retry budget exhausted after 3 attempts.',
+        executionFailureRetryable: false,
+      },
+    ],
+    transactions: [],
+  });
+
+  await page.goto('/app/tasks');
+  await page.getByRole('button', { name: 'Failed (1)' }).click();
+  await expect(page.getByRole('button', { name: 'Refund Escrow' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Refund Escrow' }).click();
+  await expect(page.getByRole('button', { name: /Refunded/ })).toBeVisible();
+
+  await page.goto('/app/wallet');
+  await expect(page.getByText('Escrow Refund')).toBeVisible();
+  await expect(page.getByText('0.20 ETH', { exact: true })).toBeVisible();
+});
