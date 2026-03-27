@@ -1,50 +1,61 @@
 # EliosBase Frontend
 
-## Requirements
+This directory contains the deployed Next.js application for EliosBase.
 
-- Node.js 20+
-- npm 10+
-- A configured Supabase project
-- Base or Base Sepolia RPC access
+For the full project overview, architecture, contracts, database bootstrap, and repository-wide validation rules, start with the root [`README.md`](../README.md).
 
-## Local Setup
+## What Lives Here
 
-1. Copy the root `.env.example` and fill in the required values.
-2. Install dependencies:
+- Public marketing site at `/`
+- Authenticated product surfaces under `/app`
+- API routes under `src/app/api`
+- Browser and integration tests under `tests` and `e2e`
+- Vercel deployment config in [`vercel.json`](vercel.json)
+
+## Local Development
 
 ```bash
+cp .env.example .env.local
 npm install
-```
-
-3. Start the app:
-
-```bash
 npm run dev
 ```
 
-4. Open `http://localhost:3000`.
+Open `http://localhost:3000`.
 
 ## Validation
 
 ```bash
+npm test
 npm run lint
 npm run build
-npm run smoke:real
+npm run e2e
 ```
 
-These checks now run in CI together with `forge test`.
-Set `SMOKE_BASE_URL` before running the real-environment smoke script, and optionally provide `SMOKE_CRON_SECRET`, `SMOKE_SESSION_COOKIE`, and `SMOKE_TASK_ID` for deeper coverage.
+Live smoke:
 
-## Key Runtime Areas
+```bash
+SMOKE_BASE_URL=https://eliosbase.net npm run smoke:real
+```
 
-- `src/app/api/` for API routes
-- `src/app/app/` for the authenticated dashboard pages
-- `src/lib/` for Supabase, proof, contract, and session code
-- `src/components/dashboard/` for task, agent, wallet, and security UI
+Optional inputs for deeper smoke coverage:
 
-## Additional Docs
+- `SMOKE_CRON_SECRET`
+- `SMOKE_SESSION_COOKIE`
+- `SMOKE_TASK_ID`
 
-- `../runbooks/local-setup.md`
-- `../runbooks/deployment-runbook.md`
-- `../runbooks/contracts-circuits-runbook.md`
-- `../runbooks/manual-smoke-checklist.md`
+## Environment
+
+The minimum local env set is documented in [`.env.example`](.env.example). In practice you will need:
+
+- Supabase credentials
+- Base RPC access
+- deployed escrow and verifier addresses
+- a session secret
+- a cron secret
+- an Anthropic API key for task execution
+
+For production source map uploads, also set:
+
+- `SENTRY_AUTH_TOKEN`
+- `SENTRY_ORG`
+- `SENTRY_PROJECT`
