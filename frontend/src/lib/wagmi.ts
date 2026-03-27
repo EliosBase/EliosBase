@@ -7,17 +7,27 @@ const isTestnet = readEnv(process.env.NEXT_PUBLIC_CHAIN) === 'testnet';
 
 export const activeChain = isTestnet ? baseSepolia : base;
 
+const connectors = [
+  injected({ target: 'metaMask' }),
+  injected({ target: 'coinbaseWallet' }),
+  injected({ target: 'rabby' }),
+  injected({ target: 'phantom' }),
+  injected(),
+];
+
 export const config = isTestnet
   ? createConfig({
       chains: [baseSepolia],
-      connectors: [injected({ target: 'phantom' })],
+      connectors,
+      multiInjectedProviderDiscovery: false,
       transports: {
         [baseSepolia.id]: http(),
       },
     })
   : createConfig({
       chains: [base],
-      connectors: [injected({ target: 'phantom' })],
+      connectors,
+      multiInjectedProviderDiscovery: false,
       transports: {
         [base.id]: http(),
       },
