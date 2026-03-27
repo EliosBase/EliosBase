@@ -3,22 +3,33 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { toTask } from '@/lib/transforms';
 import { logAudit, logActivity, checkRateLimit } from '@/lib/audit';
+import { buildTaskDisputeSource } from '@/lib/taskDisputes';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = createServiceClient();
 
-  const { data, error } = await supabase
-    .from('tasks')
-    .select('*, agents(name)')
-    .eq('id', id)
-    .single();
+  const [{ data, error }, disputesRes] = await Promise.all([
+    supabase
+      .from('tasks')
+      .select('*, agents(name, owner_id, users:owner_id(wallet_address))')
+      .eq('id', id)
+      .single(),
+    supabase
+      .from('security_alerts')
+      .select('id')
+      .eq('source', buildTaskDisputeSource(id))
+      .eq('resolved', false),
+  ]);
 
   if (error || !data) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   }
 
-  return NextResponse.json(toTask(data));
+  return NextResponse.json(toTask({
+    ...data,
+    has_open_dispute: (disputesRes.data ?? []).length > 0,
+  }));
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

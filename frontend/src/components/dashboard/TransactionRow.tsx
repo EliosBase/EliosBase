@@ -4,6 +4,7 @@ import { ArrowUpRight, ArrowDownLeft, Lock, Unlock, Award } from 'lucide-react';
 const typeConfig = {
   escrow_lock: { icon: Lock, label: 'Escrow Lock', color: 'text-yellow-400' },
   escrow_release: { icon: Unlock, label: 'Escrow Release', color: 'text-green-400' },
+  escrow_refund: { icon: Unlock, label: 'Escrow Refund', color: 'text-amber-400' },
   payment: { icon: ArrowUpRight, label: 'Payment', color: 'text-red-400' },
   reward: { icon: Award, label: 'Reward', color: 'text-green-400' },
   stake: { icon: ArrowDownLeft, label: 'Stake', color: 'text-blue-400' },

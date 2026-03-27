@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import { parseEther, stringToHex } from 'viem';
 import { ESCROW_ABI, ESCROW_CONTRACT_ADDRESS } from '@/lib/contracts';
 import { parseRewardAmount } from '@/lib/audit';
@@ -13,6 +13,10 @@ import { isE2EMode, readE2EWalletState } from '@/lib/e2e';
 function toBytes32(value: string): `0x${string}` {
   return stringToHex(value, { size: 32 });
 }
+
+const escrowStates = ['None', 'Locked', 'Released', 'Refunded'] as const;
+
+export type EscrowState = (typeof escrowStates)[number];
 
 function useE2ETransaction() {
   const [txHash, setTxHash] = useState<`0x${string}` | undefined>();
@@ -174,5 +178,38 @@ export function useEscrowRefund() {
     isConfirmed: isE2EMode ? e2eTx.isConfirmed : isConfirmed,
     error: isE2EMode ? e2eTx.error : writeError,
     reset: isE2EMode ? e2eTx.reset : reset,
+  };
+}
+
+export function useEscrowStatus(taskId: string) {
+  const taskIdBytes = toBytes32(taskId);
+  const e2eWallet = readE2EWalletState();
+  const contract = useReadContract({
+    address: ESCROW_CONTRACT_ADDRESS,
+    abi: ESCROW_ABI,
+    functionName: 'getEscrow',
+    args: [taskIdBytes],
+    query: {
+      enabled: !isE2EMode && ESCROW_CONTRACT_ADDRESS !== '0x',
+    },
+  });
+
+  if (isE2EMode) {
+    return {
+      amount: 0n,
+      depositor: e2eWallet.address as `0x${string}`,
+      state: (e2eWallet.connected ? 'Locked' : 'None') as EscrowState,
+      isLoading: false,
+    };
+  }
+
+  const data = contract.data as readonly [`0x${string}`, `0x${string}`, bigint, number] | undefined;
+  const [depositor = '0x0000000000000000000000000000000000000000', , amount = 0n, stateValue = 0] = data ?? [];
+
+  return {
+    amount,
+    depositor,
+    isLoading: contract.isLoading,
+    state: escrowStates[stateValue] ?? 'None',
   };
 }

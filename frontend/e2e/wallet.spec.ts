@@ -67,3 +67,26 @@ test('renders wallet stats, smart-wallet capabilities, and transaction history',
   await expect(page.getByText('Escrow Release')).toBeVisible();
   await expect(page.getByText('pending', { exact: true })).toBeVisible();
 });
+
+test('withdraws eth from the connected wallet and records the payout', async ({ page }) => {
+  await mockAppApi(page, {
+    session: {
+      authenticated: true,
+      userId: 'user-1',
+      walletAddress: '0x123400000000000000000000000000000000abcd',
+      chainId: 8453,
+      role: 'submitter',
+    },
+    e2eWalletConnected: true,
+    transactions: [],
+  });
+
+  await page.goto('/app/wallet');
+  await page.getByPlaceholder('0x...').fill('0xfeed00000000000000000000000000000000beef');
+  await page.getByPlaceholder('0.00').fill('0.05');
+  await page.getByRole('button', { name: 'Withdraw ETH' }).click();
+
+  await expect(page.getByRole('button', { name: 'Sent' })).toBeVisible();
+  await expect(page.getByText('Payment', { exact: true })).toBeVisible();
+  await expect(page.getByText('0.05 ETH', { exact: true })).toBeVisible();
+});
