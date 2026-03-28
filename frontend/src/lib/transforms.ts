@@ -39,6 +39,7 @@ export function toTask(row: DbTask): Task {
     executionFailureRetryable: executionFailure?.retryable,
     submitterId: row.submitter_id,
     agentOperatorAddress: row.agents?.users?.wallet_address ?? undefined,
+    hasOpenDispute: row.has_open_dispute ?? false,
   };
 }
 

@@ -1,12 +1,13 @@
 import { createWalletClient, createPublicClient, http, stringToHex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { base, baseSepolia } from 'viem/chains';
+import { readEnv, readRequiredEnv } from '@/lib/env';
 import { VERIFIER_ABI, VERIFIER_CONTRACT_ADDRESS } from './contracts';
 import { formatProofForContract, type ZkProofResult } from './zkProof';
 
-const isTestnet = process.env.NEXT_PUBLIC_CHAIN === 'testnet';
+const isTestnet = readEnv(process.env.NEXT_PUBLIC_CHAIN) === 'testnet';
 const chain = isTestnet ? baseSepolia : base;
-const rpcUrl = process.env.BASE_RPC_URL || (isTestnet ? 'https://sepolia.base.org' : 'https://mainnet.base.org');
+const rpcUrl = readEnv(process.env.BASE_RPC_URL) || (isTestnet ? 'https://sepolia.base.org' : 'https://mainnet.base.org');
 
 /**
  * Submit a ZK proof to the EliosProofVerifier contract on-chain.
@@ -16,10 +17,10 @@ export async function submitProofOnChain(
   taskId: string,
   proofResult: ZkProofResult
 ): Promise<string> {
-  const privateKey = process.env.PROOF_SUBMITTER_PRIVATE_KEY;
-  if (!privateKey) {
-    throw new Error('PROOF_SUBMITTER_PRIVATE_KEY not configured');
-  }
+  const privateKey = readRequiredEnv(
+    'PROOF_SUBMITTER_PRIVATE_KEY',
+    process.env.PROOF_SUBMITTER_PRIVATE_KEY,
+  );
 
   const account = privateKeyToAccount(privateKey as `0x${string}`);
 

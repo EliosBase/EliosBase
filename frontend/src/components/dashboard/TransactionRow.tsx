@@ -4,6 +4,7 @@ import { ArrowUpRight, ArrowDownLeft, Lock, Unlock, Award } from 'lucide-react';
 const typeConfig = {
   escrow_lock: { icon: Lock, label: 'Escrow Lock', color: 'text-yellow-400' },
   escrow_release: { icon: Unlock, label: 'Escrow Release', color: 'text-green-400' },
+  escrow_refund: { icon: Unlock, label: 'Escrow Refund', color: 'text-amber-400' },
   payment: { icon: ArrowUpRight, label: 'Payment', color: 'text-red-400' },
   reward: { icon: Award, label: 'Reward', color: 'text-green-400' },
   stake: { icon: ArrowDownLeft, label: 'Stake', color: 'text-blue-400' },
@@ -21,6 +22,7 @@ interface TransactionRowProps {
 
 export default function TransactionRow({ tx }: TransactionRowProps) {
   const { icon: Icon, label, color } = typeConfig[tx.type];
+  const amountLabel = tx.amount.endsWith(` ${tx.token}`) ? tx.amount : `${tx.amount} ${tx.token}`;
 
   return (
     <div className="flex items-center gap-4 px-4 py-3 hover:bg-white/3 transition-colors rounded-lg">
@@ -37,7 +39,7 @@ export default function TransactionRow({ tx }: TransactionRowProps) {
 
       <div className="text-right flex-shrink-0">
         <p className="text-sm font-medium text-white font-[family-name:var(--font-mono)]">
-          {tx.amount} {tx.token}
+          {amountLabel}
         </p>
         <div className="flex items-center gap-2 justify-end mt-0.5">
           <span className={`text-[10px] px-1.5 py-0.5 rounded ${statusStyles[tx.status]}`}>

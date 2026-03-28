@@ -2,6 +2,38 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSession, type SessionData } from '@/lib/session';
 import { validateOrigin } from '@/lib/csrf';
 
+type PrivilegedRole = 'operator' | 'admin';
+type PrivilegedSession = SessionData & { userId: string; role: PrivilegedRole };
+
+function hasPrivilegedRole(role: SessionData['role']): role is PrivilegedRole {
+  return role === 'operator' || role === 'admin';
+}
+
+function unauthorized() {
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+}
+
+function forbidden() {
+  return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+}
+
+export async function requireAdminOrOperatorSession(): Promise<
+  { session: PrivilegedSession; error: null } |
+  { session: null; error: NextResponse }
+> {
+  const session = await getSession();
+
+  if (!session.userId) {
+    return { session: null, error: unauthorized() };
+  }
+
+  if (!hasPrivilegedRole(session.role)) {
+    return { session: null, error: forbidden() };
+  }
+
+  return { session: session as PrivilegedSession, error: null };
+}
+
 /**
  * Require admin or operator role for a mutation request.
  * Validates CSRF origin, session, and role.
@@ -10,7 +42,7 @@ export async function requireAdminOrOperator(
   req: NextRequest,
   { skipCsrf }: { skipCsrf?: boolean } = {}
 ): Promise<
-  { session: SessionData & { userId: string; role: string }; error: null } |
+  { session: PrivilegedSession; error: null } |
   { session: null; error: NextResponse }
 > {
   if (!skipCsrf) {
@@ -18,15 +50,5 @@ export async function requireAdminOrOperator(
     if (csrfError) return { session: null, error: csrfError };
   }
 
-  const session = await getSession();
-
-  if (!session.userId) {
-    return { session: null, error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
-  }
-
-  if (session.role !== 'admin' && session.role !== 'operator') {
-    return { session: null, error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
-  }
-
-  return { session: session as SessionData & { userId: string; role: string }, error: null };
+  return requireAdminOrOperatorSession();
 }
