@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useAccount, useSignMessage, useDisconnect, useSwitchChain } from 'wagmi';
-import { base } from 'wagmi/chains';
 import { SiweMessage } from 'siwe';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { clearE2EWalletState, isE2EMode } from '@/lib/e2e';
+import { activeChain } from '@/lib/wagmi';
 
 export function useSiwe() {
   const { address, isConnected, isReconnecting } = useAccount();
@@ -23,10 +24,15 @@ export function useSiwe() {
   const hasAutoTriggered = useRef(false);
 
   const signIn = useCallback(async () => {
+    if (isE2EMode) {
+      await refreshSession();
+      return;
+    }
+
     if (!address || isSigningIn) return;
     setIsSigningIn(true);
     try {
-      await switchChainAsync({ chainId: base.id });
+      await switchChainAsync({ chainId: activeChain.id });
 
       const nonceRes = await fetch('/api/auth/nonce');
       const { nonce } = await nonceRes.json();
@@ -37,7 +43,7 @@ export function useSiwe() {
         statement: 'Sign in to EliosBase',
         uri: window.location.origin,
         version: '1',
-        chainId: 8453,
+        chainId: activeChain.id,
         nonce,
       });
       const messageStr = message.prepareMessage();
@@ -70,7 +76,11 @@ export function useSiwe() {
 
   const signOut = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
-    disconnect();
+    if (isE2EMode) {
+      clearE2EWalletState();
+    } else {
+      disconnect();
+    }
     hasAutoTriggered.current = false;
     await refreshSession();
   }, [disconnect, refreshSession]);

@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session';
 import { toTask } from '@/lib/transforms';
 import { logAudit, logActivity, checkSpendingLimit, parseRewardAmount, generateId } from '@/lib/audit';
 import { validateOrigin } from '@/lib/csrf';
+import { getTaskIdFromDisputeSource } from '@/lib/taskDisputes';
 
 export async function GET(req: NextRequest) {
   const supabase = createServiceClient();
@@ -14,13 +15,30 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status');
   if (status) query = query.eq('status', status);
 
-  const { data, error } = await query.order('submitted_at', { ascending: false });
+  const [{ data, error }, disputesRes] = await Promise.all([
+    query.order('submitted_at', { ascending: false }),
+    supabase
+      .from('security_alerts')
+      .select('source')
+      .eq('resolved', false),
+  ]);
 
   if (error) {
     return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
   }
 
-  return NextResponse.json(data.map(toTask));
+  const openDisputes = new Set(
+    (disputesRes.data ?? [])
+      .map((alert) => getTaskIdFromDisputeSource(alert.source))
+      .filter((taskId): taskId is string => !!taskId),
+  );
+
+  return NextResponse.json(
+    data.map((task) => toTask({
+      ...task,
+      has_open_dispute: openDisputes.has(task.id),
+    })),
+  );
 }
 
 export async function POST(req: NextRequest) {

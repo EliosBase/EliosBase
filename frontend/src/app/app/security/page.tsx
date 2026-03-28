@@ -24,11 +24,12 @@ const resultColors: Record<string, string> = {
 };
 
 export default function SecurityPage() {
-  const { isAuthenticated } = useAuthContext();
-  const { data: securityAlerts = [] } = useSecurityAlerts(isAuthenticated);
-  const { data: guardrails = [] } = useGuardrails(isAuthenticated);
-  const { data: auditLog = [] } = useAuditLog(isAuthenticated);
-  const { data: stats } = useSecurityStats(isAuthenticated);
+  const { isAuthenticated, session } = useAuthContext();
+  const canAccessSecurity = session?.role === 'admin' || session?.role === 'operator';
+  const { data: securityAlerts = [] } = useSecurityAlerts(canAccessSecurity);
+  const { data: guardrails = [] } = useGuardrails(canAccessSecurity);
+  const { data: auditLog = [] } = useAuditLog(canAccessSecurity);
+  const { data: stats } = useSecurityStats(canAccessSecurity);
   const queryClient = useQueryClient();
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState('');
@@ -93,6 +94,16 @@ export default function SecurityPage() {
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <p className="text-white/40 text-sm font-[family-name:var(--font-body)]">
           Connect your wallet and sign in to view security data.
+        </p>
+      </div>
+    );
+  }
+
+  if (!canAccessSecurity) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <p className="text-white/40 text-sm font-[family-name:var(--font-body)]">
+          Security Center is limited to operator and admin accounts.
         </p>
       </div>
     );

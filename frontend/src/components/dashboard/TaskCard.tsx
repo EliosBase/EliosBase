@@ -6,7 +6,7 @@ import TaskResultModal from './TaskResultModal';
 import { type Task } from '@/lib/types';
 import { TASK_STEPS } from '@/lib/constants';
 import { AlertTriangle, Bot, CheckCircle, Loader2 } from 'lucide-react';
-import { useEscrowRelease } from '@/hooks/useEscrow';
+import { useEscrowRefund, useEscrowRelease, useEscrowStatus } from '@/hooks/useEscrow';
 import { useProofVerification } from '@/hooks/useProofVerification';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -16,18 +16,49 @@ interface TaskCardProps {
   canViewResult?: boolean;
 }
 
-type ReleaseStep = 'idle' | 'signing' | 'mining' | 'confirming' | 'released' | 'error';
+type EscrowActionStep = 'idle' | 'signing' | 'mining' | 'confirming' | 'released' | 'refunded' | 'error';
 
 export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardProps) {
   const currentStepIndex = TASK_STEPS.indexOf(task.currentStep);
   const queryClient = useQueryClient();
   const { release, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useEscrowRelease();
-  const [releaseStep, setReleaseStep] = useState<ReleaseStep>('idle');
+  const {
+    refundFunds,
+    txHash: refundTxHash,
+    isSigning: isRefundSigning,
+    isMining: isRefundMining,
+    isConfirmed: isRefundConfirmed,
+    error: refundContractError,
+    reset: resetRefund,
+  } = useEscrowRefund();
+  const { state: escrowState } = useEscrowStatus(task.id);
+  const [releaseStep, setReleaseStep] = useState<EscrowActionStep>('idle');
   const [releaseError, setReleaseError] = useState('');
+  const [refundStep, setRefundStep] = useState<EscrowActionStep>('idle');
+  const [refundError, setRefundError] = useState('');
   const [showResult, setShowResult] = useState(false);
+  const [isDisputeComposerOpen, setIsDisputeComposerOpen] = useState(false);
+  const [isSubmittingDispute, setIsSubmittingDispute] = useState(false);
+  const [disputeError, setDisputeError] = useState('');
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeOpened, setDisputeOpened] = useState(false);
   const { isVerified: onChainVerified } = useProofVerification(task.id);
 
-  const canRelease = isSubmitter && task.currentStep === 'Complete' && task.agentOperatorAddress && onChainVerified;
+  const hasOpenDispute = task.hasOpenDispute || disputeOpened;
+  const canRelease = isSubmitter
+    && !hasOpenDispute
+    && escrowState === 'Locked'
+    && task.currentStep === 'Complete'
+    && task.agentOperatorAddress
+    && onChainVerified;
+  const canRefund = isSubmitter
+    && escrowState === 'Locked'
+    && (task.status === 'failed' || hasOpenDispute);
+  const canDispute = isSubmitter
+    && !hasOpenDispute
+    && task.status !== 'failed'
+    && releaseStep !== 'released'
+    && refundStep !== 'refunded';
   const canOpenResult = !!canViewResult && !!task.hasExecutionResult && task.status === 'completed';
   const showsExecutionFailure = (task.currentStep === 'Assigned' || task.status === 'failed') && !!task.executionFailureMessage;
   const isTerminalExecutionFailure = task.status === 'failed' && showsExecutionFailure;
@@ -38,6 +69,11 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
     if (isMining && releaseStep === 'signing') setReleaseStep('mining');
   }, [isSigning, isMining, releaseStep]);
 
+  useEffect(() => {
+    if (isRefundSigning && refundStep === 'idle') setRefundStep('signing');
+    if (isRefundMining && refundStep === 'signing') setRefundStep('mining');
+  }, [isRefundSigning, isRefundMining, refundStep]);
+
   // When release tx confirmed, call API
   useEffect(() => {
     if (isConfirmed && txHash && releaseStep === 'mining') {
@@ -47,26 +83,34 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfirmed, txHash]);
 
+  useEffect(() => {
+    if (isRefundConfirmed && refundTxHash && refundStep === 'mining') {
+      setRefundStep('confirming');
+      registerRefund(refundTxHash);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRefundConfirmed, refundTxHash]);
+
   // Handle contract errors
   useEffect(() => {
     if (contractError && releaseStep !== 'idle' && releaseStep !== 'released') {
       setReleaseStep('error');
-      const raw = contractError.message ?? '';
-      let msg = 'Something went wrong. Please try again.';
-      if (raw.includes('User rejected') || raw.includes('user rejected')) {
-        msg = 'You cancelled the transaction.';
-      } else if (raw.includes('reverted') || raw.includes('InvalidState')) {
-        msg = 'Funds have already been released or refunded for this task.';
-      } else if (raw.includes('NotAuthorized')) {
-        msg = 'Only the task submitter can release funds.';
-      } else if (raw.includes('insufficient funds') || raw.includes('exceeds balance')) {
-        msg = 'Insufficient funds for gas fees.';
-      } else if (raw.includes('chain') || raw.includes('network')) {
-        msg = 'Please switch to Base network and try again.';
-      }
-      setReleaseError(msg);
+      setReleaseError(getEscrowErrorMessage(contractError.message, {
+        invalidState: 'Funds have already been released or refunded for this task.',
+        unauthorized: 'Only the task submitter can release funds.',
+      }));
     }
   }, [contractError, releaseStep]);
+
+  useEffect(() => {
+    if (refundContractError && refundStep !== 'idle' && refundStep !== 'refunded') {
+      setRefundStep('error');
+      setRefundError(getEscrowErrorMessage(refundContractError.message, {
+        invalidState: 'Escrow is no longer locked for this task.',
+        unauthorized: 'Only the task submitter can refund escrow.',
+      }));
+    }
+  }, [refundContractError, refundStep]);
 
   function handleRelease() {
     if (!canRelease || (releaseStep !== 'idle' && releaseStep !== 'error')) return;
@@ -74,6 +118,14 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
     setReleaseStep('idle');
     reset();
     release(task.id, task.agentOperatorAddress as `0x${string}`);
+  }
+
+  function handleRefund() {
+    if (!canRefund || (refundStep !== 'idle' && refundStep !== 'error')) return;
+    setRefundError('');
+    setRefundStep('idle');
+    resetRefund();
+    refundFunds(task.id);
   }
 
   async function registerRelease(hash: string) {
@@ -106,6 +158,77 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
     }
   }
 
+  async function registerRefund(hash: string) {
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/refund`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ txHash: hash }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: '' }));
+        const apiErr = data.error || '';
+        let msg = 'Failed to complete refund. Please try again.';
+        if (apiErr.includes('submitter')) msg = 'Only the task creator can refund escrow.';
+        else if (apiErr.includes('failed or under dispute')) msg = 'Open a dispute or wait for the task to fail before refunding escrow.';
+        else if (apiErr.includes('not to the escrow')) msg = 'Transaction verification failed. Please try again.';
+        setRefundError(msg);
+        setRefundStep('error');
+        return;
+      }
+      setRefundStep('refunded');
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['activity'] });
+      queryClient.invalidateQueries({ queryKey: ['wallet-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['security-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['security-stats'] });
+    } catch {
+      setRefundError('Network error. Check your connection and try again.');
+      setRefundStep('error');
+    }
+  }
+
+  async function handleDisputeSubmit() {
+    if (!canDispute || isSubmittingDispute) return;
+
+    const reason = disputeReason.trim();
+    if (reason.length < 10) {
+      setDisputeError('Explain the issue in at least 10 characters.');
+      return;
+    }
+
+    setIsSubmittingDispute(true);
+    setDisputeError('');
+
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/dispute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: '' }));
+        setDisputeError(data.error || 'Failed to open dispute');
+        return;
+      }
+
+      setDisputeOpened(true);
+      setDisputeReason('');
+      setIsDisputeComposerOpen(false);
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['activity'] });
+      queryClient.invalidateQueries({ queryKey: ['security-alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['security-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    } catch {
+      setDisputeError('Network error. Check your connection and try again.');
+    } finally {
+      setIsSubmittingDispute(false);
+    }
+  }
+
   const proofStatus = onChainVerified
     ? 'verified' as const
     : task.status === 'failed'
@@ -116,14 +239,27 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
         ? 'verifying' as const
         : 'pending' as const;
 
-  const releaseLabel = {
+  const releaseLabels: Record<EscrowActionStep, string> = {
     idle: 'Release Funds',
     signing: 'Sign Tx...',
     mining: 'Mining...',
     confirming: 'Confirming...',
     released: 'Released',
+    refunded: 'Released',
     error: 'Retry',
-  }[releaseStep];
+  };
+
+  const refundLabels: Record<EscrowActionStep, string> = {
+    idle: 'Refund Escrow',
+    signing: 'Sign Tx...',
+    mining: 'Mining...',
+    confirming: 'Confirming...',
+    released: 'Refund Escrow',
+    refunded: 'Refunded',
+    error: 'Retry',
+  };
+  const releaseLabel = releaseLabels[releaseStep];
+  const refundLabel = refundLabels[refundStep];
 
   return (
     <div className="glass p-5 rounded-2xl">
@@ -136,7 +272,14 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
             {task.description}
           </p>
         </div>
-        <ProofBadge status={proofStatus} proofId={task.zkProofId} />
+        <div className="flex items-center gap-2">
+          {hasOpenDispute ? (
+            <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-300">
+              Dispute Open
+            </span>
+          ) : null}
+          <ProofBadge status={proofStatus} proofId={task.zkProofId} />
+        </div>
       </div>
 
       {/* Timeline */}
@@ -203,6 +346,42 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
         </div>
       )}
 
+      {isDisputeComposerOpen ? (
+        <div className="mb-4 rounded-2xl border border-white/8 bg-white/3 p-4">
+          <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">
+            Open Dispute
+          </p>
+          <textarea
+            value={disputeReason}
+            onChange={(event) => setDisputeReason(event.target.value)}
+            rows={4}
+            placeholder="Describe what went wrong and why the task should be reviewed."
+            className="mt-3 w-full rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-sm text-white outline-none transition focus:border-white/25"
+          />
+          {disputeError ? (
+            <p className="mt-2 text-[11px] text-red-400">{disputeError}</p>
+          ) : null}
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <button
+              onClick={() => {
+                setIsDisputeComposerOpen(false);
+                setDisputeError('');
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/8 text-white/70 hover:bg-white/12 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDisputeSubmit}
+              disabled={isSubmittingDispute}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-300 text-black hover:bg-amber-200 transition-colors disabled:opacity-70"
+            >
+              {isSubmittingDispute ? 'Submitting...' : 'Submit Dispute'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-white/6">
         <div className="flex items-center gap-2">
@@ -220,9 +399,41 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
               View Result
             </button>
           )}
+          {canDispute && (
+            <button
+              onClick={() => {
+                setIsDisputeComposerOpen(true);
+                setDisputeError('');
+              }}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 transition-colors"
+            >
+              Open Dispute
+            </button>
+          )}
+          {canRefund && (
+            <button
+              onClick={handleRefund}
+              disabled={['signing', 'mining', 'confirming'].includes(refundStep) || refundStep === 'refunded'}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                refundStep === 'refunded'
+                  ? 'bg-green-500/15 text-green-400 border border-green-500/20'
+                  : refundStep === 'error'
+                    ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/20'
+                    : 'bg-amber-300 text-black hover:bg-amber-200'
+              } disabled:opacity-70`}
+            >
+              {refundStep === 'refunded' ? (
+                <span className="flex items-center gap-1"><CheckCircle size={12} /> Refunded</span>
+              ) : ['signing', 'mining', 'confirming'].includes(refundStep) ? (
+                <span className="flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> {refundLabel}</span>
+              ) : (
+                refundLabel
+              )}
+            </button>
+          )}
           {canRelease && (
             <button
-              onClick={releaseStep === 'error' ? handleRelease : handleRelease}
+              onClick={handleRelease}
               disabled={['signing', 'mining', 'confirming'].includes(releaseStep) || releaseStep === 'released'}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 releaseStep === 'released'
@@ -250,6 +461,9 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
       {releaseError && (
         <p className="text-[10px] text-red-400 mt-2">{releaseError}</p>
       )}
+      {refundError && (
+        <p className="text-[10px] text-red-400 mt-2">{refundError}</p>
+      )}
 
       {showResult && (
         <TaskResultModal
@@ -260,4 +474,31 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
       )}
     </div>
   );
+}
+
+function getEscrowErrorMessage(
+  rawMessage: string | undefined,
+  overrides: {
+    invalidState: string;
+    unauthorized: string;
+  },
+) {
+  const raw = rawMessage ?? '';
+  if (raw.includes('User rejected') || raw.includes('user rejected')) {
+    return 'You cancelled the transaction.';
+  }
+  if (raw.includes('reverted') || raw.includes('InvalidState')) {
+    return overrides.invalidState;
+  }
+  if (raw.includes('NotAuthorized')) {
+    return overrides.unauthorized;
+  }
+  if (raw.includes('insufficient funds') || raw.includes('exceeds balance')) {
+    return 'Insufficient funds for gas fees.';
+  }
+  if (raw.includes('chain') || raw.includes('network')) {
+    return 'Please switch to Base network and try again.';
+  }
+
+  return 'Something went wrong. Please try again.';
 }

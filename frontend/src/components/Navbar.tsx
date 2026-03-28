@@ -70,13 +70,15 @@ export default function Navbar() {
           onClick={() => setOpen(!open)}
           className="md:hidden text-white cursor-pointer"
           aria-label="Toggle menu"
+          aria-expanded={open}
+          aria-controls="mobile-nav"
         >
           {open ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
 
       {open && (
-        <div className="md:hidden px-6 pb-4 flex flex-col gap-3">
+        <div id="mobile-nav" className="md:hidden px-6 pb-4 flex flex-col gap-3">
           {links.map((l) => (
             <a
               key={l.href}

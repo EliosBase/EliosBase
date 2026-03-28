@@ -8,3 +8,5 @@ cache/
 contracts/out/
 frontend/output/
 frontend/playwright-report/
+.playwright-cli/
+docs/

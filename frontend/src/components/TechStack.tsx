@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import AnimatedCard from "./AnimatedCard";
 
@@ -79,15 +79,48 @@ const layers: Layer[] = [
 ];
 
 function TechModal({ tech, onClose }: { tech: Tech; onClose: () => void }) {
+  const titleId = useMemo(
+    () => `tech-modal-${tech.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+    [tech.name],
+  );
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
-      <div className="relative max-w-lg w-full animate-fade-in-up" onClick={(e) => e.stopPropagation()}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative max-w-lg w-full animate-fade-in-up"
+        onClick={(e) => e.stopPropagation()}
+      >
         <AnimatedCard className="glass p-8" tilt={false} spotlight borderGlow hoverLift={false}>
-          <button onClick={onClose} className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors duration-200 cursor-pointer z-30" aria-label="Close">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors duration-200 cursor-pointer z-30"
+            aria-label={`Close ${tech.name} details`}
+            autoFocus
+          >
             <X size={20} />
           </button>
           <div className="flex items-center gap-3 mb-6">
-            <h3 className="font-[family-name:var(--font-heading)] text-xl font-bold text-white">{tech.name}</h3>
+            <h3 id={titleId} className="font-[family-name:var(--font-heading)] text-xl font-bold text-white">{tech.name}</h3>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/10 text-white/60">{tech.tag}</span>
           </div>
           <div className="space-y-5">
@@ -145,6 +178,18 @@ export default function TechStack() {
                     key={tech.name}
                     className="bg-white/[0.02] border border-white/[0.05] p-4"
                     onClick={() => setSelected(tech)}
+                    interactiveProps={{
+                      role: "button",
+                      tabIndex: 0,
+                      "aria-haspopup": "dialog",
+                      "aria-label": `Open ${tech.name} details`,
+                      onKeyDown: (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setSelected(tech);
+                        }
+                      },
+                    }}
                     tilt
                     spotlight
                     borderGlow

@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, Store, ListChecks, Wallet, ShieldCheck, X } from 'lucide-react';
-import { usePhantom } from '@/hooks/usePhantom';
+import { useWallet } from '@/hooks/useWallet';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useMounted } from '@/hooks/useMounted';
 
@@ -12,7 +12,7 @@ const navItems = [
   { href: '/app/marketplace', label: 'Marketplace', icon: Store },
   { href: '/app/tasks', label: 'Tasks', icon: ListChecks },
   { href: '/app/wallet', label: 'Wallet', icon: Wallet },
-  { href: '/app/security', label: 'Security', icon: ShieldCheck },
+  { href: '/app/security', label: 'Security', icon: ShieldCheck, privileged: true },
 ];
 
 interface SidebarProps {
@@ -22,9 +22,11 @@ interface SidebarProps {
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { isConnected, shortAddress } = usePhantom();
-  const { isAuthenticated } = useAuthContext();
+  const { isConnected, shortAddress, walletName } = useWallet();
+  const { isAuthenticated, session } = useAuthContext();
   const mounted = useMounted();
+  const canAccessSecurity = session?.role === 'admin' || session?.role === 'operator';
+  const visibleNavItems = navItems.filter((item) => !item.privileged || canAccessSecurity);
 
   const isActive = (href: string) => {
     if (href === '/app') return pathname === '/app';
@@ -55,14 +57,14 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               <span className="text-white/60">BASE</span>
             </span>
           </Link>
-          <button onClick={onClose} className="lg:hidden text-white/50 hover:text-white">
+          <button onClick={onClose} className="lg:hidden text-white/50 hover:text-white" aria-label="Close navigation">
             <X size={20} />
           </button>
         </div>
 
         {/* Nav links */}
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map(({ href, label, icon: Icon }) => (
+          {visibleNavItems.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
@@ -90,7 +92,9 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                 <p className="text-xs text-white/70 font-[family-name:var(--font-mono)] truncate">
                   {shortAddress}
                 </p>
-                <p className="text-[10px] text-white/40">Base Network</p>
+                <p className="text-[10px] text-white/40 truncate">
+                  {walletName ? `${walletName} · Base` : 'Base'}
+                </p>
               </div>
               <div className={`w-2 h-2 rounded-full ${isAuthenticated ? 'bg-green-500' : 'bg-yellow-500'}`} />
             </div>
