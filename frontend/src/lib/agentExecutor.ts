@@ -1,6 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
+import { readEnv, readIntEnv } from '@/lib/env';
 import { logMetric } from '@/lib/metrics';
 import Anthropic, {
   APIConnectionError,
@@ -62,8 +63,8 @@ export class AgentExecutionError extends Error {
 }
 
 function getTimeoutMs() {
-  const raw = Number(process.env.AGENT_EXECUTION_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS);
-  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_TIMEOUT_MS;
+  const timeoutMs = readIntEnv(process.env.AGENT_EXECUTION_TIMEOUT_MS, DEFAULT_TIMEOUT_MS);
+  return timeoutMs > 0 ? timeoutMs : DEFAULT_TIMEOUT_MS;
 }
 
 function stripFence(value: string) {
@@ -220,7 +221,7 @@ export function serializeExecutionResult(result: TaskExecutionState | AgentExecu
 }
 
 export async function executeAgentTask(task: TaskRuntime, agent: AgentRuntime): Promise<AgentExecutionResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = readEnv(process.env.ANTHROPIC_API_KEY);
   if (!apiKey) {
     throw new AgentExecutionError('ANTHROPIC_API_KEY not configured', {
       code: 'anthropic_not_configured',
@@ -237,7 +238,7 @@ export async function executeAgentTask(task: TaskRuntime, agent: AgentRuntime): 
   }
 
   // Spend ceiling check — if configured, count recent executions
-  const spendCeilingCents = parseInt(process.env.AI_SPEND_CEILING_CENTS ?? '0');
+  const spendCeilingCents = readIntEnv(process.env.AI_SPEND_CEILING_CENTS, 0);
   if (spendCeilingCents > 0) {
     logMetric('ai_spend_ceiling_check', spendCeilingCents, { taskId: task.id });
   }

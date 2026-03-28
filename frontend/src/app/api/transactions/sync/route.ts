@@ -21,6 +21,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (session.walletAddress && String(body.from).toLowerCase() !== session.walletAddress.toLowerCase()) {
+    return NextResponse.json({ error: 'Transaction sender does not match your wallet' }, { status: 400 });
+  }
+
   // Verify the transaction on-chain
   let txStatus: 'confirmed' | 'pending' = 'pending';
   let blockNumber: number | null = null;
@@ -29,6 +33,13 @@ export async function POST(req: NextRequest) {
     const receipt = await publicClient.getTransactionReceipt({
       hash: body.txHash as `0x${string}`,
     });
+    if (
+      session.walletAddress
+      && typeof receipt.from === 'string'
+      && receipt.from.toLowerCase() !== session.walletAddress.toLowerCase()
+    ) {
+      return NextResponse.json({ error: 'Transaction sender does not match your wallet' }, { status: 400 });
+    }
     if (receipt.status === 'success') {
       txStatus = 'confirmed';
       blockNumber = Number(receipt.blockNumber);

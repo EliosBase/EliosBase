@@ -57,6 +57,7 @@ export interface Task {
   executionFailureRetryable?: boolean;
   submitterId?: string;
   agentOperatorAddress?: string;
+  hasOpenDispute?: boolean;
 }
 
 export interface ActivityEvent {
@@ -68,7 +69,7 @@ export interface ActivityEvent {
 
 export interface Transaction {
   id: string;
-  type: 'escrow_lock' | 'escrow_release' | 'payment' | 'reward' | 'stake';
+  type: 'escrow_lock' | 'escrow_release' | 'escrow_refund' | 'payment' | 'reward' | 'stake';
   from: string;
   to: string;
   amount: string;
