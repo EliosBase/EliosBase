@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode, type MouseEvent } from "react";
+import { useRef, useState, type ReactNode, type MouseEvent, type HTMLAttributes } from "react";
 
 interface AnimatedCardProps {
   children: ReactNode;
@@ -11,6 +11,7 @@ interface AnimatedCardProps {
   spotlight?: boolean;
   hoverLift?: boolean;
   onClick?: () => void;
+  interactiveProps?: HTMLAttributes<HTMLDivElement>;
 }
 
 export default function AnimatedCard({
@@ -22,6 +23,7 @@ export default function AnimatedCard({
   spotlight = true,
   hoverLift = true,
   onClick,
+  interactiveProps,
 }: AnimatedCardProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [style, setStyle] = useState<React.CSSProperties>({});
@@ -90,6 +92,7 @@ export default function AnimatedCard({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={handleMouseLeave}
         onClick={onClick}
+        {...interactiveProps}
       >
         {/* Spotlight overlay */}
         {spotlight && (

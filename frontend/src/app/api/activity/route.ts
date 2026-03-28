@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { collapseNoisyActivity } from '@/lib/productionData';
 import { toActivityEvent } from '@/lib/transforms';
 
 export async function GET() {
@@ -9,11 +10,11 @@ export async function GET() {
     .from('activity_events')
     .select('*')
     .order('timestamp', { ascending: false })
-    .limit(20);
+    .limit(50);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data.map(toActivityEvent));
+  return NextResponse.json(collapseNoisyActivity(data).slice(0, 20).map(toActivityEvent));
 }

@@ -74,3 +74,50 @@ test('filters marketplace results and registers a new agent', async ({ page }) =
       pricePerTask: '0.09 ETH',
     });
 });
+
+test('hires an agent through the task picker and records the escrow lock in wallet history', async ({ page }) => {
+  await mockAppApi(page, {
+    session,
+    e2eWalletConnected: true,
+    agents: [
+      {
+        id: 'agent-a',
+        name: 'Audit Sentinel',
+        description: 'Focuses on Solidity review and access-control analysis.',
+        capabilities: ['solidity-audit', 'access-control'],
+        reputation: 98,
+        tasksCompleted: 214,
+        pricePerTask: '0.12 ETH',
+        status: 'online',
+        type: 'auditor',
+        ownerId: 'owner-a',
+      },
+    ],
+    tasks: [
+      {
+        id: 'task-open',
+        title: 'Payment flow audit',
+        description: 'Verify release invariants.',
+        status: 'active',
+        currentStep: 'Submitted',
+        assignedAgent: '',
+        reward: '0.12 ETH',
+        submittedAt: '2026-03-24T12:00:00.000Z',
+        submitterId: 'operator-7',
+      },
+    ],
+    transactions: [],
+  });
+
+  await page.goto('/app/marketplace');
+
+  await page.getByRole('button', { name: 'Hire' }).click();
+  await expect(page.getByRole('heading', { name: 'Select Task' })).toBeVisible();
+  await page.getByRole('button', { name: /Payment flow audit/ }).click();
+
+  await expect(page.getByRole('button', { name: 'Hired' })).toBeVisible();
+
+  await page.goto('/app/wallet');
+  await expect(page.getByText('Escrow Lock')).toBeVisible();
+  await expect(page.getByText('0.12 ETH', { exact: true }).last()).toBeVisible();
+});

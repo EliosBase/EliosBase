@@ -77,6 +77,10 @@ await checkJson('/api/stats', 'dashboard stats', 200, (body) => {
 });
 
 if (sessionCookie) {
+  await checkJson('/api/transactions', 'transactions', 200, (body) => {
+    assert(Array.isArray(body), 'transactions is not an array');
+  });
+
   await checkJson('/api/security/stats', 'security stats', 200, (body) => {
     assert(typeof body?.threatsBlocked === 'number', 'security stats missing threatsBlocked');
     assert(typeof body?.guardrailsActive === 'number', 'security stats missing guardrailsActive');
@@ -88,10 +92,13 @@ if (sessionCookie) {
   });
 
   if (resultTaskId) {
-    await checkJson(`/api/tasks/${resultTaskId}/result`, 'task result', 200, (body) => {
-      assert(typeof body?.summary === 'string', 'task result missing summary');
-      assert(Array.isArray(body?.findings), 'task result missing findings');
-    });
+    const { res, body, contentType } = await request(`/api/tasks/${resultTaskId}/result`);
+    assert(res.status === 200, `task result returned ${res.status}, expected 200`);
+    assert(contentType.includes('application/json'), 'task result did not return JSON');
+    assert((res.headers.get('cache-control') ?? '').includes('no-store'), 'task result is missing no-store caching');
+    assert(typeof body?.summary === 'string', 'task result missing summary');
+    assert(Array.isArray(body?.findings), 'task result missing findings');
+    console.log('PASS task result');
   }
 } else {
   await checkJson('/api/security/stats', 'security stats unauthorized', 401, (body) => {
@@ -112,6 +119,18 @@ if (cronSecret) {
       assert(typeof body?.total === 'number', 'cron advance missing total');
       assert(typeof body?.advanced === 'number', 'cron advance missing advanced');
       assert(Array.isArray(body?.results), 'cron advance missing results');
+    },
+    { headers: makeHeaders({ authorization: `Bearer ${cronSecret}` }) },
+  );
+
+  await checkJson(
+    '/api/cron/check-signer-balance',
+    'signer balance',
+    200,
+    (body) => {
+      assert(typeof body?.address === 'string', 'signer balance missing address');
+      assert(typeof body?.balanceEth === 'string', 'signer balance missing balanceEth');
+      assert(typeof body?.belowThreshold === 'boolean', 'signer balance missing belowThreshold');
     },
     { headers: makeHeaders({ authorization: `Bearer ${cronSecret}` }) },
   );

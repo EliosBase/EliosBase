@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readEnv } from '@/lib/env';
 
 /**
  * Validates that a mutation request originates from the expected domain.
@@ -9,7 +10,7 @@ export function validateOrigin(req: NextRequest): NextResponse | null {
   if (process.env.NODE_ENV !== 'production') return null;
 
   const origin = req.headers.get('origin');
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const siteUrl = readEnv(process.env.NEXT_PUBLIC_SITE_URL);
 
   // If no site URL configured, skip validation
   if (!siteUrl) return null;
