@@ -103,14 +103,25 @@ export async function POST(
     return NextResponse.json({ error: 'Signed Safe transfer amount does not match the approved transfer' }, { status: 400 });
   }
 
-  const { hash, blockNumber } = await executeAgentWalletTransfer({
-    safeAddress,
-    destination,
-    amountEth: transfer.amount_eth,
-    ownerAddress: getAddress(session.walletAddress),
-    ownerSignature: ownerSignature as Hex,
-    txData,
-  });
+  let hash: Hex;
+  let blockNumber: number;
+
+  try {
+    const execution = await executeAgentWalletTransfer({
+      safeAddress,
+      destination,
+      amountEth: transfer.amount_eth,
+      ownerAddress: getAddress(session.walletAddress),
+      ownerSignature: ownerSignature as Hex,
+      txData,
+    });
+    hash = execution.hash;
+    blockNumber = execution.blockNumber;
+  } catch (error) {
+    console.error('[agent-wallet] execute transfer failed:', error);
+    const message = error instanceof Error ? error.message : 'Failed to execute the Safe transfer';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 
   const executedAt = new Date().toISOString();
   const { data: executedTransfer, error: updateError } = await supabase

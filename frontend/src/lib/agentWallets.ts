@@ -247,9 +247,11 @@ async function createSafeTransferTransaction(
   safeAddress: Address,
   transfer: AgentWalletTransferShape,
   nonce?: number,
+  signer?: Hex,
 ) {
   const safe = await Safe.init({
     provider: rpcUrl,
+    signer,
     safeAddress,
   });
   const safeTransaction = await safe.createTransaction({
@@ -307,6 +309,7 @@ export async function executeAgentWalletTransfer(params: {
       amountEth: params.amountEth,
     },
     params.txData.nonce,
+    getRequiredPolicySignerPrivateKey(),
   );
 
   if (!sameHexValue(safeTransaction.data.value, params.txData.value)) {
