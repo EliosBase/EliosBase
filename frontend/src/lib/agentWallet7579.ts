@@ -86,18 +86,26 @@ type SafeInstallModule = ReturnType<typeof getOwnableValidator> & {
   callType?: CallType;
 };
 
+export function readSafe7579PolicySignerPrivateKey() {
+  return readEnv(process.env.SAFE_POLICY_SIGNER_PRIVATE_KEY)
+    ?? readEnv(process.env.PROOF_SUBMITTER_PRIVATE_KEY);
+}
+
 export function buildSafe7579Policy(ownerWallet: Address): AgentWalletPolicy {
-  const policySignerKey = readEnv(process.env.SAFE_POLICY_SIGNER_PRIVATE_KEY);
+  const policySignerKey = readSafe7579PolicySignerPrivateKey();
   const policySigner = policySignerKey
     ? privateKeyToAccount(policySignerKey as Hex).address
     : undefined;
+  const owners = policySigner
+    ? [getAddress(ownerWallet), getAddress(policySigner)]
+    : [getAddress(ownerWallet)];
 
   return {
     standard: 'safe7579',
     owner: getAddress(ownerWallet),
     policySigner,
-    owners: [getAddress(ownerWallet)],
-    threshold: 1,
+    owners,
+    threshold: owners.length > 1 ? 2 : 1,
     dailySpendLimitEth: (readEnv(process.env.AGENT_WALLET_DAILY_LIMIT_ETH) ?? '0.50'),
     autoApproveThresholdEth: (readEnv(process.env.AGENT_WALLET_AUTO_APPROVE_THRESHOLD_ETH) ?? '0.05'),
     reviewThresholdEth: (readEnv(process.env.AGENT_WALLET_COSIGN_THRESHOLD_ETH) ?? '0.25'),
@@ -127,7 +135,7 @@ export function buildSessionDefinition(params: {
     salt: params.salt ?? `0x${Buffer.from(randomBytes(32)).toString('hex')}` as Hex,
     userOpPolicies: [
       getValueLimitPolicy({
-        limit: BigInt(params.policy.autoApproveThresholdEth.replace('.', '')) * 10n ** 16n,
+        limit: parseEthToPolicyUint(params.policy.autoApproveThresholdEth),
       }),
       getTimeFramePolicy({
         validAfter: Math.floor(Date.now() / 1000),
