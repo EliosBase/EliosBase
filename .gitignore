@@ -9,4 +9,5 @@ contracts/out/
 frontend/output/
 frontend/playwright-report/
 .playwright-cli/
+supabase/.temp/
 docs/

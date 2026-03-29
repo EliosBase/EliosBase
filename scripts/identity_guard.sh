@@ -4,6 +4,45 @@ set -eu
 
 zero_sha='0000000000000000000000000000000000000000'
 
+resolve_remote_default_ref() {
+  remote_name="${1:-}"
+
+  [ -n "$remote_name" ] || return 0
+
+  symbolic_ref=$(git symbolic-ref --quiet --short "refs/remotes/$remote_name/HEAD" 2>/dev/null || true)
+
+  if [ -n "$symbolic_ref" ]; then
+    printf '%s' "$symbolic_ref"
+    return 0
+  fi
+
+  remote_head=$(git remote show "$remote_name" 2>/dev/null | sed -n 's/.*HEAD branch: //p' | head -n 1)
+
+  if [ -n "$remote_head" ]; then
+    printf '%s/%s' "$remote_name" "$remote_head"
+  fi
+}
+
+resolve_pre_push_base() {
+  remote_name="$1"
+  local_sha="$2"
+  remote_sha="$3"
+
+  if [ -n "$remote_sha" ] && [ "$remote_sha" != "$zero_sha" ]; then
+    printf '%s' "$remote_sha"
+    return 0
+  fi
+
+  default_ref=$(resolve_remote_default_ref "$remote_name")
+
+  if [ -n "$default_ref" ] && git rev-parse --verify "$default_ref" >/dev/null 2>&1; then
+    git merge-base "$local_sha" "$default_ref"
+    return 0
+  fi
+
+  printf '%s' "$zero_sha"
+}
+
 expected_name() {
   if [ -n "${IDENTITY_GUARD_NAME:-}" ]; then
     printf '%s' "$IDENTITY_GUARD_NAME"
@@ -211,10 +250,14 @@ check_range() {
 }
 
 check_pre_push() {
+  remote_name="${1:-}"
+
   while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
     [ -n "${local_sha:-}" ] || continue
     [ "$local_sha" = "$zero_sha" ] && continue
-    check_range "${remote_sha:-$zero_sha}" "$local_sha"
+
+    base_sha=$(resolve_pre_push_base "$remote_name" "$local_sha" "${remote_sha:-$zero_sha}")
+    check_range "$base_sha" "$local_sha"
   done
 }
 
@@ -224,7 +267,7 @@ usage:
   scripts/identity_guard.sh pre-commit
   scripts/identity_guard.sh prepare-commit-msg <message-file>
   scripts/identity_guard.sh commit-msg <message-file>
-  scripts/identity_guard.sh pre-push
+  scripts/identity_guard.sh pre-push [<remote-name>]
   scripts/identity_guard.sh scan-tree
   scripts/identity_guard.sh scan-range <base-sha> <head-sha>
 EOF
@@ -254,7 +297,7 @@ case "$command_name" in
     check_message_file "$2"
     ;;
   pre-push)
-    check_pre_push
+    check_pre_push "${2:-}"
     ;;
   scan-tree)
     check_head_tree
