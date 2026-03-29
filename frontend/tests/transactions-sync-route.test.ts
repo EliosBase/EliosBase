@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   createServiceClient: vi.fn(),
   generateId: vi.fn(() => 'tx-1'),
   getSession: vi.fn(),
+  getTransaction: vi.fn(),
   getTransactionReceipt: vi.fn(),
   logActivity: vi.fn(),
   logAudit: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('@/lib/audit', () => ({
 
 vi.mock('@/lib/viemClient', () => ({
   publicClient: {
+    getTransaction: mocks.getTransaction,
     getTransactionReceipt: mocks.getTransactionReceipt,
   },
 }));
@@ -71,6 +73,10 @@ describe('transactions sync routes', () => {
     let insertedPayload: Record<string, unknown> | undefined;
 
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
+    mocks.getTransaction.mockResolvedValue({
+      from: '0xabc',
+      to: '0xdef',
+    });
     mocks.getTransactionReceipt.mockResolvedValue({
       status: 'success',
       blockNumber: 42n,
@@ -134,6 +140,10 @@ describe('transactions sync routes', () => {
     const insertPayloads: Array<Record<string, unknown>> = [];
 
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
+    mocks.getTransaction.mockResolvedValue({
+      from: '0xabc',
+      to: '0xdef',
+    });
     mocks.getTransactionReceipt.mockResolvedValue({
       status: 'success',
       blockNumber: 42n,
@@ -244,6 +254,10 @@ describe('transactions sync routes', () => {
     ];
 
     mocks.getSession.mockResolvedValue({ userId: 'user-1' });
+    mocks.getTransaction.mockResolvedValue({
+      from: '0xabc',
+      to: '0x123',
+    });
     mocks.getTransactionReceipt
       .mockResolvedValueOnce({ status: 'success', blockNumber: 10n })
       .mockResolvedValueOnce({ status: 'reverted' })

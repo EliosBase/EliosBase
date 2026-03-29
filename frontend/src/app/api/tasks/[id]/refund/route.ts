@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { generateId, logActivity, logAudit } from '@/lib/audit';
-import { publicClient } from '@/lib/viemClient';
 import { ESCROW_CONTRACT_ADDRESS } from '@/lib/contracts';
 import { validateOrigin } from '@/lib/csrf';
 import { buildTaskDisputeSource } from '@/lib/taskDisputes';
 import { insertTransactionRecord } from '@/lib/transactions';
+import { verifyOnchainTransaction } from '@/lib/transactionVerification';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const csrfError = validateOrigin(req);
@@ -58,25 +58,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let txStatus: 'confirmed' | 'pending' = 'pending';
 
   try {
-    const receipt = await publicClient.getTransactionReceipt({
-      hash: txHash as `0x${string}`,
-    });
-
-    if (receipt.to?.toLowerCase() !== ESCROW_CONTRACT_ADDRESS.toLowerCase()) {
-      return NextResponse.json({ error: 'Transaction is not to the escrow contract' }, { status: 400 });
+    ({ txStatus } = await verifyOnchainTransaction(txHash as `0x${string}`, {
+      expectedFrom: session.walletAddress,
+      expectedTo: ESCROW_CONTRACT_ADDRESS,
+    }));
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Transaction ')) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    if (session.walletAddress && receipt.from.toLowerCase() !== session.walletAddress.toLowerCase()) {
-      return NextResponse.json({ error: 'Transaction sender does not match your wallet' }, { status: 400 });
-    }
-
-    if (receipt.status !== 'success') {
-      return NextResponse.json({ error: 'Transaction reverted on-chain' }, { status: 400 });
-    }
-
-    txStatus = 'confirmed';
-  } catch {
-    txStatus = 'pending';
+    throw error;
   }
 
   const transactionId = generateId('tx');
