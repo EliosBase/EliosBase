@@ -34,9 +34,19 @@ function sameAddress(left: string | null | undefined, right: string | null | und
   return left.toLowerCase() === right.toLowerCase();
 }
 
+function looksLikeAddress(value: string | null | undefined) {
+  return typeof value === 'string' && /^0x[a-f0-9]{40}$/i.test(value.trim());
+}
+
 export function normalizeTransactionType(row: TransactionLike): TransactionType {
-  if (row.type === 'escrow_release' && sameAddress(row.from, row.to)) {
-    return 'escrow_refund';
+  if (row.type === 'escrow_release') {
+    if (sameAddress(row.from, row.to)) {
+      return 'escrow_refund';
+    }
+
+    if (row.from === 'Escrow Vault' && looksLikeAddress(row.to)) {
+      return 'escrow_refund';
+    }
   }
 
   return row.type;

@@ -83,8 +83,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { error: txError } = await insertTransactionRecord(supabase, {
     id: transactionId,
     type: 'escrow_refund',
-    from: actor,
-    to: actor,
+    from: 'Escrow Vault',
+    to: session.walletAddress ?? actor,
     amount: task.reward,
     token: 'ETH',
     status: txStatus,

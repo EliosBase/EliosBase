@@ -198,7 +198,7 @@ describe('POST /api/tasks/[id]/refund', () => {
     expect(insertedTransaction).toMatchObject({
       id: 'tx-1',
       type: 'escrow_refund',
-      from: '0xabc',
+      from: 'Escrow Vault',
       to: '0xabc',
       amount: '0.25 ETH',
       token: 'ETH',
@@ -270,7 +270,7 @@ describe('POST /api/tasks/[id]/refund', () => {
       {
         id: 'tx-1',
         type: 'escrow_refund',
-        from: '0xabc',
+        from: 'Escrow Vault',
         to: '0xabc',
         amount: '0.25 ETH',
         token: 'ETH',
@@ -281,7 +281,7 @@ describe('POST /api/tasks/[id]/refund', () => {
       {
         id: 'tx-1',
         type: 'escrow_release',
-        from: '0xabc',
+        from: 'Escrow Vault',
         to: '0xabc',
         amount: '0.25 ETH',
         token: 'ETH',
