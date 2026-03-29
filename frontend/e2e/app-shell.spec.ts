@@ -92,6 +92,7 @@ test('supports mobile sidebar navigation between app sections', async ({ page })
   await expect(page.getByRole('link', { name: 'Security' })).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Wallet' }).click();
+  await page.waitForURL('**/app/wallet');
   await expect(page.getByRole('heading', { name: 'Wallet & Payments' })).toBeVisible();
   await expect(page.getByText('Transaction History')).toBeVisible();
   await expect(page.getByText('Escrow Lock')).toBeVisible();
