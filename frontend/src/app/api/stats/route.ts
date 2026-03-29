@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { normalizeTransactionType } from '@/lib/transactions';
 
 function parseAmount(value: string) {
   const parsed = parseFloat(value.replace(/[^0-9.]/g, '') || '0');
@@ -14,7 +15,7 @@ function sumAmounts(rows: { amount: string }[] | null | undefined) {
 export async function GET() {
   const supabase = createServiceClient();
 
-  const [agentsRes, totalAgentsRes, tasksRes, completedTasksRes, escrowLockRes, escrowReleaseRes, escrowRefundRes, proofsRes] =
+  const [agentsRes, totalAgentsRes, tasksRes, completedTasksRes, transactionsRes, proofsRes] =
     await Promise.all([
       // Active Agents: COUNT where status != 'offline'
       supabase
@@ -35,23 +36,9 @@ export async function GET() {
         .from('tasks')
         .select('*', { count: 'exact', head: true })
         .eq('status', 'completed'),
-      // TVL: sum of escrow_lock amounts
       supabase
         .from('transactions')
-        .select('amount')
-        .eq('type', 'escrow_lock')
-        .eq('status', 'confirmed'),
-      // TVL: minus escrow_release amounts
-      supabase
-        .from('transactions')
-        .select('amount')
-        .eq('type', 'escrow_release')
-        .eq('status', 'confirmed'),
-      supabase
-        .from('transactions')
-        .select('amount')
-        .eq('type', 'escrow_refund')
-        .eq('status', 'confirmed'),
+        .select('type, from, to, amount, status, timestamp'),
       // ZK Proofs: COUNT of tasks with zk_proof_id IS NOT NULL
       supabase
         .from('tasks')
@@ -64,9 +51,16 @@ export async function GET() {
   const activeTasks = tasksRes.count ?? 0;
   const completedTasks = completedTasksRes.count ?? 0;
 
-  const lockedTotal = sumAmounts(escrowLockRes.data);
-  const releasedTotal = sumAmounts(escrowReleaseRes.data);
-  const refundedTotal = sumAmounts(escrowRefundRes.data);
+  const confirmedTransactions = (transactionsRes.data ?? []).filter((row) => row.status === 'confirmed');
+  const lockedTotal = sumAmounts(
+    confirmedTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_lock'),
+  );
+  const releasedTotal = sumAmounts(
+    confirmedTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_release'),
+  );
+  const refundedTotal = sumAmounts(
+    confirmedTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_refund'),
+  );
   const tvl = Math.max(0, lockedTotal - releasedTotal - refundedTotal);
 
   const zkProofs = proofsRes.count ?? 0;
@@ -84,19 +78,21 @@ export async function GET() {
   startDate.setDate(startDate.getDate() - days);
   const startIso = startDate.toISOString();
 
-  const [agentsByDay, tasksByDay, locksByDay, releasesByDay, refundsByDay, proofsByDay, priorLocks, priorReleases, priorRefunds] = await Promise.all([
+  const [agentsByDay, tasksByDay, proofsByDay] = await Promise.all([
     supabase.from('agents').select('created_at').gte('created_at', startIso),
     supabase.from('tasks').select('submitted_at').gte('submitted_at', startIso),
-    supabase.from('transactions').select('amount, timestamp').eq('type', 'escrow_lock').eq('status', 'confirmed').gte('timestamp', startIso),
-    supabase.from('transactions').select('amount, timestamp').eq('type', 'escrow_release').eq('status', 'confirmed').gte('timestamp', startIso),
-    supabase.from('transactions').select('amount, timestamp').eq('type', 'escrow_refund').eq('status', 'confirmed').gte('timestamp', startIso),
     supabase.from('tasks').select('completed_at').not('zk_proof_id', 'is', null).gte('completed_at', startIso),
-    supabase.from('transactions').select('amount').eq('type', 'escrow_lock').eq('status', 'confirmed').lt('timestamp', startIso),
-    supabase.from('transactions').select('amount').eq('type', 'escrow_release').eq('status', 'confirmed').lt('timestamp', startIso),
-    supabase.from('transactions').select('amount').eq('type', 'escrow_refund').eq('status', 'confirmed').lt('timestamp', startIso),
   ]);
 
-  let runningTvl = Math.max(0, sumAmounts(priorLocks.data) - sumAmounts(priorReleases.data) - sumAmounts(priorRefunds.data));
+  const priorTransactions = confirmedTransactions.filter((row) => row.timestamp < startIso);
+  let runningTvl = Math.max(
+    0,
+    sumAmounts(priorTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_lock'))
+      - sumAmounts(priorTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_release'))
+      - sumAmounts(priorTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_refund')),
+  );
+
+  const recentTransactions = confirmedTransactions.filter((row) => row.timestamp >= startIso);
 
   for (let d = 0; d < days; d++) {
     const dayStart = new Date(now);
@@ -113,9 +109,16 @@ export async function GET() {
     sparklines.agents.push((agentsByDay.data ?? []).filter((r) => inRange(r.created_at)).length);
     sparklines.tasks.push((tasksByDay.data ?? []).filter((r) => inRange(r.submitted_at)).length);
 
-    const dayLocked = (locksByDay.data ?? []).filter((r) => inRange(r.timestamp)).reduce((sum, row) => sum + parseAmount(row.amount), 0);
-    const dayReleased = (releasesByDay.data ?? []).filter((r) => inRange(r.timestamp)).reduce((sum, row) => sum + parseAmount(row.amount), 0);
-    const dayRefunded = (refundsByDay.data ?? []).filter((r) => inRange(r.timestamp)).reduce((sum, row) => sum + parseAmount(row.amount), 0);
+    const dayTransactions = recentTransactions.filter((row) => inRange(row.timestamp));
+    const dayLocked = dayTransactions
+      .filter((row) => normalizeTransactionType(row) === 'escrow_lock')
+      .reduce((sum, row) => sum + parseAmount(row.amount), 0);
+    const dayReleased = dayTransactions
+      .filter((row) => normalizeTransactionType(row) === 'escrow_release')
+      .reduce((sum, row) => sum + parseAmount(row.amount), 0);
+    const dayRefunded = dayTransactions
+      .filter((row) => normalizeTransactionType(row) === 'escrow_refund')
+      .reduce((sum, row) => sum + parseAmount(row.amount), 0);
     runningTvl = Math.max(0, runningTvl + dayLocked - dayReleased - dayRefunded);
     sparklines.tvl.push(parseFloat(runningTvl.toFixed(4)));
 

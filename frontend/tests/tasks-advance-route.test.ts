@@ -225,6 +225,46 @@ describe('POST /api/tasks/[id]/advance', () => {
     }));
   });
 
+  it('raises an explicit alert when execution credits are exhausted', async () => {
+    const task = makeTask();
+    const claimedTask = makeTask({ current_step: 'Executing' });
+
+    mocks.executeAgentTask.mockRejectedValue(new AgentExecutionError(
+      'Anthropic credits are exhausted. Top up the Anthropic account to resume task execution.',
+      {
+        code: 'anthropic_credits_exhausted',
+        retryable: false,
+      },
+    ));
+    mocks.createServiceClient.mockReturnValue(
+      makeSupabaseClient({
+        tasks: [
+          makeSupabaseBuilder({ data: task, error: null }),
+          makeSupabaseBuilder({ data: claimedTask, error: null }),
+          makeSupabaseBuilder({ data: null, error: null }),
+        ],
+        agents: [
+          makeSupabaseBuilder({ data: null, error: null }),
+        ],
+      }),
+    );
+
+    const response = await POST(makeRequest(), { params: Promise.resolve({ id: 'task-1' }) });
+    const body = await readJson(response);
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      advanced: false,
+      currentStep: 'Assigned',
+      retryable: false,
+      status: 'failed',
+    });
+    expect(mocks.createSecurityAlert).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'Anthropic credits exhausted',
+      description: expect.stringContaining('Top up the Anthropic account'),
+    }));
+  });
+
   it('applies exponential backoff before retrying a transient execution failure', async () => {
     const task = makeTask({
       execution_result: {

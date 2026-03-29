@@ -45,20 +45,24 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
   const { isVerified: onChainVerified } = useProofVerification(task.id);
 
   const hasOpenDispute = task.hasOpenDispute || disputeOpened;
+  const isEscrowLocked = escrowState === 'Locked';
+  const isEscrowReleased = escrowState === 'Released' || releaseStep === 'released';
+  const isEscrowRefunded = escrowState === 'Refunded' || refundStep === 'refunded';
   const canRelease = isSubmitter
     && !hasOpenDispute
-    && escrowState === 'Locked'
+    && isEscrowLocked
     && task.currentStep === 'Complete'
     && task.agentOperatorAddress
     && onChainVerified;
   const canRefund = isSubmitter
-    && escrowState === 'Locked'
+    && isEscrowLocked
     && (task.status === 'failed' || hasOpenDispute);
   const canDispute = isSubmitter
+    && isEscrowLocked
     && !hasOpenDispute
     && task.status !== 'failed'
-    && releaseStep !== 'released'
-    && refundStep !== 'refunded';
+    && !isEscrowReleased
+    && !isEscrowRefunded;
   const canOpenResult = !!canViewResult && !!task.hasExecutionResult && task.status === 'completed';
   const showsExecutionFailure = (task.currentStep === 'Assigned' || task.status === 'failed') && !!task.executionFailureMessage;
   const isTerminalExecutionFailure = task.status === 'failed' && showsExecutionFailure;
@@ -276,6 +280,16 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
           {hasOpenDispute ? (
             <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-300">
               Dispute Open
+            </span>
+          ) : null}
+          {isEscrowRefunded ? (
+            <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-300">
+              Escrow Refunded
+            </span>
+          ) : null}
+          {isEscrowReleased ? (
+            <span className="rounded-full border border-green-500/25 bg-green-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-green-300">
+              Funds Released
             </span>
           ) : null}
           <ProofBadge status={proofStatus} proofId={task.zkProofId} />

@@ -57,14 +57,20 @@ function makeSupabaseBuilder(
   result: { data: unknown; error: unknown },
   options: {
     onInsert?: (payload: Record<string, unknown>) => void;
+    insertResults?: Array<{ data?: unknown; error: { code?: string; message?: string } | null }>;
   } = {},
 ) {
   const builder: Record<string, unknown> = {};
 
   builder.select = vi.fn(() => builder);
-  builder.insert = vi.fn(async (payload: Record<string, unknown>) => {
+  builder.insert = vi.fn((payload: Record<string, unknown>) => {
     options.onInsert?.(payload);
-    return { error: null };
+
+    return {
+      select: vi.fn(() => ({
+        single: vi.fn(async () => options.insertResults?.shift() ?? { data: payload, error: null }),
+      })),
+    };
   });
   builder.eq = vi.fn(() => builder);
   builder.single = vi.fn(async () => result);

@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { createPublicClient, http, formatEther } from 'viem';
 import { base } from 'viem/chains';
+import { normalizeTransactionType } from '@/lib/transactions';
 
 // GET /api/wallet/stats — live wallet statistics for the authenticated user
 export async function GET() {
@@ -28,59 +29,10 @@ export async function GET() {
     ethBalance = '0';
   }
 
-  // Calculate "In Escrow" — active escrow_lock minus released for this user
-  const [locksRes, releasesRes, refundsRes, rewardsRes, stakesRes, activeLocksRes, activeReleasesRes, activeRefundsRes] = await Promise.all([
-    supabase
-      .from('transactions')
-      .select('amount')
-      .eq('user_id', session.userId)
-      .eq('type', 'escrow_lock')
-      .eq('status', 'confirmed'),
-    supabase
-      .from('transactions')
-      .select('amount')
-      .eq('user_id', session.userId)
-      .eq('type', 'escrow_release')
-      .eq('status', 'confirmed'),
-    supabase
-      .from('transactions')
-      .select('amount')
-      .eq('user_id', session.userId)
-      .eq('type', 'escrow_refund')
-      .eq('status', 'confirmed'),
-    // Total Earned — reward transactions for this user
-    supabase
-      .from('transactions')
-      .select('amount')
-      .eq('user_id', session.userId)
-      .eq('type', 'reward')
-      .eq('status', 'confirmed'),
-    // Staked amount
-    supabase
-      .from('transactions')
-      .select('amount')
-      .eq('user_id', session.userId)
-      .eq('type', 'stake')
-      .eq('status', 'confirmed'),
-    supabase
-      .from('transactions')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', session.userId)
-      .eq('type', 'escrow_lock')
-      .eq('status', 'confirmed'),
-    supabase
-      .from('transactions')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', session.userId)
-      .eq('type', 'escrow_release')
-      .eq('status', 'confirmed'),
-    supabase
-      .from('transactions')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', session.userId)
-      .eq('type', 'escrow_refund')
-      .eq('status', 'confirmed'),
-  ]);
+  const { data: transactions } = await supabase
+    .from('transactions')
+    .select('type, from, to, amount, status')
+    .eq('user_id', session.userId);
 
   const parseAmounts = (rows: { amount: string }[] | null) =>
     (rows ?? []).reduce(
@@ -88,17 +40,30 @@ export async function GET() {
       0
     );
 
-  const lockedTotal = parseAmounts(locksRes.data);
-  const releasedTotal = parseAmounts(releasesRes.data);
-  const refundedTotal = parseAmounts(refundsRes.data);
+  const confirmedTransactions = (transactions ?? []).filter((row) => row.status === 'confirmed');
+  const lockedTotal = parseAmounts(
+    confirmedTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_lock'),
+  );
+  const releasedTotal = parseAmounts(
+    confirmedTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_release'),
+  );
+  const refundedTotal = parseAmounts(
+    confirmedTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_refund'),
+  );
   const inEscrow = Math.max(0, lockedTotal - releasedTotal - refundedTotal);
 
-  const totalEarned = parseAmounts(rewardsRes.data);
-  const staked = parseAmounts(stakesRes.data);
+  const totalEarned = parseAmounts(
+    confirmedTransactions.filter((row) => normalizeTransactionType(row) === 'reward'),
+  );
+  const staked = parseAmounts(
+    confirmedTransactions.filter((row) => normalizeTransactionType(row) === 'stake'),
+  );
 
   const activeLocks = Math.max(
     0,
-    (activeLocksRes.count ?? 0) - (activeReleasesRes.count ?? 0) - (activeRefundsRes.count ?? 0),
+    confirmedTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_lock').length
+      - confirmedTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_release').length
+      - confirmedTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_refund').length,
   );
 
   return NextResponse.json({

@@ -142,4 +142,21 @@ describe('GET /api/stats', () => {
     expect(json.tvl).toBeCloseTo(0.65, 5);
     expect(json.sparklines.tvl.at(-1)).toBeCloseTo(0.65, 5);
   });
+
+  it('treats legacy self-directed escrow releases as refunds in tvl calculations', async () => {
+    mocks.createServiceClient.mockReturnValue(makeSupabase({
+      agents: [],
+      tasks: [],
+      transactions: [
+        { type: 'escrow_lock', from: '0xabc', to: 'agent-1', status: 'confirmed', amount: '1.00 ETH', timestamp: isoDaysAgo(13) },
+        { type: 'escrow_release', from: '0xabc', to: '0xabc', status: 'confirmed', amount: '0.40 ETH', timestamp: isoDaysAgo(2) },
+      ],
+    }));
+
+    const res = await GET();
+    const json = await res.json();
+
+    expect(json.tvl).toBeCloseTo(0.6, 5);
+    expect(json.sparklines.tvl.at(-1)).toBeCloseTo(0.6, 5);
+  });
 });
