@@ -3,9 +3,9 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, Store, ListChecks, Wallet, ShieldCheck, X } from 'lucide-react';
-import { useWallet } from '@/hooks/useWallet';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useMounted } from '@/hooks/useMounted';
+import { useWallet } from '@/hooks/useWallet';
 
 const navItems = [
   { href: '/app', label: 'Dashboard', icon: LayoutDashboard },
@@ -20,10 +20,44 @@ interface SidebarProps {
   onClose: () => void;
 }
 
+function SidebarWalletStatus() {
+  const { isConnected, shortAddress, walletName } = useWallet();
+  const { isAuthenticated } = useAuthContext();
+  const label = walletName ? `${walletName} · Base` : 'Base';
+
+  if (!isConnected) {
+    return (
+      <div className="flex items-center gap-3 px-2">
+        <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs font-mono text-white/30">
+          --
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-white/30">Not connected</p>
+        </div>
+        <div className="w-2 h-2 rounded-full bg-white/20" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-3 px-2">
+      <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-mono text-white/70">
+        0x
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-white/70 font-[family-name:var(--font-mono)] truncate">
+          {shortAddress}
+        </p>
+        <p className="text-[10px] text-white/40 truncate">{label}</p>
+      </div>
+      <div className={`w-2 h-2 rounded-full ${isAuthenticated ? 'bg-green-500' : 'bg-yellow-500'}`} />
+    </div>
+  );
+}
+
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { isConnected, shortAddress, walletName } = useWallet();
-  const { isAuthenticated, session } = useAuthContext();
+  const { session } = useAuthContext();
   const mounted = useMounted();
   const canAccessSecurity = session?.role === 'admin' || session?.role === 'operator';
   const visibleNavItems = navItems.filter((item) => !item.privileged || canAccessSecurity);
@@ -35,21 +69,18 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile overlay */}
-      {open && (
+      {open ? (
         <div
           className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
           onClick={onClose}
         />
-      )}
+      ) : null}
 
-      {/* Sidebar */}
       <aside
         className={`fixed top-0 left-0 z-50 h-full w-60 glass border-r border-white/6 flex flex-col transition-transform duration-300 lg:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Logo */}
         <div className="flex items-center justify-between px-5 py-5 border-b border-white/6">
           <Link href="/" className="flex items-center gap-2">
             <span className="text-lg font-bold tracking-widest font-[family-name:var(--font-heading)]">
@@ -62,7 +93,6 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           </button>
         </div>
 
-        {/* Nav links */}
         <nav className="flex-1 px-3 py-4 space-y-1">
           {visibleNavItems.map(({ href, label, icon: Icon }) => (
             <Link
@@ -81,23 +111,9 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           ))}
         </nav>
 
-        {/* Bottom section */}
         <div className="px-4 py-4 border-t border-white/6">
-          {mounted && isConnected ? (
-            <div className="flex items-center gap-3 px-2">
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-mono text-white/70">
-                0x
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-white/70 font-[family-name:var(--font-mono)] truncate">
-                  {shortAddress}
-                </p>
-                <p className="text-[10px] text-white/40 truncate">
-                  {walletName ? `${walletName} · Base` : 'Base'}
-                </p>
-              </div>
-              <div className={`w-2 h-2 rounded-full ${isAuthenticated ? 'bg-green-500' : 'bg-yellow-500'}`} />
-            </div>
+          {mounted ? (
+            <SidebarWalletStatus />
           ) : (
             <div className="flex items-center gap-3 px-2">
               <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-xs font-mono text-white/30">

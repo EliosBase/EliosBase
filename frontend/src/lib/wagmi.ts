@@ -20,6 +20,7 @@ export const config = isTestnet
       chains: [baseSepolia],
       connectors,
       multiInjectedProviderDiscovery: false,
+      ssr: true,
       transports: {
         [baseSepolia.id]: http(),
       },
@@ -28,6 +29,7 @@ export const config = isTestnet
       chains: [base],
       connectors,
       multiInjectedProviderDiscovery: false,
+      ssr: true,
       transports: {
         [base.id]: http(),
       },

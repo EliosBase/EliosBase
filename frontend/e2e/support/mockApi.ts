@@ -139,9 +139,10 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
   await page.route('**/api/transactions/sync', (route) => {
     const body = parseBody(route);
     options.onTransactionSync?.(body);
+    const txHash = String(body.txHash ?? `0xpayment-${transactions.length + 1}`);
 
     const syncedTransaction = {
-      id: 'tx-payment-new',
+      id: `tx-${txHash}`,
       type: body.type ?? 'payment',
       from: body.from ?? session.walletAddress ?? '0x1234',
       to: body.to ?? '0xrecipient',
@@ -149,7 +150,7 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
       token: body.token ?? 'ETH',
       status: 'confirmed',
       timestamp: '2026-03-24T12:15:00.000Z',
-      txHash: body.txHash ?? '0xpayment',
+      txHash,
     };
 
     transactions.unshift(syncedTransaction);
