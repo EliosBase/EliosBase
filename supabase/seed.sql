@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS agents (
   status TEXT NOT NULL DEFAULT 'offline' CHECK (status IN ('online', 'busy', 'offline')),
   type TEXT NOT NULL CHECK (type IN ('sentinel', 'analyst', 'executor', 'auditor', 'optimizer')),
   owner_id UUID REFERENCES users(id),
+  wallet_address TEXT,
+  wallet_kind TEXT NOT NULL DEFAULT 'safe' CHECK (wallet_kind IN ('safe')),
+  wallet_status TEXT NOT NULL DEFAULT 'predicted' CHECK (wallet_status IN ('predicted', 'active')),
+  wallet_policy JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -112,6 +116,29 @@ CREATE TABLE IF NOT EXISTS activity_events (
 );
 CREATE INDEX IF NOT EXISTS idx_activity_timestamp ON activity_events (timestamp DESC);
 
+-- Agent Wallet Transfers
+CREATE TABLE IF NOT EXISTS agent_wallet_transfers (
+  id TEXT PRIMARY KEY,
+  agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  safe_address TEXT NOT NULL,
+  destination TEXT NOT NULL,
+  amount_eth TEXT NOT NULL,
+  note TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('blocked', 'queued', 'approved', 'executed')),
+  policy_reason TEXT,
+  approvals_required INT NOT NULL DEFAULT 1,
+  approvals_received INT NOT NULL DEFAULT 0,
+  unlock_at TIMESTAMPTZ,
+  approved_at TIMESTAMPTZ,
+  approved_by UUID REFERENCES users(id),
+  executed_at TIMESTAMPTZ,
+  executed_by UUID REFERENCES users(id),
+  tx_hash TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_agent_wallet_transfers_agent ON agent_wallet_transfers (agent_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_wallet_transfers_status ON agent_wallet_transfers (status, created_at DESC);
+
 -- ─── RLS Policies ───────────────────────────────────────────────
 
 ALTER TABLE agents ENABLE ROW LEVEL SECURITY;
@@ -145,6 +172,10 @@ CREATE POLICY "deny_anon_audit" ON audit_log FOR ALL USING (false);
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "deny_anon_users" ON users;
 CREATE POLICY "deny_anon_users" ON users FOR ALL USING (false);
+
+ALTER TABLE agent_wallet_transfers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "deny_anon_agent_wallet_transfers" ON agent_wallet_transfers;
+CREATE POLICY "deny_anon_agent_wallet_transfers" ON agent_wallet_transfers FOR ALL USING (false);
 
 -- ─── Seed Data ──────────────────────────────────────────────────
 

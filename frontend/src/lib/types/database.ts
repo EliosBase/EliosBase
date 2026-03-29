@@ -1,4 +1,5 @@
 import type { TaskExecutionState } from './agentExecution';
+import type { AgentWalletPolicy, AgentWalletStatus, AgentWalletTransferStatus } from './agentWallet';
 
 export interface DbUser {
   id: string;
@@ -19,6 +20,10 @@ export interface DbAgent {
   status: 'online' | 'busy' | 'offline';
   type: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
   owner_id: string | null;
+  wallet_address?: string | null;
+  wallet_kind?: 'safe' | null;
+  wallet_status?: AgentWalletStatus | null;
+  wallet_policy?: AgentWalletPolicy | null;
   created_at: string;
 }
 
@@ -41,6 +46,9 @@ export interface DbTask {
   has_open_dispute?: boolean;
   agents?: {
     name: string;
+    wallet_address?: string | null;
+    wallet_policy?: AgentWalletPolicy | null;
+    wallet_status?: AgentWalletStatus | null;
     type?: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
     description?: string;
     capabilities?: string[];
@@ -95,4 +103,27 @@ export interface DbActivityEvent {
   message: string;
   timestamp: string;
   user_id: string | null;
+}
+
+export interface DbAgentWalletTransfer {
+  id: string;
+  agent_id: string;
+  agents?: {
+    name: string;
+  } | null;
+  safe_address: string;
+  destination: string;
+  amount_eth: string;
+  note: string;
+  status: AgentWalletTransferStatus;
+  policy_reason: string | null;
+  approvals_required: number;
+  approvals_received: number;
+  unlock_at: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  executed_at: string | null;
+  executed_by: string | null;
+  tx_hash: string | null;
+  created_at: string;
 }

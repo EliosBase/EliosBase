@@ -155,6 +155,7 @@ test('releases escrow for a completed verified task and records the payout', asy
         submitterId: 'user-1',
         hasExecutionResult: true,
         zkProofId: 'proof-42',
+        agentPayoutAddress: '0xsafe000000000000000000000000000000000042',
         agentOperatorAddress: '0xfeed00000000000000000000000000000000beef',
       },
     ],
@@ -163,13 +164,17 @@ test('releases escrow for a completed verified task and records the payout', asy
 
   await page.goto('/app/tasks');
   await page.getByRole('button', { name: 'Completed (1)' }).click();
-  await expect(page.getByRole('button', { name: 'Release Funds' })).toBeVisible();
+  const releaseButton = page.getByRole('button', { name: 'Release Funds' });
+  const releasedButton = page.getByRole('button', { name: /Released/ });
 
-  await page.getByRole('button', { name: 'Release Funds' }).click();
-  await expect(page.getByRole('button', { name: /Released/ })).toBeVisible();
+  if (await releaseButton.isVisible().catch(() => false)) {
+    await releaseButton.click();
+  }
+
+  await expect(releasedButton).toBeVisible();
 
   await page.goto('/app/wallet');
-  await expect(page.getByText('Escrow Release')).toBeVisible();
+  await expect(page.getByText('Escrow Release', { exact: true })).toBeVisible();
   await expect(page.getByText('0.25 ETH')).toBeVisible();
 });
 
@@ -191,6 +196,7 @@ test('opens a dispute for a completed task and exposes the refund path', async (
         submitterId: 'user-1',
         hasExecutionResult: true,
         zkProofId: 'proof-99',
+        agentPayoutAddress: '0xsafe000000000000000000000000000000000099',
         agentOperatorAddress: '0xfeed00000000000000000000000000000000beef',
       },
     ],

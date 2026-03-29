@@ -35,6 +35,10 @@ export interface Agent {
   status: 'online' | 'busy' | 'offline';
   type: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
   ownerId?: string;
+  walletAddress?: string;
+  walletKind?: 'safe';
+  walletStatus?: import('./agentWallet').AgentWalletStatus;
+  walletPolicy?: import('./agentWallet').AgentWalletPolicy;
 }
 
 export type TaskStep = 'Submitted' | 'Decomposed' | 'Assigned' | 'Executing' | 'ZK Verifying' | 'Complete';
@@ -57,8 +61,17 @@ export interface Task {
   executionFailureRetryable?: boolean;
   submitterId?: string;
   agentOperatorAddress?: string;
+  agentPayoutAddress?: string;
+  agentWalletAddress?: string;
   hasOpenDispute?: boolean;
 }
+
+export type {
+  AgentWalletPolicy,
+  AgentWalletStatus,
+  AgentWalletTransfer,
+  AgentWalletTransferStatus,
+} from './agentWallet';
 
 export interface ActivityEvent {
   id: string;
@@ -116,4 +129,5 @@ export type {
   DbGuardrail,
   DbAuditLogEntry,
   DbActivityEvent,
+  DbAgentWalletTransfer,
 } from './database';
