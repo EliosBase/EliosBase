@@ -16,6 +16,7 @@ import {
   buildSessionDefinition,
 } from '@/lib/agentWallet7579';
 import { generateEncryptedSessionKey } from '@/lib/agentWalletSecrets';
+import { mergeSafe7579Compatibility } from '@/lib/agentWalletCompat';
 
 function serializeCall(call: { to: string; value: { toString(): string }; data: `0x${string}` }) {
   return {
@@ -45,7 +46,7 @@ export async function POST(
   const supabase = createServiceClient();
   const { data: agent, error } = await supabase
     .from('agents')
-    .select('id, name, owner_id, wallet_address, wallet_policy, wallet_status, wallet_modules, users:owner_id(wallet_address)')
+    .select('id, name, owner_id, wallet_address, wallet_policy, wallet_status, users:owner_id(wallet_address)')
     .eq('id', id)
     .single();
 
@@ -84,6 +85,21 @@ export async function POST(
     hook: getAddress(SAFE_7579_HOOK_ADDRESS),
     sessionSalt: sessionDefinition.salt,
   });
+  const sessionKeyExpiresAt = new Date(validUntil * 1000).toISOString();
+  const sessionKeyRotatedAt = new Date().toISOString();
+  const nextPolicy = mergeSafe7579Compatibility(policy, {
+    migrationState: 'pending',
+    modules,
+    session: {
+      address: encryptedSession.address,
+      ciphertext: encryptedSession.ciphertext,
+      nonce: encryptedSession.nonce,
+      tag: encryptedSession.tag,
+      validUntil: sessionKeyExpiresAt,
+      rotatedAt: sessionKeyRotatedAt,
+    },
+    revision: 2,
+  });
 
   const safeCalls = buildSafe7579MigrationCalls({
     safeAddress: wallet.address,
@@ -113,17 +129,8 @@ export async function POST(
   const { error: updateError } = await supabase
     .from('agents')
     .update({
-      wallet_standard: 'safe7579',
-      wallet_status: 'migrating',
-      wallet_migration_state: 'pending',
-      wallet_policy: policy,
-      wallet_modules: modules,
-      session_key_address: encryptedSession.address,
-      session_key_ciphertext: encryptedSession.ciphertext,
-      session_key_nonce: encryptedSession.nonce,
-      session_key_tag: encryptedSession.tag,
-      session_key_expires_at: new Date(validUntil * 1000).toISOString(),
-      session_key_rotated_at: new Date().toISOString(),
+      wallet_status: 'active',
+      wallet_policy: nextPolicy,
     })
     .eq('id', id);
 
@@ -137,7 +144,7 @@ export async function POST(
     walletStandard: 'safe7579',
     migrationState: 'pending',
     sessionKeyAddress: encryptedSession.address,
-    sessionKeyExpiresAt: new Date(validUntil * 1000).toISOString(),
+    sessionKeyExpiresAt,
     modules,
     safeCalls: safeCalls.map(serializeCall),
     managerCalls: managerCalls.map(serializeCall),

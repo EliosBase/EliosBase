@@ -7,6 +7,7 @@ import { evaluateAgentWalletTransfer, resolveAgentWallet } from '@/lib/agentWall
 import { queueSafe7579ReviewedIntent } from '@/lib/agentWallet7579Transfers';
 import { toAgentWalletTransfer } from '@/lib/transforms';
 import { validateOrigin } from '@/lib/csrf';
+import { isMigratedSafe7579 } from '@/lib/agentWalletCompat';
 
 function parseAmount(value: string) {
   const parsed = Number.parseFloat(value);
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const supabase = createServiceClient();
   const { data: agent, error: agentError } = await supabase
     .from('agents')
-    .select('id, name, owner_id, wallet_address, wallet_policy, wallet_status, wallet_standard, wallet_migration_state, wallet_modules, users:owner_id(wallet_address)')
+    .select('id, name, owner_id, wallet_address, wallet_policy, wallet_status, users:owner_id(wallet_address)')
     .eq('id', id)
     .single();
 
@@ -116,33 +117,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     spentTodayEth,
   });
 
-  const isSafe7579 = agent.wallet_standard === 'safe7579' && agent.wallet_migration_state === 'migrated';
-  let intentHash: string | undefined;
-  let policyTxHash: string | undefined;
-  let executionMode: 'session' | 'owner' | 'reviewed' | undefined;
-
-  if (isSafe7579 && decision.status === 'queued') {
+  if (isMigratedSafe7579(agent) && decision.status === 'queued') {
     try {
-      const queued = await queueSafe7579ReviewedIntent({
+      await queueSafe7579ReviewedIntent({
         safeAddress: wallet.address,
         destination: getAddress(destination),
         amountEth,
         note,
       });
-      intentHash = queued.intentHash;
-      policyTxHash = queued.hash;
-      executionMode = 'reviewed';
     } catch (error) {
       console.error('[safe7579] failed to queue reviewed intent:', error);
       const message = error instanceof Error ? error.message : 'Failed to queue the Safe7579 reviewed intent';
       return NextResponse.json({ error: message }, { status: 500 });
     }
-  } else if (isSafe7579 && decision.status === 'approved') {
-    executionMode = 'session';
-  } else if (decision.status === 'approved') {
-    executionMode = 'owner';
-  } else if (decision.status === 'queued') {
-    executionMode = 'reviewed';
   }
 
   const transferId = generateId('awt');
@@ -158,9 +145,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     approvals_required: decision.approvalsRequired,
     approvals_received: decision.approvalsReceived,
     unlock_at: decision.unlockAt,
-    execution_mode: executionMode,
-    intent_hash: intentHash,
-    policy_tx_hash: policyTxHash,
   };
 
   const { data: transfer, error: transferError } = await supabase
