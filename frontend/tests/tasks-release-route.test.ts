@@ -101,6 +101,7 @@ function makeCompletedTask(overrides: Record<string, unknown> = {}) {
     submitter_id: 'user-1',
     assigned_agent: 'agent-1',
     agents: {
+      name: 'Wallet Agent',
       users: {
         wallet_address: '0xagent',
       },
@@ -228,8 +229,8 @@ describe('POST /api/tasks/[id]/release', () => {
     expect(insertedTransaction).toMatchObject({
       id: 'tx-1',
       type: 'escrow_release',
-      from: '0xabc',
-      to: '0xagent',
+      from: 'Escrow Vault',
+      to: 'Wallet Agent',
       amount: '0.25 ETH',
       token: 'ETH',
       status: 'confirmed',
