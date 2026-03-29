@@ -36,6 +36,7 @@ import { readEnv, readRequiredEnv } from '@/lib/env';
 import {
   buildStoredSafe7579Session,
   ELIOS_POLICY_MANAGER_ABI,
+  readSafe7579PolicySignerPrivateKey,
   SAFE_7579_POLICY_MANAGER_ADDRESS,
   SAFE_7579_SMART_SESSIONS_ADDRESS,
   safe7579PublicClient,
@@ -49,8 +50,8 @@ const paymasterUrl = readEnv(process.env.SAFE7579_PAYMASTER_URL);
 
 function getPolicySignerAccount() {
   const privateKey = readRequiredEnv(
-    'SAFE_POLICY_SIGNER_PRIVATE_KEY',
-    process.env.SAFE_POLICY_SIGNER_PRIVATE_KEY,
+    'SAFE_POLICY_SIGNER_PRIVATE_KEY or PROOF_SUBMITTER_PRIVATE_KEY',
+    readSafe7579PolicySignerPrivateKey(),
   ) as Hex;
 
   return privateKeyToAccount(privateKey);
