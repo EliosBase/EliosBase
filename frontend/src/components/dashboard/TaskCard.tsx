@@ -21,12 +21,13 @@ type EscrowActionStep = 'idle' | 'signing' | 'mining' | 'confirming' | 'released
 export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardProps) {
   const currentStepIndex = TASK_STEPS.indexOf(task.currentStep);
   const queryClient = useQueryClient();
-  const { release, txHash, isSigning, isMining, error: contractError, reset } = useEscrowRelease();
+  const { release, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useEscrowRelease();
   const {
     refundFunds,
     txHash: refundTxHash,
     isSigning: isRefundSigning,
     isMining: isRefundMining,
+    isConfirmed: isRefundConfirmed,
     error: refundContractError,
     reset: resetRefund,
   } = useEscrowRefund();
@@ -80,11 +81,7 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
   }, [isRefundSigning, isRefundMining, refundStep]);
 
   useEffect(() => {
-    if (!txHash || submittedReleaseHash.current === txHash) {
-      return;
-    }
-
-    if (releaseStep !== 'signing' && releaseStep !== 'mining') {
+    if (!txHash || !isConfirmed || submittedReleaseHash.current === txHash) {
       return;
     }
 
@@ -92,14 +89,10 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
     setReleaseStep('confirming');
     registerRelease(txHash);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txHash, releaseStep]);
+  }, [isConfirmed, txHash]);
 
   useEffect(() => {
-    if (!refundTxHash || submittedRefundHash.current === refundTxHash) {
-      return;
-    }
-
-    if (refundStep !== 'signing' && refundStep !== 'mining') {
+    if (!refundTxHash || !isRefundConfirmed || submittedRefundHash.current === refundTxHash) {
       return;
     }
 
@@ -107,7 +100,7 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
     setRefundStep('confirming');
     registerRefund(refundTxHash);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refundTxHash, refundStep]);
+  }, [isRefundConfirmed, refundTxHash]);
 
   // Handle contract errors
   useEffect(() => {

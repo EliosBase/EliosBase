@@ -3,8 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { logAudit, logActivity, generateId } from '@/lib/audit';
 import { validateOrigin } from '@/lib/csrf';
-import { ESCROW_CONTRACT_ADDRESS } from '@/lib/contracts';
-import { verifyOnchainTransaction } from '@/lib/transactionVerification';
+import { verifyEscrowActionTransaction } from '@/lib/transactionVerification';
 
 // POST /api/agents/[id]/hire — hire an agent with a verified on-chain escrow tx
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -24,6 +23,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Require a real transaction hash
   if (!body.txHash || typeof body.txHash !== 'string' || !body.txHash.startsWith('0x')) {
     return NextResponse.json({ error: 'Valid txHash is required' }, { status: 400 });
+  }
+
+  if (!body.taskId || typeof body.taskId !== 'string') {
+    return NextResponse.json({ error: 'Valid taskId is required' }, { status: 400 });
   }
 
   // Fetch the agent
@@ -49,9 +52,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let txStatus: 'confirmed' | 'pending' = 'pending';
 
   try {
-    ({ txStatus } = await verifyOnchainTransaction(body.txHash as `0x${string}`, {
-      expectedFrom: session.walletAddress,
-      expectedTo: ESCROW_CONTRACT_ADDRESS,
+    ({ txStatus } = await verifyEscrowActionTransaction(body.txHash as `0x${string}`, {
+      action: 'lock',
+      taskId: body.taskId,
+      agentId,
+      depositor: session.walletAddress,
     }));
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Transaction ')) {
@@ -95,16 +100,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   // If a taskId was provided, assign the agent to that task
-  if (body.taskId) {
-    await supabase
-      .from('tasks')
-      .update({
-        assigned_agent: agentId,
-        current_step: 'Assigned',
-        step_changed_at: new Date().toISOString(),
-      })
-      .eq('id', body.taskId);
-  }
+  await supabase
+    .from('tasks')
+    .update({
+      assigned_agent: agentId,
+      current_step: 'Assigned',
+      step_changed_at: new Date().toISOString(),
+    })
+    .eq('id', body.taskId);
 
   // Audit + activity logging
   await logAudit({ action: 'AGENT_HIRE', actor, target: agentId, result: 'ALLOW' });

@@ -5,11 +5,10 @@ const mocks = vi.hoisted(() => ({
   createServiceClient: vi.fn(),
   generateId: vi.fn(() => 'tx-1'),
   getSession: vi.fn(),
-  getTransaction: vi.fn(),
-  getTransactionReceipt: vi.fn(),
   logActivity: vi.fn(),
   logAudit: vi.fn(),
   validateOrigin: vi.fn(() => null),
+  verifyEscrowActionTransaction: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -26,11 +25,8 @@ vi.mock('@/lib/audit', () => ({
   logAudit: mocks.logAudit,
 }));
 
-vi.mock('@/lib/viemClient', () => ({
-  publicClient: {
-    getTransaction: mocks.getTransaction,
-    getTransactionReceipt: mocks.getTransactionReceipt,
-  },
+vi.mock('@/lib/transactionVerification', () => ({
+  verifyEscrowActionTransaction: mocks.verifyEscrowActionTransaction,
 }));
 
 vi.mock('@/lib/csrf', () => ({
@@ -115,13 +111,7 @@ describe('POST /api/agents/[id]/hire', () => {
 
   it('rejects transactions sent to the wrong contract', async () => {
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
-    mocks.getTransaction.mockResolvedValue({
-      to: '0x0000000000000000000000000000000000000002',
-      from: '0xabc',
-    });
-    mocks.getTransactionReceipt.mockResolvedValue({
-      status: 'success',
-    });
+    mocks.verifyEscrowActionTransaction.mockRejectedValue(new Error('Transaction is not to the escrow contract'));
     mocks.createServiceClient.mockReturnValue(
       makeSupabaseClient({
         agents: [
@@ -133,7 +123,7 @@ describe('POST /api/agents/[id]/hire', () => {
       }),
     );
 
-    const response = await POST(makeRequest({ txHash: '0x1234' }), { params: Promise.resolve({ id: 'agent-1' }) });
+    const response = await POST(makeRequest({ txHash: '0x1234', taskId: 'task-1' }), { params: Promise.resolve({ id: 'agent-1' }) });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'Transaction is not to the escrow contract' });
@@ -141,13 +131,7 @@ describe('POST /api/agents/[id]/hire', () => {
 
   it('rejects transactions signed by a different wallet', async () => {
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
-    mocks.getTransaction.mockResolvedValue({
-      to: '0x0000000000000000000000000000000000000001',
-      from: '0xdef',
-    });
-    mocks.getTransactionReceipt.mockResolvedValue({
-      status: 'success',
-    });
+    mocks.verifyEscrowActionTransaction.mockRejectedValue(new Error('Transaction sender does not match your wallet'));
     mocks.createServiceClient.mockReturnValue(
       makeSupabaseClient({
         agents: [
@@ -159,7 +143,7 @@ describe('POST /api/agents/[id]/hire', () => {
       }),
     );
 
-    const response = await POST(makeRequest({ txHash: '0x1234' }), { params: Promise.resolve({ id: 'agent-1' }) });
+    const response = await POST(makeRequest({ txHash: '0x1234', taskId: 'task-1' }), { params: Promise.resolve({ id: 'agent-1' }) });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'Transaction sender does not match your wallet' });
@@ -170,11 +154,7 @@ describe('POST /api/agents/[id]/hire', () => {
     let taskPayload: Record<string, unknown> | undefined;
 
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
-    mocks.getTransaction.mockResolvedValue({
-      to: '0x0000000000000000000000000000000000000001',
-      from: '0xabc',
-    });
-    mocks.getTransactionReceipt.mockRejectedValue(new Error('receipt not ready'));
+    mocks.verifyEscrowActionTransaction.mockResolvedValue({ txStatus: 'pending', blockNumber: null });
     mocks.createServiceClient.mockReturnValue(
       makeSupabaseClient({
         agents: [
@@ -238,13 +218,7 @@ describe('POST /api/agents/[id]/hire', () => {
     let rollbackPayload: Record<string, unknown> | undefined;
 
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
-    mocks.getTransaction.mockResolvedValue({
-      to: '0x0000000000000000000000000000000000000001',
-      from: '0xabc',
-    });
-    mocks.getTransactionReceipt.mockResolvedValue({
-      status: 'success',
-    });
+    mocks.verifyEscrowActionTransaction.mockResolvedValue({ txStatus: 'confirmed', blockNumber: 42 });
     mocks.createServiceClient.mockReturnValue(
       makeSupabaseClient({
         agents: [
@@ -268,7 +242,7 @@ describe('POST /api/agents/[id]/hire', () => {
       }),
     );
 
-    const response = await POST(makeRequest({ txHash: '0x1234' }), { params: Promise.resolve({ id: 'agent-1' }) });
+    const response = await POST(makeRequest({ txHash: '0x1234', taskId: 'task-1' }), { params: Promise.resolve({ id: 'agent-1' }) });
 
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: 'Failed to record transaction' });
