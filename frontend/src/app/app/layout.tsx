@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import CyberBackground from '@/components/CyberBackground';
 import Sidebar from '@/components/dashboard/Sidebar';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import TransactionSyncBridge from '@/components/dashboard/TransactionSyncBridge';
 import WalletProvider from '@/providers/WalletProvider';
 import AuthProvider from '@/providers/AuthProvider';
 import AuthGate from '@/components/dashboard/AuthGate';
@@ -26,6 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <WalletProvider>
         <AuthGate>
+          <TransactionSyncBridge />
           <div className="min-h-screen">
             <CyberBackground />
             <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
