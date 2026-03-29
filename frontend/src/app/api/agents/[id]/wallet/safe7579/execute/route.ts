@@ -93,6 +93,9 @@ export async function POST(
   const ownerWallet = getAddress(session.walletAddress);
   const storedSession = buildStoredSafe7579Session({
     sessionKeyAddress: getAddress(sessionState.address),
+    sessionKeyValidAfter: sessionState.rotatedAt
+      ? Math.floor(new Date(sessionState.rotatedAt).getTime() / 1000)
+      : undefined,
     sessionKeyValidUntil: Math.floor(new Date(sessionState.validUntil).getTime() / 1000),
     policy: agent.wallet_policy,
     modules,

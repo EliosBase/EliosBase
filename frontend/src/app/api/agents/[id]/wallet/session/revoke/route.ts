@@ -31,7 +31,7 @@ export async function POST(
   const supabase = createServiceClient();
   const { data: agent, error } = await supabase
     .from('agents')
-    .select('id, owner_id, wallet_address, wallet_standard, wallet_migration_state, wallet_policy, wallet_modules, session_key_address, session_key_expires_at')
+    .select('id, owner_id, wallet_address, wallet_standard, wallet_migration_state, wallet_policy, wallet_modules, session_key_address, session_key_expires_at, session_key_rotated_at')
     .eq('id', id)
     .single();
 
@@ -49,6 +49,9 @@ export async function POST(
 
   const storedSession = buildStoredSafe7579Session({
     sessionKeyAddress: getAddress(agent.session_key_address),
+    sessionKeyValidAfter: agent.session_key_rotated_at
+      ? Math.floor(new Date(agent.session_key_rotated_at).getTime() / 1000)
+      : undefined,
     sessionKeyValidUntil: Math.floor(new Date(agent.session_key_expires_at).getTime() / 1000),
     policy: agent.wallet_policy,
     modules: agent.wallet_modules,

@@ -161,12 +161,14 @@ async function createSessionSmartAccount(params: {
   validatorAddress: Address;
   sessionPrivateKey: Hex;
   sessionKeyAddress: Address;
+  sessionKeyValidAfter?: number;
   sessionKeyValidUntil: number;
   policy: AgentWalletPolicy;
   modules: AgentWalletModules;
 }) {
   const session = buildStoredSafe7579Session({
     sessionKeyAddress: params.sessionKeyAddress,
+    sessionKeyValidAfter: params.sessionKeyValidAfter,
     sessionKeyValidUntil: params.sessionKeyValidUntil,
     policy: params.policy,
     modules: params.modules,
@@ -336,6 +338,7 @@ export async function executeSafe7579SessionTransfer(params: {
   policy: AgentWalletPolicy;
   modules: AgentWalletModules;
   sessionKeyAddress: Address;
+  sessionKeyValidAfter?: number;
   sessionKeyValidUntil: number;
   sessionKeyCiphertext: string;
   sessionKeyNonce: string;
@@ -359,6 +362,7 @@ export async function executeSafe7579SessionTransfer(params: {
     validatorAddress,
     sessionPrivateKey,
     sessionKeyAddress: params.sessionKeyAddress,
+    sessionKeyValidAfter: params.sessionKeyValidAfter,
     sessionKeyValidUntil: params.sessionKeyValidUntil,
     policy: params.policy,
     modules: params.modules,

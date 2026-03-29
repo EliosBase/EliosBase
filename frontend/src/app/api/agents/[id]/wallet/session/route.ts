@@ -50,6 +50,9 @@ export async function GET(
       });
       const storedSession = buildStoredSafe7579Session({
         sessionKeyAddress: getAddress(agent.session_key_address),
+        sessionKeyValidAfter: agent.session_key_rotated_at
+          ? Math.floor(new Date(agent.session_key_rotated_at).getTime() / 1000)
+          : undefined,
         sessionKeyValidUntil: Math.floor(new Date(agent.session_key_expires_at).getTime() / 1000),
         policy: agent.wallet_policy,
         modules: agent.wallet_modules,

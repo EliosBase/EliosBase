@@ -121,6 +121,7 @@ export function buildSessionDefinition(params: {
   policy: AgentWalletPolicy;
   hookAddress: Address;
   validUntil: number;
+  validAfter?: number;
   salt?: Hex;
 }): Session {
   const sessionValidator = getOwnableValidator({
@@ -138,7 +139,7 @@ export function buildSessionDefinition(params: {
         limit: parseEthToPolicyUint(params.policy.autoApproveThresholdEth),
       }),
       getTimeFramePolicy({
-        validAfter: Math.floor(Date.now() / 1000),
+        validAfter: params.validAfter ?? Math.floor(Date.now() / 1000),
         validUntil: params.validUntil,
       }),
     ],
@@ -210,6 +211,7 @@ export function buildSafe7579ModuleMetadata(params: {
 export function buildStoredSafe7579Session(params: {
   sessionKeyAddress: Address;
   sessionKeyValidUntil: number;
+  sessionKeyValidAfter?: number;
   policy: AgentWalletPolicy;
   modules: AgentWalletModules;
 }): Session {
@@ -221,6 +223,7 @@ export function buildStoredSafe7579Session(params: {
     sessionKeyAddress: getAddress(params.sessionKeyAddress),
     policy: params.policy,
     hookAddress: getAddress(params.modules.hook),
+    validAfter: params.sessionKeyValidAfter,
     validUntil: params.sessionKeyValidUntil,
     salt: params.modules.sessionSalt as Hex,
   });
