@@ -1,0 +1,67 @@
+name: auto-promote
+
+on:
+  push:
+    branches-ignore:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-promote-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  promote:
+    if: github.event.repository.fork == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Create or update PR to main
+        id: promote
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPOSITORY: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          BASE: ${{ github.event.repository.default_branch }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -eu
+
+          if [ "$BRANCH" = "$BASE" ]; then
+            exit 0
+          fi
+
+          pr_url=$(gh pr list \
+            --repo "$REPOSITORY" \
+            --head "$BRANCH" \
+            --base "$BASE" \
+            --state open \
+            --json url \
+            --jq '.[0].url')
+
+          if [ -z "$pr_url" ]; then
+            title=$(printf '%s\n' "$COMMIT_MESSAGE" | sed -n '1{/^$/d;p;}')
+
+            if [ -z "$title" ]; then
+              title="merge $BRANCH into $BASE"
+            fi
+
+            pr_url=$(gh pr create \
+              --repo "$REPOSITORY" \
+              --head "$BRANCH" \
+              --base "$BASE" \
+              --title "$title" \
+              --body "Auto-generated promotion PR for \`$BRANCH\`.")
+          fi
+
+          printf 'pr_url=%s\n' "$pr_url" >>"$GITHUB_OUTPUT"
+
+      - name: Enable auto-merge
+        if: steps.promote.outputs.pr_url != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ steps.promote.outputs.pr_url }}
+        run: gh pr merge --auto --squash --delete-branch "$PR_URL"
