@@ -3,11 +3,11 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { logAudit, logActivity, generateId } from '@/lib/audit';
 import { publicClient } from '@/lib/viemClient';
-import { ESCROW_CONTRACT_ADDRESS, VERIFIER_ABI, VERIFIER_CONTRACT_ADDRESS } from '@/lib/contracts';
+import { VERIFIER_ABI, VERIFIER_CONTRACT_ADDRESS } from '@/lib/contracts';
 import { validateOrigin } from '@/lib/csrf';
 import { stringToHex } from 'viem';
 import { insertTransactionRecord } from '@/lib/transactions';
-import { verifyOnchainTransaction } from '@/lib/transactionVerification';
+import { verifyEscrowActionTransaction } from '@/lib/transactionVerification';
 
 // POST /api/tasks/[id]/release — release escrowed funds after task completion
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -69,11 +69,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Verify the release transaction on-chain
   const actor = session.walletAddress ?? session.userId;
   let txStatus: 'confirmed' | 'pending' = 'pending';
+  const releaseRecipient = task.agents?.users?.wallet_address ?? task.agentOperatorAddress ?? undefined;
 
   try {
-    ({ txStatus } = await verifyOnchainTransaction(txHash as `0x${string}`, {
-      expectedFrom: session.walletAddress,
-      expectedTo: ESCROW_CONTRACT_ADDRESS,
+    ({ txStatus } = await verifyEscrowActionTransaction(txHash as `0x${string}`, {
+      action: 'release',
+      taskId,
+      recipient: releaseRecipient,
     }));
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Transaction ')) {
@@ -85,7 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Record escrow_release transaction
   const txId = generateId('tx');
-  const releaseTarget = task.agents?.name ?? task.assigned_agent ?? task.agents?.users?.wallet_address ?? '';
+  const releaseTarget = task.agents?.name ?? task.assigned_agent ?? releaseRecipient ?? '';
 
   const { error: txError } = await insertTransactionRecord(supabase, {
     id: txId,

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { logAudit, logActivity, generateId } from '@/lib/audit';
-import { ESCROW_CONTRACT_ADDRESS } from '@/lib/contracts';
-import { verifyOnchainTransaction } from '@/lib/transactionVerification';
+import { verifyEscrowActionTransaction } from '@/lib/transactionVerification';
 
 // POST /api/admin/tasks/[id]/release-escrow — admin override escrow release (skips ZK check)
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -33,9 +32,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Verify the transaction on-chain
   let txStatus: 'confirmed' | 'pending' = 'pending';
+  const agentOperator = task.agents?.users?.wallet_address ?? task.assigned_agent ?? '';
   try {
-    ({ txStatus } = await verifyOnchainTransaction(txHash as `0x${string}`, {
-      expectedTo: ESCROW_CONTRACT_ADDRESS,
+    ({ txStatus } = await verifyEscrowActionTransaction(txHash as `0x${string}`, {
+      action: 'release',
+      taskId,
+      recipient: task.agents?.users?.wallet_address ?? undefined,
     }));
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Transaction ')) {
@@ -47,8 +49,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Record transaction
   const txId = generateId('tx');
-  const agentOperator = task.agents?.users?.wallet_address ?? task.assigned_agent ?? '';
-
   await supabase.from('transactions').insert({
     id: txId,
     type: 'escrow_release',
