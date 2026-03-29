@@ -166,7 +166,11 @@ export function buildSafe7579Modules(params: {
     hook: params.hookAddress,
     sessions: params.session ? [params.session] : [],
   });
-  const compatibilityFallback = getSmartSessionsCompatibilityFallback();
+  const rawCompatibilityFallback = getSmartSessionsCompatibilityFallback();
+  const compatibilityFallback: SafeInstallModule = {
+    ...rawCompatibilityFallback,
+    functionSig: rawCompatibilityFallback.selector,
+  };
   const hookModule: SafeInstallModule = {
     address: params.hookAddress,
     module: params.hookAddress,
