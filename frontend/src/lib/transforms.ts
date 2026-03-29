@@ -18,10 +18,18 @@ import type {
   ActivityEvent,
   AgentWalletTransfer,
 } from './types';
+import {
+  getAgentWalletMigrationState,
+  getAgentWalletModules,
+  getAgentWalletSession,
+  getAgentWalletStandard,
+} from './agentWalletCompat';
 import { getExecutionFailure, getExecutionResult } from './types/agentExecution';
 import { normalizeTransactionType } from './transactions';
 
 export function toAgent(row: DbAgent): Agent {
+  const walletSession = getAgentWalletSession(row);
+
   return {
     id: row.id,
     name: row.name,
@@ -35,16 +43,16 @@ export function toAgent(row: DbAgent): Agent {
     ownerId: row.owner_id ?? undefined,
     walletAddress: row.wallet_address ?? undefined,
     walletKind: row.wallet_kind ?? undefined,
-    walletStandard: row.wallet_standard ?? row.wallet_kind ?? undefined,
+    walletStandard: getAgentWalletStandard(row),
     walletStatus: row.wallet_status ?? undefined,
-    walletMigrationState: row.wallet_migration_state ?? undefined,
+    walletMigrationState: getAgentWalletMigrationState(row),
     walletPolicy: row.wallet_policy ?? undefined,
-    walletModules: row.wallet_modules ?? undefined,
-    walletSession: row.session_key_address
+    walletModules: getAgentWalletModules(row),
+    walletSession: walletSession
       ? {
-        address: row.session_key_address,
-        validUntil: row.session_key_expires_at ?? undefined,
-        rotatedAt: row.session_key_rotated_at ?? undefined,
+        address: walletSession.address,
+        validUntil: walletSession.validUntil,
+        rotatedAt: walletSession.rotatedAt,
       }
       : undefined,
   };
