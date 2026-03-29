@@ -6,6 +6,7 @@ import { publicClient } from '@/lib/viemClient';
 import { ESCROW_CONTRACT_ADDRESS, VERIFIER_ABI, VERIFIER_CONTRACT_ADDRESS } from '@/lib/contracts';
 import { validateOrigin } from '@/lib/csrf';
 import { stringToHex } from 'viem';
+import { insertTransactionRecord } from '@/lib/transactions';
 
 // POST /api/tasks/[id]/release — release escrowed funds after task completion
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const txId = generateId('tx');
   const agentOperator = task.agents?.users?.wallet_address ?? task.assigned_agent ?? '';
 
-  await supabase.from('transactions').insert({
+  const { error: txError } = await insertTransactionRecord(supabase, {
     id: txId,
     type: 'escrow_release',
     from: actor,
@@ -105,6 +106,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     tx_hash: txHash,
     user_id: session.userId,
   });
+
+  if (txError) {
+    return NextResponse.json({ error: 'Failed to record release transaction' }, { status: 500 });
+  }
 
   // Audit + activity logging
   await logAudit({

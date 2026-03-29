@@ -137,7 +137,10 @@ export default function AgentCard({ agent }: AgentCardProps) {
   }[step];
 
   const isOwner = session?.userId === agent.ownerId;
-  const isDisabled = ['signing', 'mining', 'confirming'].includes(step) || agent.status === 'offline';
+  const isBusy = agent.status === 'busy';
+  const isOffline = agent.status === 'offline';
+  const isDisabled = ['signing', 'mining', 'confirming'].includes(step) || isBusy || isOffline;
+  const idleLabel = isBusy ? 'Busy' : isOffline ? 'Offline' : buttonLabel;
 
   return (
     <div className="glass p-5 rounded-2xl">
@@ -204,7 +207,9 @@ export default function AgentCard({ agent }: AgentCardProps) {
           className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
             step === 'hired'
               ? 'bg-green-500/15 text-green-400 border border-green-500/20'
-              : agent.status === 'offline'
+              : isBusy
+                ? 'bg-yellow-500/15 text-yellow-300 border border-yellow-500/20 cursor-not-allowed'
+                : isOffline
                 ? 'bg-white/10 text-white/30 cursor-not-allowed'
                 : step === 'error'
                   ? 'bg-red-500/15 text-red-400 hover:bg-red-500/25 border border-red-500/20'
@@ -216,7 +221,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
           ) : ['signing', 'mining', 'confirming'].includes(step) ? (
             <span className="flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> {buttonLabel}</span>
           ) : (
-            buttonLabel
+            idleLabel
           )}
         </button>
       </div>

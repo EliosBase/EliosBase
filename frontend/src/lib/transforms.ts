@@ -1,6 +1,7 @@
 import type { DbAgent, DbTask, DbTransaction, DbSecurityAlert, DbGuardrail, DbAuditLogEntry, DbActivityEvent } from './types/database';
 import type { Agent, Task, Transaction, SecurityAlert, Guardrail, AuditLogEntry, ActivityEvent } from './types';
 import { getExecutionFailure, getExecutionResult } from './types/agentExecution';
+import { normalizeTransactionType } from './transactions';
 
 export function toAgent(row: DbAgent): Agent {
   return {
@@ -46,7 +47,7 @@ export function toTask(row: DbTask): Task {
 export function toTransaction(row: DbTransaction): Transaction {
   return {
     id: row.id,
-    type: row.type,
+    type: normalizeTransactionType(row),
     from: row.from,
     to: row.to,
     amount: row.amount,

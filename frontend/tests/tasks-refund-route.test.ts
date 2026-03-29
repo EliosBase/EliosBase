@@ -51,13 +51,21 @@ function makeRequest(body: Record<string, unknown>) {
 
 function makeBuilder(
   result: { data: unknown; error: unknown },
-  options: { onInsert?: (payload: Record<string, unknown>) => void } = {},
+  options: {
+    onInsert?: (payload: Record<string, unknown>) => void;
+    insertResults?: Array<{ error: { code?: string; message?: string } | null }>;
+  } = {},
 ) {
   const builder: Record<string, unknown> = {};
   builder.select = vi.fn(() => builder);
-  builder.insert = vi.fn(async (payload: Record<string, unknown>) => {
+  builder.insert = vi.fn((payload: Record<string, unknown>) => {
     options.onInsert?.(payload);
-    return { error: null };
+
+    return {
+      select: vi.fn(() => ({
+        single: vi.fn(async () => options.insertResults?.shift() ?? { data: payload, error: null }),
+      })),
+    };
   });
   builder.update = vi.fn(() => builder);
   builder.eq = vi.fn(() => builder);
@@ -204,5 +212,83 @@ describe('POST /api/tasks/[id]/refund', () => {
       target: 'task-1',
       result: 'ALLOW',
     });
+  });
+
+  it('falls back to the legacy escrow_release alias when the live schema rejects escrow_refund', async () => {
+    const insertedTransactions: Array<Record<string, unknown>> = [];
+
+    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
+    mocks.getTransactionReceipt.mockResolvedValue({
+      to: '0x0000000000000000000000000000000000000001',
+      from: '0xabc',
+      status: 'success',
+    });
+    mocks.createServiceClient.mockReturnValue(
+      makeSupabaseClient({
+        tasks: [
+          makeBuilder({ data: makeTask(), error: null }),
+        ],
+        security_alerts: [
+          {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(async () => ({ data: [], error: null })),
+              })),
+            })),
+          },
+        ],
+        transactions: [
+          makeBuilder(
+            { data: null, error: null },
+            {
+              onInsert: (payload) => { insertedTransactions.push(payload); },
+              insertResults: [
+                {
+                  error: {
+                    code: '23514',
+                    message: 'new row for relation "transactions" violates check constraint "transactions_type_check"',
+                  },
+                },
+              ],
+            },
+          ),
+          makeBuilder(
+            { data: null, error: null },
+            {
+              onInsert: (payload) => { insertedTransactions.push(payload); },
+              insertResults: [{ error: null }],
+            },
+          ),
+        ],
+      }),
+    );
+
+    const response = await POST(makeRequest({ txHash: '0x1234' }), { params: Promise.resolve({ id: 'task-1' }) });
+
+    expect(response.status).toBe(200);
+    expect(insertedTransactions).toEqual([
+      {
+        id: 'tx-1',
+        type: 'escrow_refund',
+        from: '0xabc',
+        to: '0xabc',
+        amount: '0.25 ETH',
+        token: 'ETH',
+        status: 'confirmed',
+        tx_hash: '0x1234',
+        user_id: 'user-1',
+      },
+      {
+        id: 'tx-1',
+        type: 'escrow_release',
+        from: '0xabc',
+        to: '0xabc',
+        amount: '0.25 ETH',
+        token: 'ETH',
+        status: 'confirmed',
+        tx_hash: '0x1234',
+        user_id: 'user-1',
+      },
+    ]);
   });
 });

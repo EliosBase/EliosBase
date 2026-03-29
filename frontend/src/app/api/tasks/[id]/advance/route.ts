@@ -62,6 +62,35 @@ function buildTerminalFailureReason(message: string, attempts: number) {
   return `${message} Retry budget exhausted after ${attempts} attempts.`;
 }
 
+function buildTerminalExecutionAlert(params: {
+  failure: AgentExecutionError;
+  taskTitle: string;
+  agentName: string;
+  attempts: number;
+}) {
+  if (params.failure.code === 'anthropic_credits_exhausted') {
+    return {
+      severity: 'critical' as const,
+      title: 'Anthropic credits exhausted',
+      description: `Task "${params.taskTitle}" cannot run for agent "${params.agentName}". ${params.failure.message}`,
+    };
+  }
+
+  if (params.failure.retryable) {
+    return {
+      severity: 'high' as const,
+      title: 'Task execution retry budget exhausted',
+      description: `Task "${params.taskTitle}" failed ${params.attempts} times for agent "${params.agentName}". ${params.failure.message}`,
+    };
+  }
+
+  return {
+    severity: 'critical' as const,
+    title: 'Task execution failed permanently',
+    description: `Task "${params.taskTitle}" cannot run for agent "${params.agentName}". ${params.failure.message}`,
+  };
+}
+
 async function releaseAssignedAgent(supabase: ReturnType<typeof createServiceClient>, agentId: string | null) {
   if (!agentId) {
     return;
@@ -222,13 +251,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           terminal: true,
         });
 
-        await createSecurityAlert({
-          severity: 'critical',
-          title: 'Task execution failed permanently',
-          description: `Task "${task.title}" cannot run for agent "${task.agents.name}". ${existingFailure.message}`,
-          source: 'agent-execution',
-          actor,
+        const alert = buildTerminalExecutionAlert({
+          failure: nonRetryableFailure,
+          taskTitle: task.title,
+          agentName: task.agents.name,
+          attempts: getFailureAttempts(existingFailure),
         });
+
+        await createSecurityAlert({ ...alert, source: 'agent-execution', actor });
       }
 
       return NextResponse.json({
@@ -397,17 +427,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       });
 
       if (terminal) {
-        await createSecurityAlert({
-          severity: failure.retryable ? 'high' : 'critical',
-          title: failure.retryable
-            ? 'Task execution retry budget exhausted'
-            : 'Task execution failed permanently',
-          description: failure.retryable
-            ? `Task "${task.title}" failed ${attempts} times for agent "${task.agents.name}". ${failure.message}`
-            : `Task "${task.title}" cannot run for agent "${task.agents.name}". ${failure.message}`,
-          source: 'agent-execution',
-          actor,
+        const alert = buildTerminalExecutionAlert({
+          failure,
+          taskTitle: task.title,
+          agentName: task.agents.name,
+          attempts,
         });
+
+        await createSecurityAlert({ ...alert, source: 'agent-execution', actor });
       }
 
       await logAudit({ action: 'AGENT_EXECUTE', actor, target: id, result: 'FLAG' });
