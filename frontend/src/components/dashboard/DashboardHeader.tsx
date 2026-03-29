@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ExternalLink, LogOut, Menu } from 'lucide-react';
-import { useWallet, type WalletId } from '@/hooks/useWallet';
+import { useWallet } from '@/hooks/useWallet';
 import { useSiweContext } from '@/components/dashboard/AuthGate';
 import { useMounted } from '@/hooks/useMounted';
+import type { WalletId } from '@/lib/wallets';
 
 interface DashboardHeaderProps {
   title: string;

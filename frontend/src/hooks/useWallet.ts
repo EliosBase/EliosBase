@@ -9,15 +9,7 @@ import {
   subscribeE2EWallet,
   writeE2EWalletState,
 } from '@/lib/e2e';
-
-const knownWallets = [
-  { id: 'metaMask', name: 'MetaMask', downloadUrl: 'https://metamask.io/download/' },
-  { id: 'coinbaseWallet', name: 'Coinbase Wallet', downloadUrl: 'https://www.coinbase.com/wallet/downloads' },
-  { id: 'rabby', name: 'Rabby', downloadUrl: 'https://rabby.io/' },
-  { id: 'phantom', name: 'Phantom', downloadUrl: 'https://phantom.com/download' },
-] as const;
-
-export type WalletId = (typeof knownWallets)[number]['id'] | 'injected' | 'browserWallet';
+import { detectInstalledWallets, getWalletName, knownWallets, type WalletId } from '@/lib/wallets';
 
 export interface WalletOption {
   id: WalletId;
@@ -26,17 +18,19 @@ export interface WalletOption {
   downloadUrl?: string;
 }
 
-function getWalletName(id: string, fallback: string) {
-  if (id === 'injected') return 'Browser Wallet';
-  return knownWallets.find((wallet) => wallet.id === id)?.name ?? fallback;
-}
-
 export function useWallet() {
   const { connectors, connect, isPending } = useConnect();
   const connection = useConnection();
   const { disconnect } = useDisconnect();
   const [e2eState, setE2EState] = useState(() => readE2EWalletState());
-  const [installedConnectorIds, setInstalledConnectorIds] = useState<string[]>([]);
+  const readInstalledWallets = useCallback(
+    () => detectInstalledWallets(window as Parameters<typeof detectInstalledWallets>[0]),
+    [],
+  );
+  const [installedWalletIds, setInstalledWalletIds] = useState<WalletId[]>(() => {
+    if (isE2EMode || typeof window === 'undefined') return [];
+    return readInstalledWallets();
+  });
 
   useEffect(() => {
     if (!isE2EMode) return;
@@ -48,37 +42,39 @@ export function useWallet() {
   useEffect(() => {
     if (isE2EMode) return;
 
-    let cancelled = false;
+    const resolveInstalledWallets = () => {
+      setInstalledWalletIds(readInstalledWallets());
+    };
 
-    async function resolveInstalledConnectors() {
-      const installed = await Promise.all(
-        connectors.map(async (connector) => {
-          try {
-            return (await connector.getProvider()) ? connector.id : null;
-          } catch {
-            return null;
-          }
-        }),
-      );
+    resolveInstalledWallets();
 
-      if (!cancelled) {
-        setInstalledConnectorIds(installed.filter((id): id is string => !!id));
-      }
-    }
+    const timerIds = [250, 1000].map((delay) => window.setTimeout(resolveInstalledWallets, delay));
 
-    resolveInstalledConnectors();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') resolveInstalledWallets();
+    };
+
+    window.addEventListener('focus', resolveInstalledWallets);
+    window.addEventListener('ethereum#initialized', resolveInstalledWallets);
+    window.addEventListener('eip6963:announceProvider', resolveInstalledWallets as EventListener);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
 
     return () => {
-      cancelled = true;
+      timerIds.forEach((timerId) => window.clearTimeout(timerId));
+      window.removeEventListener('focus', resolveInstalledWallets);
+      window.removeEventListener('ethereum#initialized', resolveInstalledWallets);
+      window.removeEventListener('eip6963:announceProvider', resolveInstalledWallets as EventListener);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [connectors]);
+  }, [readInstalledWallets]);
 
   const walletOptions = useMemo<WalletOption[]>(() => {
     if (isE2EMode) {
       return [{ id: 'browserWallet', name: 'Browser Wallet', installed: true }];
     }
 
-    const installed = new Set(installedConnectorIds);
+    const installed = new Set(installedWalletIds);
     const options: WalletOption[] = knownWallets.map((wallet) => ({
       ...wallet,
       installed: installed.has(wallet.id),
@@ -93,7 +89,7 @@ export function useWallet() {
     }
 
     return options;
-  }, [installedConnectorIds]);
+  }, [installedWalletIds]);
 
   const installedWallets = useMemo(
     () => walletOptions.filter((wallet) => wallet.installed),
