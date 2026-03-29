@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { generateId, logActivity, logAudit } from '@/lib/audit';
-import { ESCROW_CONTRACT_ADDRESS } from '@/lib/contracts';
 import { validateOrigin } from '@/lib/csrf';
 import { buildTaskDisputeSource } from '@/lib/taskDisputes';
 import { insertTransactionRecord } from '@/lib/transactions';
-import { verifyOnchainTransaction } from '@/lib/transactionVerification';
+import { verifyEscrowActionTransaction } from '@/lib/transactionVerification';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const csrfError = validateOrigin(req);
@@ -58,9 +57,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let txStatus: 'confirmed' | 'pending' = 'pending';
 
   try {
-    ({ txStatus } = await verifyOnchainTransaction(txHash as `0x${string}`, {
-      expectedFrom: session.walletAddress,
-      expectedTo: ESCROW_CONTRACT_ADDRESS,
+    ({ txStatus } = await verifyEscrowActionTransaction(txHash as `0x${string}`, {
+      action: 'refund',
+      taskId,
+      depositor: session.walletAddress,
     }));
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Transaction ')) {

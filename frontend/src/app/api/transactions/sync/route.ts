@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
   try {
     ({ txStatus, blockNumber } = await verifyOnchainTransaction(body.txHash as `0x${string}`, {
       expectedFrom: session.walletAddress,
+      allowLoggedAddressMatch: true,
     }));
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Transaction ')) {

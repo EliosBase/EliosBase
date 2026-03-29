@@ -14,7 +14,7 @@ export default function WalletTransferCard() {
   const queryClient = useQueryClient();
   const { session } = useAuthContext();
   const { isConnected } = useWallet();
-  const { transfer, txHash, isSigning, isMining, error: contractError, reset } = useWalletTransfer();
+  const { transfer, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useWalletTransfer();
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');
   const [step, setStep] = useState<TransferStep>('idle');
@@ -27,11 +27,7 @@ export default function WalletTransferCard() {
   }, [isSigning, isMining, step]);
 
   useEffect(() => {
-    if (!txHash || submittedHash.current === txHash) {
-      return;
-    }
-
-    if (step !== 'signing' && step !== 'mining') {
+    if (!txHash || !isConfirmed || submittedHash.current === txHash) {
       return;
     }
 
@@ -39,7 +35,7 @@ export default function WalletTransferCard() {
     setStep('confirming');
     syncTransfer(txHash);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txHash, step]);
+  }, [isConfirmed, txHash]);
 
   useEffect(() => {
     if (!contractError || step === 'idle' || step === 'sent') {
