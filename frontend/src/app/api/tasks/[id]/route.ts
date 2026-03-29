@@ -11,8 +11,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const [{ data, error }, disputesRes] = await Promise.all([
     supabase
-      .from('tasks')
-      .select('*, agents(name, owner_id, users:owner_id(wallet_address))')
+    .from('tasks')
+      .select('*, agents(name, owner_id, wallet_address, wallet_policy, wallet_status, users:owner_id(wallet_address))')
       .eq('id', id)
       .single(),
     supabase

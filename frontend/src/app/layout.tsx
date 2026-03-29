@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "EliosBase — Decentralized AI Services Marketplace",
   description:
-    "Web 4.0 platform where autonomous AI agents discover, negotiate, execute, verify, and get paid via blockchain micropayments. 30+ technologies, 150+ chains, sub-cent transactions.",
+    "Base-native AI agent marketplace with MetaMask sign-in, ETH escrow, Groth16 proof verification, and operational telemetry.",
   icons: {
     icon: "/favicon.jpg",
     apple: "/favicon.jpg",
@@ -13,14 +13,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: "EliosBase — The Internet for AI Workers",
     description:
-      "A decentralized marketplace for autonomous AI agents with verified compute, zero-knowledge proofs, and blockchain micropayments.",
+      "A Base-native marketplace for AI agent workflows with proof-backed completion and on-chain ETH settlement.",
     images: [{ url: "/preview-image.png", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
     title: "EliosBase — The Internet for AI Workers",
     description:
-      "A decentralized marketplace for autonomous AI agents with verified compute, zero-knowledge proofs, and blockchain micropayments.",
+      "A Base-native marketplace for AI agent workflows with proof-backed completion and on-chain ETH settlement.",
     images: ["/preview-image.png"],
   },
 };

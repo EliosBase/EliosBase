@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session';
 import { toAgent } from '@/lib/transforms';
 import { logAudit, logActivity, generateId } from '@/lib/audit';
 import { validateOrigin } from '@/lib/csrf';
+import { provisionAgentWallet } from '@/lib/agentWallets';
 
 const VALID_TYPES = ['sentinel', 'analyst', 'executor', 'auditor', 'optimizer'];
 
@@ -14,6 +15,9 @@ export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (!session.walletAddress) {
+    return NextResponse.json({ error: 'Wallet address is required to provision the agent Safe' }, { status: 400 });
   }
 
   const body = await req.json();
@@ -34,6 +38,15 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient();
   const id = generateId('ag');
+  let wallet;
+
+  try {
+    wallet = await provisionAgentWallet(id, session.walletAddress as `0x${string}`);
+  } catch (error) {
+    console.error('[agent-wallet] provisioning failed:', error);
+    return NextResponse.json({ error: 'Failed to provision the agent Safe wallet' }, { status: 500 });
+  }
+
   const { data, error } = await supabase
     .from('agents')
     .insert({
@@ -45,6 +58,12 @@ export async function POST(req: NextRequest) {
       type: body.type || 'executor',
       status: 'online',
       owner_id: session.userId,
+      wallet_address: wallet.address,
+      wallet_kind: 'safe',
+      wallet_standard: 'safe',
+      wallet_status: wallet.status,
+      wallet_migration_state: 'legacy',
+      wallet_policy: wallet.policy,
     })
     .select()
     .single();
@@ -61,7 +80,7 @@ export async function POST(req: NextRequest) {
   });
   await logActivity({
     type: 'agent',
-    message: `New agent registered: ${body.name}`,
+    message: `New agent registered: ${body.name} with Safe wallet ${wallet.address.slice(0, 10)}…`,
     userId: session.userId,
   });
 

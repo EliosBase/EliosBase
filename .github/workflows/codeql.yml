@@ -3,8 +3,7 @@ name: codeql
 on:
   push:
     branches:
-      - main
-      - 'ghost369/**'
+      - '**'
   pull_request:
   schedule:
     - cron: '0 5 * * 1'

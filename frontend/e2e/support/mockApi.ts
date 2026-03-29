@@ -15,6 +15,7 @@ interface MockAppOptions {
   tasks?: JsonRecord[];
   taskResult?: JsonRecord | null;
   agents?: JsonRecord[];
+  agentWalletTransfers?: JsonRecord[];
   stats?: JsonRecord;
   activity?: JsonRecord[];
   walletStats?: JsonRecord;
@@ -93,6 +94,7 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
   let session = clone(options.session ?? { authenticated: false });
   const tasks = clone(options.tasks ?? []);
   const agents = clone(options.agents ?? []);
+  const agentWalletTransfers = clone(options.agentWalletTransfers ?? []);
   const taskResult = options.taskResult ?? null;
   const stats = clone(options.stats ?? defaultDashboardStats);
   const activity = clone(options.activity ?? []);
@@ -157,6 +159,13 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
     return fulfillJson(route, syncedTransaction, 201);
   });
   await page.route('**/api/wallet/stats', (route) => fulfillJson(route, walletStats));
+  await page.route('**/api/agent-wallets', (route) => fulfillJson(route, {
+    agents: agents.filter((agent) => agent.ownerId === session.userId),
+    transfers: agentWalletTransfers,
+    reviewQueue: session.role === 'operator' || session.role === 'admin'
+      ? agentWalletTransfers.filter((transfer) => transfer.status === 'queued' || transfer.status === 'approved')
+      : [],
+  }));
 
   await page.route('**/api/tasks', (route) => {
     if (route.request().method() === 'POST') {
@@ -196,7 +205,7 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
       id: `tx-release-${taskId}`,
       type: 'escrow_release',
       from: session.walletAddress ?? '0x1234',
-      to: task.agentOperatorAddress ?? task.assignedAgent ?? 'agent-operator',
+      to: task.agentPayoutAddress ?? task.agentWalletAddress ?? task.agentOperatorAddress ?? task.assignedAgent ?? 'agent-safe',
       amount: task.reward,
       token: 'ETH',
       status: 'confirmed',
@@ -292,11 +301,129 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
       reputation: 100,
       tasksCompleted: 0,
       status: 'online',
+      walletAddress: '0xsafe000000000000000000000000000000000001',
+      walletKind: 'safe',
+      walletStatus: 'active',
+      walletPolicy: {
+        standard: 'safe',
+        owner: session.walletAddress ?? '0x123400000000000000000000000000000000abcd',
+        policySigner: '0xsafe00000000000000000000000000000000sign',
+        owners: [
+          session.walletAddress ?? '0x123400000000000000000000000000000000abcd',
+          '0xsafe00000000000000000000000000000000sign',
+        ],
+        threshold: 2,
+        dailySpendLimitEth: '0.50',
+        coSignThresholdEth: '0.25',
+        timelockThresholdEth: '1.00',
+        timelockSeconds: 86400,
+        blockedDestinations: [],
+      },
       ...body,
     };
 
     agents.unshift(createdAgent);
     return fulfillJson(route, createdAgent, 201);
+  });
+
+  await page.route('**/api/agents/*/wallet/transfers', (route) => {
+    if (route.request().method() === 'GET') {
+      return fulfillJson(route, agentWalletTransfers);
+    }
+
+    const agentId = route.request().url().split('/').at(-3) ?? 'agent';
+    const body = parseBody(route);
+    const amountEth = String(body.amountEth ?? '0.00');
+    const transfer = {
+      id: `awt-${agentWalletTransfers.length + 1}`,
+      agentId,
+      safeAddress: '0xsafe000000000000000000000000000000000001',
+      destination: String(body.destination ?? ''),
+      amountEth,
+      note: String(body.note ?? ''),
+      status: parseFloat(amountEth) >= 0.25 ? 'queued' : 'approved',
+      policyReason: parseFloat(amountEth) >= 0.25
+        ? 'Transfer requires operator co-approval before Safe execution.'
+        : 'Transfer is within the agent Safe auto-approval lane.',
+      approvalsRequired: parseFloat(amountEth) >= 0.25 ? 2 : 1,
+      approvalsReceived: 1,
+      unlockAt: null,
+      createdAt: '2026-03-24T12:20:00.000Z',
+    };
+
+    agentWalletTransfers.unshift(transfer);
+    return fulfillJson(route, transfer, transfer.status === 'queued' ? 202 : 201);
+  });
+
+  await page.route('**/api/agents/*/wallet/transfers/*/prepare', (route) => {
+    const transferId = route.request().url().split('/').at(-2);
+    const transfer = agentWalletTransfers.find((entry) => entry.id === transferId);
+    if (!transfer) {
+      return fulfillJson(route, { error: 'Transfer not found' }, 404);
+    }
+
+    return fulfillJson(route, {
+      safeTxHash: `0x${'1'.repeat(64)}`,
+      chainId: 8453,
+      safeVersion: '1.4.1',
+      txData: {
+        to: transfer.destination,
+        value: `${BigInt(Math.round(Number(transfer.amountEth) * 1e6)) * 10n ** 12n}`,
+        data: '0x',
+        operation: 0,
+        safeTxGas: '0',
+        baseGas: '0',
+        gasPrice: '0',
+        gasToken: '0x0000000000000000000000000000000000000000',
+        refundReceiver: '0x0000000000000000000000000000000000000000',
+        nonce: 0,
+      },
+    });
+  });
+
+  await page.route('**/api/agents/*/wallet/transfers/*/execute', (route) => {
+    const transferId = route.request().url().split('/').at(-2);
+    const transfer = agentWalletTransfers.find((entry) => entry.id === transferId);
+    if (!transfer) {
+      return fulfillJson(route, { error: 'Transfer not found' }, 404);
+    }
+
+    transfer.status = 'executed';
+    transfer.executedAt = '2026-03-24T12:25:00.000Z';
+    transfer.executedBy = session.userId ?? 'user-1';
+    transfer.txHash = '0xsafeexecute';
+
+    transactions.unshift({
+      id: `tx-safe-${transferId}`,
+      type: 'payment',
+      from: transfer.safeAddress,
+      to: transfer.destination,
+      amount: `${transfer.amountEth} ETH`,
+      token: 'ETH',
+      status: 'confirmed',
+      timestamp: '2026-03-24T12:25:00.000Z',
+      txHash: transfer.txHash,
+    });
+
+    return fulfillJson(route, {
+      transfer,
+      txHash: transfer.txHash,
+    });
+  });
+
+  await page.route('**/api/agents/*/wallet/transfers/*/approve', (route) => {
+    const transferId = route.request().url().split('/').at(-2);
+    const transfer = agentWalletTransfers.find((entry) => entry.id === transferId);
+    if (!transfer) {
+      return fulfillJson(route, { error: 'Transfer not found' }, 404);
+    }
+
+    transfer.status = 'approved';
+    transfer.approvalsReceived = transfer.approvalsRequired;
+    transfer.approvedAt = '2026-03-24T12:22:00.000Z';
+    transfer.approvedBy = session.userId ?? 'user-1';
+
+    return fulfillJson(route, transfer);
   });
 
   await page.route('**/api/agents/*/hire', (route) => {

@@ -8,6 +8,7 @@ import { validateOrigin } from '@/lib/csrf';
 import { stringToHex } from 'viem';
 import { insertTransactionRecord } from '@/lib/transactions';
 import { verifyEscrowActionTransaction } from '@/lib/transactionVerification';
+import { resolveAgentWallet } from '@/lib/agentWallets';
 
 // POST /api/tasks/[id]/release — release escrowed funds after task completion
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Fetch task with agent operator info
   const { data: task, error: taskError } = await supabase
     .from('tasks')
-    .select('*, agents(name, owner_id, users:owner_id(wallet_address))')
+    .select('*, agents(name, owner_id, wallet_address, wallet_policy, wallet_status, users:owner_id(wallet_address))')
     .eq('id', taskId)
     .single();
 
@@ -69,7 +70,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Verify the release transaction on-chain
   const actor = session.walletAddress ?? session.userId;
   let txStatus: 'confirmed' | 'pending' = 'pending';
-  const releaseRecipient = task.agents?.users?.wallet_address ?? task.agentOperatorAddress ?? undefined;
+  const agentWallet = task.agents
+    ? await resolveAgentWallet({
+      id: task.assigned_agent ?? '',
+      wallet_address: task.agents.wallet_address,
+      wallet_policy: task.agents.wallet_policy,
+      wallet_status: task.agents.wallet_status,
+      users: task.agents.users ?? undefined,
+    })
+    : null;
+  const releaseRecipient = agentWallet?.address ?? task.agents?.users?.wallet_address ?? undefined;
 
   try {
     ({ txStatus } = await verifyEscrowActionTransaction(txHash as `0x${string}`, {
@@ -87,7 +97,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Record escrow_release transaction
   const txId = generateId('tx');
-  const releaseTarget = task.agents?.name ?? task.assigned_agent ?? releaseRecipient ?? '';
+  const releaseTarget = agentWallet
+    ? `${task.agents?.name ?? task.assigned_agent ?? 'Agent'} Safe`
+    : task.agents?.name ?? task.assigned_agent ?? releaseRecipient ?? '';
 
   const { error: txError } = await insertTransactionRecord(supabase, {
     id: txId,

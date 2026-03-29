@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   logActivity: vi.fn(),
   logAudit: vi.fn(),
   readContract: vi.fn(),
+  resolveAgentWallet: vi.fn(),
   validateOrigin: vi.fn(() => null),
   verifyEscrowActionTransaction: vi.fn(),
 }));
@@ -34,6 +35,10 @@ vi.mock('@/lib/viemClient', () => ({
 
 vi.mock('@/lib/transactionVerification', () => ({
   verifyEscrowActionTransaction: mocks.verifyEscrowActionTransaction,
+}));
+
+vi.mock('@/lib/agentWallets', () => ({
+  resolveAgentWallet: mocks.resolveAgentWallet,
 }));
 
 vi.mock('@/lib/csrf', () => ({
@@ -117,6 +122,22 @@ describe('POST /api/tasks/[id]/release', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.validateOrigin.mockReturnValue(null);
+    mocks.resolveAgentWallet.mockResolvedValue({
+      address: '0xsafe000000000000000000000000000000000042',
+      status: 'active',
+      policy: {
+        standard: 'safe',
+        owner: '0xagent',
+        policySigner: '0xpolicy',
+        owners: ['0xagent', '0xpolicy'],
+        threshold: 2,
+        dailySpendLimitEth: '0.50',
+        coSignThresholdEth: '0.25',
+        timelockThresholdEth: '1.00',
+        timelockSeconds: 86400,
+        blockedDestinations: [],
+      },
+    });
   });
 
   it('returns 401 without an authenticated session', async () => {
@@ -229,12 +250,17 @@ describe('POST /api/tasks/[id]/release', () => {
       id: 'tx-1',
       type: 'escrow_release',
       from: 'Escrow Vault',
-      to: 'Wallet Agent',
+      to: 'Wallet Agent Safe',
       amount: '0.25 ETH',
       token: 'ETH',
       status: 'confirmed',
       tx_hash: '0x1234',
       user_id: 'user-1',
+    });
+    expect(mocks.verifyEscrowActionTransaction).toHaveBeenCalledWith('0x1234', {
+      action: 'release',
+      taskId: 'task-1',
+      recipient: '0xsafe000000000000000000000000000000000042',
     });
     expect(mocks.logAudit).toHaveBeenCalledWith({
       action: 'ESCROW_RELEASE',

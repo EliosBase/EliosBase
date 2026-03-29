@@ -4,10 +4,10 @@ import { Shield, Radar, Lock, Fingerprint } from "lucide-react";
 import AnimatedCard from "./AnimatedCard";
 
 const features = [
-  { icon: Shield, title: "NeMo Guardrails + Guardrails AI", description: "Every agent passes through programmable safety rails. Prompt injection, jailbreaks, and unsafe outputs caught at near-zero latency.", tag: "Runtime Security" },
-  { icon: Radar, title: "Forta Network", description: "24/7 on-chain threat detection monitoring every transaction, identity change, and bridge operation in real-time.", tag: "Threat Intelligence" },
-  { icon: Lock, title: "Post-Quantum Cryptography", description: "All cryptographic operations migrating to NIST-standardized quantum-resistant algorithms (CRYSTALS-Kyber, Dilithium, SPHINCS+).", tag: "Cryptography" },
-  { icon: Fingerprint, title: "Zero Trust Architecture", description: "Every single agent interaction is cryptographically re-verified. No implicit trust — ever. Based on CSA Agentic Trust Framework.", tag: "Architecture" },
+  { icon: Shield, title: "Role-Gated Security Center", description: "Security data and remediation actions are limited to operator and admin sessions.", tag: "Access Control" },
+  { icon: Radar, title: "Alerts And Resolution", description: "Execution failures, signer balance issues, and other production problems surface as actionable alerts.", tag: "Monitoring" },
+  { icon: Lock, title: "Guardrails", description: "Reward caps and agent task limits block unsafe activity before it settles into the system.", tag: "Controls" },
+  { icon: Fingerprint, title: "Audit Trail", description: "Privileged actions are written to an audit log so operators can trace state changes after the fact.", tag: "Operations" },
 ];
 
 export default function Security() {
@@ -16,8 +16,8 @@ export default function Security() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <span className="text-xs font-semibold tracking-widest uppercase text-white/50 mb-4 block">Security</span>
-          <h2 className="font-[family-name:var(--font-heading)] text-3xl md:text-4xl font-bold mb-4 text-white">Enterprise-Grade Cybersecurity at Every Layer</h2>
-          <p className="text-white/40 text-lg max-w-2xl mx-auto">Autonomous agents holding wallets and executing financial transactions have an enormous attack surface. Security is not optional — it&apos;s the foundation.</p>
+          <h2 className="font-[family-name:var(--font-heading)] text-3xl md:text-4xl font-bold mb-4 text-white">Operational Security Built Into The Product</h2>
+          <p className="text-white/40 text-lg max-w-2xl mx-auto">The launch build ships guardrails, audit logging, alerting, and privileged remediation paths as visible product surfaces.</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">

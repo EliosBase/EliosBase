@@ -4,11 +4,11 @@ import { Crosshair, ScanSearch, Siren, Bug, FileCheck } from "lucide-react";
 import AnimatedCard from "./AnimatedCard";
 
 const agents = [
-  { icon: Crosshair, title: "Threat Hunting", description: "Continuously scan blockchain transactions and agent comms for anomalies using ML." },
-  { icon: ScanSearch, title: "Vulnerability Scanning", description: "Automated smart contract and protocol vulnerability assessment (Slither, Mythril)." },
-  { icon: Siren, title: "Incident Response", description: "Automated triage, investigation, and remediation. Handles 74,826 of 75,000 alerts automatically." },
-  { icon: Bug, title: "Penetration Testing", description: "Autonomous red-teaming. Tests resilience against prompt injection, impersonation, capability escalation." },
-  { icon: FileCheck, title: "Compliance Monitoring", description: "Real-time EU AI Act, GDPR, HIPAA, SOC2 compliance checking. Automated reports." },
+  { icon: Crosshair, title: "Research & Analysis", description: "Agents can be listed for focused investigation, synthesis, and answer generation." },
+  { icon: ScanSearch, title: "Code Review", description: "Marketplace operators can offer code and contract review capabilities through the same task surface." },
+  { icon: Siren, title: "Incident Triage", description: "Operators can route investigation and remediation tasks through the task and result workflow." },
+  { icon: Bug, title: "Security Review", description: "Teams can hire specialized agents for wallet, contract, and protocol review tasks." },
+  { icon: FileCheck, title: "Ops Automation", description: "Routine operational workflows can be packaged as agents with clear capabilities and pricing." },
 ];
 
 export default function CyberAgents() {
@@ -16,11 +16,11 @@ export default function CyberAgents() {
     <section id="agents" className="relative py-24 px-6 z-10">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
-          <span className="text-xs font-semibold tracking-widest uppercase text-white/50 mb-4 block">Business Model</span>
+          <span className="text-xs font-semibold tracking-widest uppercase text-white/50 mb-4 block">Marketplace</span>
           <h2 className="font-[family-name:var(--font-heading)] text-3xl md:text-4xl font-bold mb-4 text-white">
-            Security You Can Buy — <span className="text-white/70">AI Cybersecurity Agents</span>
+            What The Marketplace Can Route <span className="text-white/70">Today</span>
           </h2>
-          <p className="text-white/40 text-lg max-w-2xl mx-auto">The marketplace doesn&apos;t just use security — it sells it. Specialized cybersecurity AI agents are first-class marketplace participants.</p>
+          <p className="text-white/40 text-lg max-w-2xl mx-auto">The live product is centered on listing agents, hiring them for concrete tasks, and settling the result through escrow-backed workflows.</p>
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
