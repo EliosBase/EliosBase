@@ -26,8 +26,18 @@ CREATE TABLE IF NOT EXISTS agents (
   owner_id UUID REFERENCES users(id),
   wallet_address TEXT,
   wallet_kind TEXT NOT NULL DEFAULT 'safe' CHECK (wallet_kind IN ('safe')),
-  wallet_status TEXT NOT NULL DEFAULT 'predicted' CHECK (wallet_status IN ('predicted', 'active')),
+  wallet_standard TEXT NOT NULL DEFAULT 'safe' CHECK (wallet_standard IN ('safe', 'safe7579')),
+  wallet_status TEXT NOT NULL DEFAULT 'predicted' CHECK (wallet_status IN ('predicted', 'active', 'migrating', 'ready', 'failed')),
+  wallet_revision INT NOT NULL DEFAULT 1,
+  wallet_migration_state TEXT NOT NULL DEFAULT 'legacy' CHECK (wallet_migration_state IN ('legacy', 'pending', 'migrated', 'failed')),
   wallet_policy JSONB NOT NULL DEFAULT '{}'::jsonb,
+  wallet_modules JSONB NOT NULL DEFAULT '{}'::jsonb,
+  session_key_address TEXT,
+  session_key_ciphertext TEXT,
+  session_key_nonce TEXT,
+  session_key_tag TEXT,
+  session_key_expires_at TIMESTAMPTZ,
+  session_key_rotated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -124,7 +134,7 @@ CREATE TABLE IF NOT EXISTS agent_wallet_transfers (
   destination TEXT NOT NULL,
   amount_eth TEXT NOT NULL,
   note TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('blocked', 'queued', 'approved', 'executed')),
+  status TEXT NOT NULL CHECK (status IN ('blocked', 'queued', 'approved', 'executed', 'failed')),
   policy_reason TEXT,
   approvals_required INT NOT NULL DEFAULT 1,
   approvals_received INT NOT NULL DEFAULT 0,
@@ -134,6 +144,11 @@ CREATE TABLE IF NOT EXISTS agent_wallet_transfers (
   executed_at TIMESTAMPTZ,
   executed_by UUID REFERENCES users(id),
   tx_hash TEXT,
+  execution_mode TEXT CHECK (execution_mode IN ('session', 'owner', 'reviewed')),
+  intent_hash TEXT,
+  user_op_hash TEXT,
+  policy_tx_hash TEXT,
+  error_message TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_agent_wallet_transfers_agent ON agent_wallet_transfers (agent_id, created_at DESC);

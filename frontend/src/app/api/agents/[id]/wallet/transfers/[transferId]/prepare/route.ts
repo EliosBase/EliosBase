@@ -3,6 +3,7 @@ import { getAddress, isAddress } from 'viem';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { prepareAgentWalletTransferExecution, resolveAgentWallet } from '@/lib/agentWallets';
+import { safeWalletChain } from '@/lib/agentWallet7579';
 import { validateOrigin } from '@/lib/csrf';
 
 export async function POST(
@@ -36,7 +37,7 @@ export async function POST(
 
   const { data: agent, error: agentError } = await supabase
     .from('agents')
-    .select('id, owner_id, wallet_address, wallet_policy, wallet_status, users:owner_id(wallet_address)')
+    .select('id, owner_id, wallet_address, wallet_policy, wallet_status, wallet_standard, wallet_migration_state, wallet_modules, session_key_address, session_key_expires_at, users:owner_id(wallet_address)')
     .eq('id', id)
     .single();
 
@@ -57,11 +58,29 @@ export async function POST(
     return NextResponse.json({ error: 'Approved transfer wallet does not match the current agent Safe' }, { status: 409 });
   }
 
+  if (transfer.execution_mode === 'session') {
+    if (agent.wallet_standard !== 'safe7579' || agent.wallet_migration_state !== 'migrated') {
+      return NextResponse.json({ error: 'This transfer expects a migrated Safe7579 wallet' }, { status: 409 });
+    }
+    if (!agent.wallet_modules?.sessionSalt || !agent.session_key_address || !agent.session_key_expires_at) {
+      return NextResponse.json({ error: 'Safe7579 session metadata is incomplete' }, { status: 409 });
+    }
+
+    return NextResponse.json({
+      executionMode: 'session',
+      safeAddress: wallet.address,
+      chainId: safeWalletChain.id,
+    });
+  }
+
   const prepared = await prepareAgentWalletTransferExecution({
     safeAddress: wallet.address,
     destination: getAddress(transfer.destination),
     amountEth: transfer.amount_eth,
   });
 
-  return NextResponse.json(prepared);
+  return NextResponse.json({
+    executionMode: transfer.execution_mode ?? 'owner',
+    ...prepared,
+  });
 }

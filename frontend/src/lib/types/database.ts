@@ -1,5 +1,13 @@
 import type { TaskExecutionState } from './agentExecution';
-import type { AgentWalletPolicy, AgentWalletStatus, AgentWalletTransferStatus } from './agentWallet';
+import type {
+  AgentWalletExecutionMode,
+  AgentWalletMigrationState,
+  AgentWalletModules,
+  AgentWalletPolicy,
+  AgentWalletStandard,
+  AgentWalletStatus,
+  AgentWalletTransferStatus,
+} from './agentWallet';
 
 export interface DbUser {
   id: string;
@@ -21,9 +29,15 @@ export interface DbAgent {
   type: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
   owner_id: string | null;
   wallet_address?: string | null;
-  wallet_kind?: 'safe' | null;
+  wallet_kind?: AgentWalletStandard | null;
+  wallet_standard?: AgentWalletStandard | null;
   wallet_status?: AgentWalletStatus | null;
+  wallet_migration_state?: AgentWalletMigrationState | null;
   wallet_policy?: AgentWalletPolicy | null;
+  wallet_modules?: AgentWalletModules | null;
+  session_key_address?: string | null;
+  session_key_expires_at?: string | null;
+  session_key_rotated_at?: string | null;
   created_at: string;
 }
 
@@ -49,6 +63,8 @@ export interface DbTask {
     wallet_address?: string | null;
     wallet_policy?: AgentWalletPolicy | null;
     wallet_status?: AgentWalletStatus | null;
+    wallet_standard?: AgentWalletStandard | null;
+    wallet_migration_state?: AgentWalletMigrationState | null;
     type?: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
     description?: string;
     capabilities?: string[];
@@ -125,5 +141,10 @@ export interface DbAgentWalletTransfer {
   executed_at: string | null;
   executed_by: string | null;
   tx_hash: string | null;
+  execution_mode: AgentWalletExecutionMode | null;
+  intent_hash: string | null;
+  user_op_hash: string | null;
+  policy_tx_hash: string | null;
+  error_message: string | null;
   created_at: string;
 }

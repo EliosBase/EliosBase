@@ -15,8 +15,9 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import type { AgentWalletTransfer } from '@/lib/types';
 
 type PreparedExecution = {
-  safeTxHash: string;
-  txData: {
+  executionMode?: 'session' | 'owner' | 'reviewed';
+  safeTxHash?: string;
+  txData?: {
     to: string;
     value: string;
     data: string;
@@ -28,8 +29,8 @@ type PreparedExecution = {
     refundReceiver: string;
     nonce: number;
   };
-  chainId: number;
-  safeVersion: string;
+  chainId?: number;
+  safeVersion?: string;
 };
 
 const smartWalletFeatures = [
@@ -226,12 +227,6 @@ export default function WalletPage() {
       return;
     }
 
-    const injected = getInjectedProvider(window as Window & WalletWindow, 'metaMask');
-    if (!injected) {
-      setQueueError('MetaMask is required to sign the Safe execution.');
-      return;
-    }
-
     setExecutingTransferId(transfer.id);
 
     try {
@@ -241,6 +236,30 @@ export default function WalletPage() {
       const prepared = await prepareRes.json().catch(() => ({} as PreparedExecution));
       if (!prepareRes.ok) {
         setQueueError((prepared as { error?: string }).error || 'Failed to prepare the Safe transaction.');
+        return;
+      }
+
+      if (prepared.executionMode === 'session') {
+        const executeRes = await fetch(`/api/agents/${transfer.agentId}/wallet/transfers/${transfer.id}/execute`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        });
+        const data = await executeRes.json().catch(() => ({}));
+
+        if (!executeRes.ok) {
+          setQueueError(data.error || 'Failed to execute the Safe7579 session transfer.');
+          return;
+        }
+
+        setQueueStatus(`Executed ${transfer.amountEth} ETH from the agent Safe with the session key.`);
+        await refreshWalletViews();
+        return;
+      }
+
+      const injected = getInjectedProvider(window as Window & WalletWindow, 'metaMask');
+      if (!injected) {
+        setQueueError('MetaMask is required to sign the Safe execution.');
         return;
       }
 
@@ -397,7 +416,7 @@ export default function WalletPage() {
                         <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-white/45">
                           <p>Threshold: {agent.walletPolicy.threshold}-of-{agent.walletPolicy.owners.length}</p>
                           <p>Daily limit: {agent.walletPolicy.dailySpendLimitEth} ETH</p>
-                          <p>Co-sign over: {agent.walletPolicy.coSignThresholdEth} ETH</p>
+                          <p>Review over: {agent.walletPolicy.reviewThresholdEth} ETH</p>
                           <p>Timelock over: {agent.walletPolicy.timelockThresholdEth} ETH</p>
                         </div>
                       ) : null}

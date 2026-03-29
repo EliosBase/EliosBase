@@ -126,10 +126,15 @@ export function buildAgentWalletPolicy(ownerWallet: Address): AgentWalletPolicy 
     owners,
     threshold: 2,
     dailySpendLimitEth: readFloatEnv(process.env.AGENT_WALLET_DAILY_LIMIT_ETH, 0.5).toFixed(2),
-    coSignThresholdEth: readFloatEnv(process.env.AGENT_WALLET_COSIGN_THRESHOLD_ETH, 0.25).toFixed(2),
+    autoApproveThresholdEth: readFloatEnv(
+      process.env.AGENT_WALLET_AUTO_APPROVE_THRESHOLD_ETH || process.env.AGENT_WALLET_COSIGN_THRESHOLD_ETH,
+      0.25,
+    ).toFixed(2),
+    reviewThresholdEth: readFloatEnv(process.env.AGENT_WALLET_COSIGN_THRESHOLD_ETH, 0.25).toFixed(2),
     timelockThresholdEth: readFloatEnv(process.env.AGENT_WALLET_TIMELOCK_THRESHOLD_ETH, 1).toFixed(2),
     timelockSeconds: readIntEnv(process.env.AGENT_WALLET_TIMELOCK_SECONDS, 24 * 60 * 60),
     blockedDestinations: getDefaultBlockedDestinations(),
+    allowlistedContracts: [],
   };
 }
 
@@ -413,7 +418,7 @@ export async function evaluateAgentWalletTransfer(params: {
     };
   }
 
-  const requiresCoSign = amountWei >= parsePolicyAmount(params.policy.coSignThresholdEth);
+  const requiresCoSign = amountWei >= parsePolicyAmount(params.policy.reviewThresholdEth);
   const requiresTimelock = amountWei >= parsePolicyAmount(params.policy.timelockThresholdEth);
   const unlockAt = requiresTimelock
     ? new Date(Date.now() + params.policy.timelockSeconds * 1000).toISOString()

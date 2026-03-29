@@ -35,8 +35,18 @@ export function toAgent(row: DbAgent): Agent {
     ownerId: row.owner_id ?? undefined,
     walletAddress: row.wallet_address ?? undefined,
     walletKind: row.wallet_kind ?? undefined,
+    walletStandard: row.wallet_standard ?? row.wallet_kind ?? undefined,
     walletStatus: row.wallet_status ?? undefined,
+    walletMigrationState: row.wallet_migration_state ?? undefined,
     walletPolicy: row.wallet_policy ?? undefined,
+    walletModules: row.wallet_modules ?? undefined,
+    walletSession: row.session_key_address
+      ? {
+        address: row.session_key_address,
+        validUntil: row.session_key_expires_at ?? undefined,
+        rotatedAt: row.session_key_rotated_at ?? undefined,
+      }
+      : undefined,
   };
 }
 
@@ -144,6 +154,11 @@ export function toAgentWalletTransfer(row: DbAgentWalletTransfer): AgentWalletTr
     executedAt: row.executed_at ?? undefined,
     executedBy: row.executed_by ?? undefined,
     txHash: row.tx_hash ?? undefined,
+    executionMode: row.execution_mode ?? undefined,
+    intentHash: row.intent_hash ?? undefined,
+    userOpHash: row.user_op_hash ?? undefined,
+    policyTxHash: row.policy_tx_hash ?? undefined,
+    errorMessage: row.error_message ?? undefined,
     createdAt: row.created_at,
   };
 }

@@ -36,9 +36,13 @@ export interface Agent {
   type: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
   ownerId?: string;
   walletAddress?: string;
-  walletKind?: 'safe';
+  walletKind?: import('./agentWallet').AgentWalletStandard;
+  walletStandard?: import('./agentWallet').AgentWalletStandard;
   walletStatus?: import('./agentWallet').AgentWalletStatus;
+  walletMigrationState?: import('./agentWallet').AgentWalletMigrationState;
   walletPolicy?: import('./agentWallet').AgentWalletPolicy;
+  walletModules?: import('./agentWallet').AgentWalletModules;
+  walletSession?: import('./agentWallet').AgentWalletSessionState;
 }
 
 export type TaskStep = 'Submitted' | 'Decomposed' | 'Assigned' | 'Executing' | 'ZK Verifying' | 'Complete';
@@ -67,7 +71,12 @@ export interface Task {
 }
 
 export type {
+  AgentWalletExecutionMode,
+  AgentWalletMigrationState,
+  AgentWalletModules,
   AgentWalletPolicy,
+  AgentWalletSessionState,
+  AgentWalletStandard,
   AgentWalletStatus,
   AgentWalletTransfer,
   AgentWalletTransferStatus,

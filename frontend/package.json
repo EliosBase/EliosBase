@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
+    "@rhinestone/module-sdk": "^0.4.0",
+    "@rhinestone/sdk": "^1.4.0",
     "@safe-global/api-kit": "^4.1.0",
     "@safe-global/protocol-kit": "^7.0.0",
     "@safe-global/types-kit": "^3.1.0",

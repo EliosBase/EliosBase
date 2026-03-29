@@ -7,6 +7,7 @@ import {
   resolveAgentWallet,
   type AgentWalletTransactionData,
 } from '@/lib/agentWallets';
+import { executeSafe7579SessionTransfer } from '@/lib/agentWallet7579Transfers';
 import { getSession } from '@/lib/session';
 import { validateOrigin } from '@/lib/csrf';
 import { insertTransactionRecord } from '@/lib/transactions';
@@ -45,9 +46,6 @@ export async function POST(
   const body = await req.json().catch(() => ({}));
   const ownerSignature = String(body.ownerSignature ?? '').trim();
   const txData = body.txData;
-  if (!ownerSignature || !ownerSignature.startsWith('0x') || !isSafeTxData(txData)) {
-    return NextResponse.json({ error: 'Safe execution requires a signed Safe transaction payload' }, { status: 400 });
-  }
 
   const { id, transferId } = await params;
   const supabase = createServiceClient();
@@ -68,7 +66,7 @@ export async function POST(
 
   const { data: agent, error: agentError } = await supabase
     .from('agents')
-    .select('id, name, owner_id, wallet_address, wallet_policy, wallet_status, users:owner_id(wallet_address)')
+    .select('id, name, owner_id, wallet_address, wallet_policy, wallet_status, wallet_standard, wallet_migration_state, wallet_modules, session_key_address, session_key_ciphertext, session_key_nonce, session_key_tag, session_key_expires_at, users:owner_id(wallet_address)')
     .eq('id', id)
     .single();
 
@@ -105,21 +103,65 @@ export async function POST(
 
   let hash: Hex;
   let blockNumber: number;
+  let userOpHash: Hex | undefined;
 
   try {
-    const execution = await executeAgentWalletTransfer({
-      safeAddress,
-      destination,
-      amountEth: transfer.amount_eth,
-      ownerAddress: getAddress(session.walletAddress),
-      ownerSignature: ownerSignature as Hex,
-      txData,
-    });
-    hash = execution.hash;
-    blockNumber = execution.blockNumber;
+    if (transfer.execution_mode === 'session') {
+      if (agent.wallet_standard !== 'safe7579' || agent.wallet_migration_state !== 'migrated') {
+        return NextResponse.json({ error: 'This transfer expects a migrated Safe7579 wallet' }, { status: 409 });
+      }
+      if (!agent.wallet_modules?.sessionSalt
+        || !agent.session_key_address
+        || !agent.session_key_ciphertext
+        || !agent.session_key_nonce
+        || !agent.session_key_tag
+        || !agent.session_key_expires_at
+      ) {
+        return NextResponse.json({ error: 'Safe7579 session data is incomplete' }, { status: 409 });
+      }
+
+      const execution = await executeSafe7579SessionTransfer({
+        safeAddress,
+        destination,
+        amountEth: transfer.amount_eth,
+        policy: wallet.policy,
+        modules: agent.wallet_modules,
+        sessionKeyAddress: getAddress(agent.session_key_address),
+        sessionKeyValidUntil: Math.floor(new Date(agent.session_key_expires_at).getTime() / 1000),
+        sessionKeyCiphertext: agent.session_key_ciphertext,
+        sessionKeyNonce: agent.session_key_nonce,
+        sessionKeyTag: agent.session_key_tag,
+      });
+      hash = execution.txHash;
+      blockNumber = execution.blockNumber;
+      userOpHash = execution.userOpHash;
+    } else {
+      if (!ownerSignature || !ownerSignature.startsWith('0x') || !isSafeTxData(txData)) {
+        return NextResponse.json({ error: 'Safe execution requires a signed Safe transaction payload' }, { status: 400 });
+      }
+
+      const execution = await executeAgentWalletTransfer({
+        safeAddress,
+        destination,
+        amountEth: transfer.amount_eth,
+        ownerAddress: getAddress(session.walletAddress),
+        ownerSignature: ownerSignature as Hex,
+        txData,
+      });
+      hash = execution.hash;
+      blockNumber = execution.blockNumber;
+    }
   } catch (error) {
     console.error('[agent-wallet] execute transfer failed:', error);
     const message = error instanceof Error ? error.message : 'Failed to execute the Safe transfer';
+    await supabase
+      .from('agent_wallet_transfers')
+      .update({
+        status: 'failed',
+        error_message: message,
+      })
+      .eq('id', transferId)
+      .eq('agent_id', id);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
@@ -132,6 +174,8 @@ export async function POST(
       executed_at: executedAt,
       executed_by: session.userId,
       tx_hash: hash,
+      user_op_hash: userOpHash ?? null,
+      error_message: null,
     })
     .eq('id', transferId)
     .eq('agent_id', id)

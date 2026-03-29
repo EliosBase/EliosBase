@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { Hex } from 'viem';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { logActivity, logAudit } from '@/lib/audit';
+import { approveSafe7579ReviewedIntent } from '@/lib/agentWallet7579Transfers';
 import { toAgentWalletTransfer } from '@/lib/transforms';
 
 export async function POST(
@@ -32,6 +34,18 @@ export async function POST(
     return NextResponse.json({ error: 'Timelock has not expired yet' }, { status: 400 });
   }
 
+  let policyTxHash: string | undefined;
+  if (transfer.execution_mode === 'reviewed' && transfer.intent_hash) {
+    try {
+      const approval = await approveSafe7579ReviewedIntent(transfer.intent_hash as Hex);
+      policyTxHash = approval.hash;
+    } catch (error) {
+      console.error('[safe7579] approve reviewed intent failed:', error);
+      const message = error instanceof Error ? error.message : 'Failed to approve the Safe7579 reviewed intent';
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+  }
+
   const { data: approved, error: updateError } = await supabase
     .from('agent_wallet_transfers')
     .update({
@@ -39,6 +53,7 @@ export async function POST(
       approvals_received: transfer.approvals_required,
       approved_at: new Date().toISOString(),
       approved_by: auth.session.userId,
+      policy_tx_hash: policyTxHash ?? transfer.policy_tx_hash ?? null,
     })
     .eq('id', transferId)
     .eq('agent_id', id)

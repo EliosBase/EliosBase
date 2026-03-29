@@ -60,7 +60,9 @@ export async function POST(req: NextRequest) {
       owner_id: session.userId,
       wallet_address: wallet.address,
       wallet_kind: 'safe',
+      wallet_standard: 'safe',
       wallet_status: wallet.status,
+      wallet_migration_state: 'legacy',
       wallet_policy: wallet.policy,
     })
     .select()
