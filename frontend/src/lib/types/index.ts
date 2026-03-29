@@ -35,6 +35,14 @@ export interface Agent {
   status: 'online' | 'busy' | 'offline';
   type: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
   ownerId?: string;
+  walletAddress?: string;
+  walletKind?: import('./agentWallet').AgentWalletStandard;
+  walletStandard?: import('./agentWallet').AgentWalletStandard;
+  walletStatus?: import('./agentWallet').AgentWalletStatus;
+  walletMigrationState?: import('./agentWallet').AgentWalletMigrationState;
+  walletPolicy?: import('./agentWallet').AgentWalletPolicy;
+  walletModules?: import('./agentWallet').AgentWalletModules;
+  walletSession?: import('./agentWallet').AgentWalletSessionState;
 }
 
 export type TaskStep = 'Submitted' | 'Decomposed' | 'Assigned' | 'Executing' | 'ZK Verifying' | 'Complete';
@@ -57,8 +65,22 @@ export interface Task {
   executionFailureRetryable?: boolean;
   submitterId?: string;
   agentOperatorAddress?: string;
+  agentPayoutAddress?: string;
+  agentWalletAddress?: string;
   hasOpenDispute?: boolean;
 }
+
+export type {
+  AgentWalletExecutionMode,
+  AgentWalletMigrationState,
+  AgentWalletModules,
+  AgentWalletPolicy,
+  AgentWalletSessionState,
+  AgentWalletStandard,
+  AgentWalletStatus,
+  AgentWalletTransfer,
+  AgentWalletTransferStatus,
+} from './agentWallet';
 
 export interface ActivityEvent {
   id: string;
@@ -116,4 +138,5 @@ export type {
   DbGuardrail,
   DbAuditLogEntry,
   DbActivityEvent,
+  DbAgentWalletTransfer,
 } from './database';

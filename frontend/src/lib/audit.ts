@@ -27,7 +27,10 @@ export type AuditAction =
   | 'TASK_RETRY'
   | 'TASK_REASSIGN'
   | 'TASK_CANCEL'
-  | 'TASK_DISPUTE';
+  | 'TASK_DISPUTE'
+  | 'AGENT_WALLET_TRANSFER'
+  | 'AGENT_WALLET_APPROVE'
+  | 'AGENT_WALLET_EXECUTE';
 
 export type AuditResult = 'ALLOW' | 'DENY' | 'FLAG';
 

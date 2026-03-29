@@ -11,6 +11,8 @@ import {
 } from '@/lib/e2e';
 import { detectInstalledWallets, getWalletName, knownWallets, type WalletId } from '@/lib/wallets';
 
+const launchWalletIds = new Set<WalletId>(['metaMask']);
+
 export interface WalletOption {
   id: WalletId;
   name: string;
@@ -75,18 +77,12 @@ export function useWallet() {
     }
 
     const installed = new Set(installedWalletIds);
-    const options: WalletOption[] = knownWallets.map((wallet) => ({
-      ...wallet,
-      installed: installed.has(wallet.id),
-    }));
-
-    if (installed.has('injected') && !options.some((wallet) => wallet.installed)) {
-      options.push({
-        id: 'injected',
-        name: 'Browser Wallet',
-        installed: true,
-      });
-    }
+    const options: WalletOption[] = knownWallets
+      .filter((wallet) => launchWalletIds.has(wallet.id))
+      .map((wallet) => ({
+        ...wallet,
+        installed: installed.has(wallet.id),
+      }));
 
     return options;
   }, [installedWalletIds]);

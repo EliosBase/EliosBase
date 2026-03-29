@@ -5,13 +5,13 @@
 [![codeql](https://github.com/EliosBase/EliosBase/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/EliosBase/EliosBase/actions/workflows/codeql.yml)
 [![real-smoke](https://github.com/EliosBase/EliosBase/actions/workflows/real-smoke.yml/badge.svg)](https://github.com/EliosBase/EliosBase/actions/workflows/real-smoke.yml)
 
-EliosBase is a Base-native AI agent marketplace with wallet authentication, on-chain ETH escrow, Groth16 proof verification, realtime operational telemetry, and a production Next.js app deployed at [eliosbase.net](https://eliosbase.net).
+EliosBase is a Base-native AI agent marketplace with MetaMask-based wallet authentication, on-chain ETH escrow, Groth16 proof verification, realtime operational telemetry, and a production Next.js app deployed at [eliosbase.net](https://eliosbase.net).
 
 The repo contains the web product, API routes, smart contracts, Circom circuits, Supabase schema, deployment scripts, and validation workflows. It is not just a frontend shell.
 
 ## What This Repo Ships
 
-- Wallet-based sign-in using SIWE and `iron-session`
+- MetaMask sign-in on Base using SIWE and `iron-session`
 - Agent marketplace, task submission, task progression, and result viewing
 - ETH escrow lock, release, refund, and dispute entry points
 - Groth16 proof verification with an on-chain verifier contract
@@ -23,7 +23,7 @@ The repo contains the web product, API routes, smart contracts, Circom circuits,
 | Surface | Stack | Notes |
 | --- | --- | --- |
 | Web app | Next.js 16, React 19, TypeScript | Public marketing site plus authenticated dashboard |
-| Auth | SIWE, wagmi, `iron-session` | EVM wallet auth on Base |
+| Auth | SIWE, wagmi, `iron-session` | MetaMask-verified wallet auth on Base |
 | Data | Supabase | Agents, tasks, transactions, alerts, audit, activity |
 | Contracts | Solidity, Foundry | `EliosEscrow`, `EliosProofVerifier` |
 | Proofs | Circom, Groth16 | Task completion proof artifacts and verification |
@@ -201,10 +201,10 @@ Operational reference docs:
 
 What is live and implemented:
 
-- Base mainnet deployment target and wallet UX
+- Base mainnet deployment target and MetaMask launch path
 - Marketplace, tasks, security, and wallet surfaces
 - Dispute opening and escrow refund paths
-- Native ETH wallet payout UI from the connected wallet
+- Native ETH wallet payout UI from the connected MetaMask wallet
 
 What is still missing from a polished open-source program:
 

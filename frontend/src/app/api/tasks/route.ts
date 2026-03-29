@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServiceClient();
   const { searchParams } = req.nextUrl;
 
-  let query = supabase.from('tasks').select('*, agents(name, owner_id, users:owner_id(wallet_address))');
+  let query = supabase.from('tasks').select('*, agents(name, owner_id, wallet_address, wallet_policy, wallet_status, users:owner_id(wallet_address))');
 
   const status = searchParams.get('status');
   if (status) query = query.eq('status', status);

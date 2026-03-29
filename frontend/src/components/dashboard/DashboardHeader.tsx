@@ -115,12 +115,12 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
             <div className="absolute right-0 top-[calc(100%+0.75rem)] z-20 w-80 rounded-2xl border border-white/10 bg-[#0b0b10] p-4 shadow-2xl shadow-black/40">
               <div className="mb-3">
                 <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)]">
-                  {installedWallets.length > 0 ? 'Choose a wallet' : 'Install a wallet'}
+                  {installedWallets.length > 0 ? 'Connect MetaMask' : 'Install MetaMask'}
                 </h2>
                 <p className="mt-1 text-xs text-white/45">
                   {installedWallets.length > 0
-                    ? 'Use any supported EVM wallet on Base.'
-                    : 'No compatible browser wallet was detected.'}
+                    ? 'MetaMask on Base is the launch-certified wallet path.'
+                    : 'MetaMask is required for the current launch flow.'}
                 </p>
               </div>
 
@@ -143,7 +143,7 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
               {installableWallets.length > 0 ? (
                 <div className={`${installedWallets.length > 0 ? 'mt-4 border-t border-white/8 pt-4' : ''} space-y-2`}>
                   {installedWallets.length > 0 ? (
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-white/25">Need another wallet?</p>
+                    <p className="text-[11px] uppercase tracking-[0.18em] text-white/25">Need MetaMask?</p>
                   ) : null}
                   {installableWallets.map((wallet) => (
                     <a

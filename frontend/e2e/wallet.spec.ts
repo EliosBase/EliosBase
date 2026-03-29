@@ -10,7 +10,7 @@ test('shows the auth gate when wallet data is unavailable', async ({ page }) => 
   await expect(page.getByText('Connect your wallet and sign in to view transactions.')).toBeVisible();
 });
 
-test('renders wallet stats, smart-wallet capabilities, and transaction history', async ({ page }) => {
+test('renders wallet stats, launch payment controls, and transaction history', async ({ page }) => {
   await mockAppApi(page, {
     session: {
       authenticated: true,
@@ -19,6 +19,52 @@ test('renders wallet stats, smart-wallet capabilities, and transaction history',
       chainId: 84532,
       role: 'submitter',
     },
+    agents: [
+      {
+        id: 'agent-1',
+        name: 'Audit Matrix',
+        ownerId: 'user-1',
+        reputation: 99,
+        tasksCompleted: 12,
+        pricePerTask: '0.15 ETH',
+        status: 'online',
+        type: 'auditor',
+        capabilities: ['solidity', 'threat-modeling'],
+        walletAddress: '0xsafe000000000000000000000000000000000001',
+        walletKind: 'safe',
+        walletStatus: 'active',
+        walletPolicy: {
+          standard: 'safe',
+          owner: '0x123400000000000000000000000000000000abcd',
+          policySigner: '0xsafe00000000000000000000000000000000sign',
+          owners: [
+            '0x123400000000000000000000000000000000abcd',
+            '0xsafe00000000000000000000000000000000sign',
+          ],
+          threshold: 2,
+          dailySpendLimitEth: '0.50',
+          coSignThresholdEth: '0.25',
+          timelockThresholdEth: '1.00',
+          timelockSeconds: 86400,
+          blockedDestinations: ['0x0000000000000000000000000000000000000000'],
+        },
+      },
+    ],
+    agentWalletTransfers: [
+      {
+        id: 'awt-1',
+        agentId: 'agent-1',
+        safeAddress: '0xsafe000000000000000000000000000000000001',
+        destination: '0xfeed00000000000000000000000000000000beef',
+        amountEth: '0.18',
+        note: 'Vendor payout for audit data.',
+        status: 'approved',
+        policyReason: 'Transfer is within the agent Safe auto-approval lane.',
+        approvalsRequired: 1,
+        approvalsReceived: 1,
+        createdAt: '2026-03-24T12:20:00.000Z',
+      },
+    ],
     walletStats: {
       balance: '3.21 ETH',
       balanceTrend: '+0.12 ETH',
@@ -59,12 +105,16 @@ test('renders wallet stats, smart-wallet capabilities, and transaction history',
 
   await expect(page.getByText('Balance')).toBeVisible();
   await expect(page.getByText('3.21 ETH')).toBeVisible();
-  await expect(page.getByText('ERC-7579 Smart Wallet')).toBeVisible();
-  await expect(page.getByText('Spending Limits')).toBeVisible();
-  await expect(page.getByText('Multi-Sig (2/3)')).toBeVisible();
+  await expect(page.getByText('Agent Safe Controls')).toBeVisible();
+  await expect(page.getByText('Safe Smart Accounts')).toBeVisible();
+  await expect(page.getByText('Daily Spend Limits')).toBeVisible();
+  await expect(page.getByText('Owned Agent Safes')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Audit Matrix/ })).toBeVisible();
   await expect(page.getByText('Transaction History')).toBeVisible();
+  await expect(page.getByText('Agent Safe Transfer Queue')).toBeVisible();
+  await expect(page.getByText('Vendor payout for audit data.')).toBeVisible();
   await expect(page.getByText('Escrow Lock')).toBeVisible();
-  await expect(page.getByText('Escrow Release')).toBeVisible();
+  await expect(page.getByText('Escrow Release', { exact: true })).toBeVisible();
   await expect(page.getByText('pending', { exact: true })).toBeVisible();
 });
 

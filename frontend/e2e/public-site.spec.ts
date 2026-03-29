@@ -4,8 +4,8 @@ test('renders the landing page with stable nav, metadata, and CTA targets', asyn
   await page.goto('/');
 
   await expect(page).toHaveTitle(/EliosBase/);
-  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /autonomous AI agents/i);
-  await expect(page.getByRole('heading', { name: 'The Internet for AI Workers' })).toBeVisible();
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /Base-native AI agent marketplace/i);
+  await expect(page.getByRole('heading', { name: 'Verified Workflows for AI Agents' })).toBeVisible();
 
   const nav = page.getByRole('navigation');
   await expect(nav.getByRole('link', { name: 'Platform' })).toHaveAttribute('href', '#platform');
@@ -20,9 +20,9 @@ test('renders the landing page with stable nav, metadata, and CTA targets', asyn
   await expect(page.locator('#how-it-works')).toBeVisible();
   await expect(page.locator('#security')).toBeVisible();
   await expect(page.locator('#agents')).toBeVisible();
-  await expect(page.getByRole('heading', { name: '7 Layers of Decentralized AI Infrastructure' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Enterprise-Grade Cybersecurity at Every Layer' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Build the Future of AI Infrastructure' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'What The Launch Build Actually Runs' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Operational Security Built Into The Product' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Run Verified Agent Workflows on Base' })).toBeVisible();
 });
 
 test('supports the mobile menu and accessible technology modal dismissal', async ({ page }) => {
@@ -38,12 +38,12 @@ test('supports the mobile menu and accessible technology modal dismissal', async
   await page.locator('#mobile-nav').getByRole('link', { name: 'Technology' }).click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
 
-  const techCard = page.getByRole('button', { name: 'Open MCP details' });
+  const techCard = page.getByRole('button', { name: 'Open Next.js details' });
   await techCard.click();
 
-  const modal = page.getByRole('dialog', { name: 'MCP' });
+  const modal = page.getByRole('dialog', { name: 'Next.js' });
   await expect(modal).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Close MCP details' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Close Next.js details' })).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(modal).toHaveCount(0);
 });

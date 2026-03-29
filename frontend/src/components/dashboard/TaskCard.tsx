@@ -54,7 +54,7 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
     && !hasOpenDispute
     && isEscrowLocked
     && task.currentStep === 'Complete'
-    && task.agentOperatorAddress
+    && task.agentPayoutAddress
     && onChainVerified;
   const canRefund = isSubmitter
     && isEscrowLocked
@@ -129,7 +129,7 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
     setReleaseStep('idle');
     submittedReleaseHash.current = null;
     reset();
-    release(task.id, task.agentOperatorAddress as `0x${string}`);
+    release(task.id, task.agentPayoutAddress as `0x${string}`);
   }
 
   function handleRefund() {
