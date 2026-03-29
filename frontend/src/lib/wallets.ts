@@ -8,7 +8,7 @@ export const knownWallets = [
 export type KnownWalletId = (typeof knownWallets)[number]['id'];
 export type WalletId = KnownWalletId | 'injected' | 'browserWallet';
 
-type MaybeProvider = {
+export type MaybeProvider = {
   isMetaMask?: boolean;
   isPhantom?: boolean;
   isCoinbaseWallet?: boolean;
@@ -16,7 +16,7 @@ type MaybeProvider = {
   providers?: MaybeProvider[];
 };
 
-type WalletWindow = {
+export type WalletWindow = {
   coinbaseWalletExtension?: MaybeProvider;
   ethereum?: MaybeProvider;
   phantom?: {
@@ -73,6 +73,30 @@ function isMetaMaskProvider(provider: MaybeProvider) {
   }
 
   return true;
+}
+
+export function getInjectedProvider(source: WalletWindow, walletId: WalletId): MaybeProvider | null {
+  const providers = collectProviders(source);
+
+  switch (walletId) {
+    case 'metaMask':
+      return providers.find(isMetaMaskProvider) ?? null;
+    case 'coinbaseWallet':
+      return source.coinbaseWalletExtension
+        ?? providers.find((provider) => !!provider.isCoinbaseWallet)
+        ?? null;
+    case 'phantom':
+      return source.phantom?.ethereum
+        ?? providers.find((provider) => !!provider.isPhantom)
+        ?? null;
+    case 'rabby':
+      return providers.find((provider) => !!provider.isRabby) ?? null;
+    case 'browserWallet':
+    case 'injected':
+      return source.ethereum ?? providers[0] ?? null;
+    default:
+      return null;
+  }
 }
 
 export function detectInstalledWallets(source: WalletWindow): WalletId[] {

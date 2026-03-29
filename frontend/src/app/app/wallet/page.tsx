@@ -10,6 +10,7 @@ import WalletTransferCard from '@/components/dashboard/WalletTransferCard';
 import { useAgentWallets } from '@/hooks/useAgentWallets';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useWalletStats } from '@/hooks/useWalletStats';
+import { getInjectedProvider, type WalletWindow } from '@/lib/wallets';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { AgentWalletTransfer } from '@/lib/types';
 
@@ -225,7 +226,7 @@ export default function WalletPage() {
       return;
     }
 
-    const injected = (window as Window & { ethereum?: unknown }).ethereum;
+    const injected = getInjectedProvider(window as Window & WalletWindow, 'metaMask');
     if (!injected) {
       setQueueError('MetaMask is required to sign the Safe execution.');
       return;

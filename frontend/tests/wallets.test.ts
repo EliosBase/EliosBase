@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectInstalledWallets } from '@/lib/wallets';
+import { detectInstalledWallets, getInjectedProvider } from '@/lib/wallets';
 
 describe('detectInstalledWallets', () => {
   it('detects MetaMask and Phantom when both are installed', () => {
@@ -31,5 +31,17 @@ describe('detectInstalledWallets', () => {
         ethereum: { providers: [{}] },
       }),
     ).toEqual(['injected']);
+  });
+
+  it('resolves the real MetaMask provider when Phantom also injects ethereum', () => {
+    const metaMask = { isMetaMask: true };
+    const phantom = { isMetaMask: true, isPhantom: true };
+
+    expect(
+      getInjectedProvider({
+        ethereum: { providers: [metaMask, phantom] },
+        phantom: { ethereum: phantom },
+      }, 'metaMask'),
+    ).toBe(metaMask);
   });
 });
