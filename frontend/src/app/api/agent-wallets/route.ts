@@ -39,14 +39,8 @@ export async function GET() {
       ...agent,
       wallet_address: wallet.address,
       wallet_kind: 'safe',
-      wallet_standard: agent.wallet_standard ?? 'safe',
       wallet_status: wallet.status,
-      wallet_migration_state: agent.wallet_migration_state ?? 'legacy',
       wallet_policy: wallet.policy,
-      wallet_modules: agent.wallet_modules ?? {},
-      session_key_address: agent.session_key_address ?? null,
-      session_key_expires_at: agent.session_key_expires_at ?? null,
-      session_key_rotated_at: agent.session_key_rotated_at ?? null,
     });
   }));
 
