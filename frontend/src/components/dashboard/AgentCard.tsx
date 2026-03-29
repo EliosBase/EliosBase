@@ -28,7 +28,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
   const submittedHash = useRef<`0x${string}` | null>(null);
   const queryClient = useQueryClient();
   const { isAuthenticated, session } = useAuthContext();
-  const { lock, txHash, isSigning, isMining, error: contractError, reset } = useEscrowLock();
+  const { lock, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useEscrowLock();
 
   // Track contract interaction state
   useEffect(() => {
@@ -37,11 +37,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
   }, [isSigning, isMining, step]);
 
   useEffect(() => {
-    if (!txHash || submittedHash.current === txHash) {
-      return;
-    }
-
-    if (step !== 'signing' && step !== 'mining') {
+    if (!txHash || !isConfirmed || submittedHash.current === txHash) {
       return;
     }
 
@@ -49,7 +45,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
     setStep('confirming');
     registerHire(txHash);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txHash, step]);
+  }, [isConfirmed, txHash]);
 
   // Handle contract errors
   useEffect(() => {

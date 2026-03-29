@@ -5,12 +5,11 @@ const mocks = vi.hoisted(() => ({
   createServiceClient: vi.fn(),
   generateId: vi.fn(() => 'tx-1'),
   getSession: vi.fn(),
-  getTransaction: vi.fn(),
-  getTransactionReceipt: vi.fn(),
   logActivity: vi.fn(),
   logAudit: vi.fn(),
   readContract: vi.fn(),
   validateOrigin: vi.fn(() => null),
+  verifyEscrowActionTransaction: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -29,10 +28,12 @@ vi.mock('@/lib/audit', () => ({
 
 vi.mock('@/lib/viemClient', () => ({
   publicClient: {
-    getTransaction: mocks.getTransaction,
-    getTransactionReceipt: mocks.getTransactionReceipt,
     readContract: mocks.readContract,
   },
+}));
+
+vi.mock('@/lib/transactionVerification', () => ({
+  verifyEscrowActionTransaction: mocks.verifyEscrowActionTransaction,
 }));
 
 vi.mock('@/lib/csrf', () => ({
@@ -201,13 +202,7 @@ describe('POST /api/tasks/[id]/release', () => {
 
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
     mocks.readContract.mockResolvedValue(true);
-    mocks.getTransaction.mockResolvedValue({
-      to: '0x0000000000000000000000000000000000000001',
-      from: '0xabc',
-    });
-    mocks.getTransactionReceipt.mockResolvedValue({
-      status: 'success',
-    });
+    mocks.verifyEscrowActionTransaction.mockResolvedValue({ txStatus: 'confirmed', blockNumber: 42 });
     mocks.createServiceClient.mockReturnValue(
       makeSupabaseClient({
         tasks: [
