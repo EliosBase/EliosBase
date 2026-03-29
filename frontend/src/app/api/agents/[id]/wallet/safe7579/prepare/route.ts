@@ -17,7 +17,7 @@ import {
 } from '@/lib/agentWallet7579';
 import { generateEncryptedSessionKey } from '@/lib/agentWalletSecrets';
 
-function serializeCall(call: { to: string; value: bigint; data: `0x${string}` }) {
+function serializeCall(call: { to: string; value: { toString(): string }; data: `0x${string}` }) {
   return {
     to: call.to,
     value: call.value.toString(),
