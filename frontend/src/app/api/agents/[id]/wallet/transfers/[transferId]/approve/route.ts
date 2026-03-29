@@ -5,6 +5,7 @@ import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { logActivity, logAudit } from '@/lib/audit';
 import { approveSafe7579ReviewedIntent } from '@/lib/agentWallet7579Transfers';
 import { toAgentWalletTransfer } from '@/lib/transforms';
+import { deriveReviewedIntentHash, inferTransferExecutionMode, isMigratedSafe7579 } from '@/lib/agentWalletCompat';
 
 export async function POST(
   req: NextRequest,
@@ -34,11 +35,15 @@ export async function POST(
     return NextResponse.json({ error: 'Timelock has not expired yet' }, { status: 400 });
   }
 
-  let policyTxHash: string | undefined;
-  if (transfer.execution_mode === 'reviewed' && transfer.intent_hash) {
+  const { data: agent } = await supabase
+    .from('agents')
+    .select('id, wallet_policy')
+    .eq('id', id)
+    .single();
+
+  if (agent && isMigratedSafe7579(agent) && inferTransferExecutionMode(transfer, agent) === 'reviewed') {
     try {
-      const approval = await approveSafe7579ReviewedIntent(transfer.intent_hash as Hex);
-      policyTxHash = approval.hash;
+      await approveSafe7579ReviewedIntent(deriveReviewedIntentHash(transfer) as Hex);
     } catch (error) {
       console.error('[safe7579] approve reviewed intent failed:', error);
       const message = error instanceof Error ? error.message : 'Failed to approve the Safe7579 reviewed intent';
@@ -53,7 +58,6 @@ export async function POST(
       approvals_received: transfer.approvals_required,
       approved_at: new Date().toISOString(),
       approved_by: auth.session.userId,
-      policy_tx_hash: policyTxHash ?? transfer.policy_tx_hash ?? null,
     })
     .eq('id', transferId)
     .eq('agent_id', id)
