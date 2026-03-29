@@ -57,6 +57,17 @@ jobs:
                 base_sha="$(git merge-base "$head_sha" "$default_ref")"
               fi
             fi
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            head_sha="$(git rev-parse HEAD)"
+            base_sha='0000000000000000000000000000000000000000'
+
+            if [ -n "$DEFAULT_BRANCH" ]; then
+              default_ref="origin/$DEFAULT_BRANCH"
+
+              if git rev-parse --verify "$default_ref" >/dev/null 2>&1; then
+                base_sha="$(git merge-base "$head_sha" "$default_ref")"
+              fi
+            fi
           else
             base_sha='0000000000000000000000000000000000000000'
             head_sha="$(git rev-parse HEAD)"
