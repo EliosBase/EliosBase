@@ -93,14 +93,6 @@ export async function POST(
     return NextResponse.json({ error: 'Approved transfer wallet does not match the current agent Safe' }, { status: 409 });
   }
 
-  if (getAddress(txData.to) !== destination) {
-    return NextResponse.json({ error: 'Signed Safe transfer destination does not match the approved transfer' }, { status: 400 });
-  }
-
-  if (BigInt(txData.value) !== parseEther(transfer.amount_eth)) {
-    return NextResponse.json({ error: 'Signed Safe transfer amount does not match the approved transfer' }, { status: 400 });
-  }
-
   let hash: Hex;
   let blockNumber: number;
   let userOpHash: Hex | undefined;
@@ -138,6 +130,12 @@ export async function POST(
     } else {
       if (!ownerSignature || !ownerSignature.startsWith('0x') || !isSafeTxData(txData)) {
         return NextResponse.json({ error: 'Safe execution requires a signed Safe transaction payload' }, { status: 400 });
+      }
+      if (getAddress(txData.to) !== destination) {
+        return NextResponse.json({ error: 'Signed Safe transfer destination does not match the approved transfer' }, { status: 400 });
+      }
+      if (BigInt(txData.value) !== parseEther(transfer.amount_eth)) {
+        return NextResponse.json({ error: 'Signed Safe transfer amount does not match the approved transfer' }, { status: 400 });
       }
 
       const execution = await executeAgentWalletTransfer({
