@@ -56,6 +56,34 @@ function getPolicySignerAccount() {
   return privateKeyToAccount(privateKey);
 }
 
+export async function executePolicySignerCall(call: {
+  to: Address;
+  value: bigint;
+  data: Hex;
+}) {
+  const account = getPolicySignerAccount();
+  const walletClient = createWalletClient({
+    account,
+    chain: safeWalletChain,
+    transport: http(readRequiredEnv('BASE_RPC_URL', process.env.BASE_RPC_URL)),
+  });
+  const hash = await walletClient.sendTransaction({
+    account,
+    to: call.to,
+    value: call.value,
+    data: call.data,
+  });
+  const receipt = await safe7579PublicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== 'success') {
+    throw new Error('Policy signer transaction reverted');
+  }
+
+  return {
+    hash,
+    blockNumber: Number(receipt.blockNumber),
+  };
+}
+
 function encodeExecutionMode() {
   return encodePacked(
     ['bytes1', 'bytes1', 'bytes4', 'bytes4', 'bytes22'],

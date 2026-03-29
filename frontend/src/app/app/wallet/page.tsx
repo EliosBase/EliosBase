@@ -79,8 +79,11 @@ export default function WalletPage() {
   const [transferStatus, setTransferStatus] = useState('');
   const [queueError, setQueueError] = useState('');
   const [queueStatus, setQueueStatus] = useState('');
+  const [maintenanceError, setMaintenanceError] = useState('');
+  const [maintenanceStatus, setMaintenanceStatus] = useState('');
   const [approvingTransferId, setApprovingTransferId] = useState('');
   const [executingTransferId, setExecutingTransferId] = useState('');
+  const [migratingAgentId, setMigratingAgentId] = useState('');
 
   const ownedAgents = useMemo(
     () => agentWalletData?.agents ?? [],
@@ -146,6 +149,48 @@ export default function WalletPage() {
       queryClient.invalidateQueries({ queryKey: ['activity'] }),
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] }),
     ]);
+  }
+
+  async function signPreparedSafeExecution(safeAddress: string, prepared: PreparedExecution) {
+    if (!session?.walletAddress) {
+      throw new Error('Sign in with the Safe owner wallet first.');
+    }
+    if (!prepared.txData) {
+      throw new Error('Prepared Safe transaction data is missing.');
+    }
+
+    const injected = getInjectedProvider(window as Window & WalletWindow, 'metaMask');
+    if (!injected) {
+      throw new Error('MetaMask is required to sign the Safe execution.');
+    }
+
+    const { default: Safe } = await import('@safe-global/protocol-kit');
+    const owner = getAddress(session.walletAddress);
+    const safe = await Safe.init({
+      provider: injected as never,
+      signer: owner,
+      safeAddress,
+    });
+    const safeTransaction = await safe.createTransaction({
+      transactions: [{
+        to: prepared.txData.to,
+        value: prepared.txData.value,
+        data: prepared.txData.data,
+        operation: prepared.txData.operation,
+      }],
+      options: {
+        nonce: prepared.txData.nonce,
+        safeTxGas: prepared.txData.safeTxGas,
+        baseGas: prepared.txData.baseGas,
+        gasPrice: prepared.txData.gasPrice,
+        gasToken: prepared.txData.gasToken,
+        refundReceiver: prepared.txData.refundReceiver,
+      },
+    });
+    const signed = await safe.signTransaction(safeTransaction);
+    return signed.getSignature(owner)?.data
+      ?? signed.getSignature(owner.toLowerCase())?.data
+      ?? null;
   }
 
   async function handleSafeTransferSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -218,6 +263,57 @@ export default function WalletPage() {
     }
   }
 
+  async function handleMigrateAgentWallet() {
+    if (!selectedAgent?.walletAddress) {
+      setMaintenanceError('Select an agent with a Safe wallet first.');
+      return;
+    }
+
+    setMaintenanceError('');
+    setMaintenanceStatus('');
+    setMigratingAgentId(selectedAgent.id);
+
+    try {
+      const prepareRes = await fetch(`/api/agents/${selectedAgent.id}/wallet/safe7579/prepare`, {
+        method: 'POST',
+      });
+      const prepared = await prepareRes.json().catch(() => ({} as PreparedExecution & { error?: string }));
+      if (!prepareRes.ok) {
+        setMaintenanceError(prepared.error || 'Failed to prepare Safe7579 migration.');
+        return;
+      }
+
+      const ownerSignature = await signPreparedSafeExecution(selectedAgent.walletAddress, prepared);
+      if (!ownerSignature) {
+        setMaintenanceError('MetaMask signed the Safe migration transaction, but Elios could not read the owner signature.');
+        return;
+      }
+
+      const executeRes = await fetch(`/api/agents/${selectedAgent.id}/wallet/safe7579/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ownerSignature,
+          txData: prepared.txData,
+        }),
+      });
+      const data = await executeRes.json().catch(() => ({}));
+
+      if (!executeRes.ok) {
+        setMaintenanceError(data.error || 'Failed to execute Safe7579 migration.');
+        return;
+      }
+
+      setMaintenanceStatus('Safe7579 is now active for this agent wallet.');
+      await refreshWalletViews();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to migrate the agent wallet to Safe7579.';
+      setMaintenanceError(message);
+    } finally {
+      setMigratingAgentId('');
+    }
+  }
+
   async function handleExecuteTransfer(transfer: AgentWalletTransfer) {
     setQueueError('');
     setQueueStatus('');
@@ -257,39 +353,7 @@ export default function WalletPage() {
         return;
       }
 
-      const injected = getInjectedProvider(window as Window & WalletWindow, 'metaMask');
-      if (!injected) {
-        setQueueError('MetaMask is required to sign the Safe execution.');
-        return;
-      }
-
-      const { default: Safe } = await import('@safe-global/protocol-kit');
-      const owner = getAddress(session.walletAddress);
-      const safe = await Safe.init({
-        provider: injected as never,
-        signer: owner,
-        safeAddress: transfer.safeAddress,
-      });
-      const safeTransaction = await safe.createTransaction({
-        transactions: [{
-          to: prepared.txData.to,
-          value: prepared.txData.value,
-          data: prepared.txData.data,
-          operation: prepared.txData.operation,
-        }],
-        options: {
-          nonce: prepared.txData.nonce,
-          safeTxGas: prepared.txData.safeTxGas,
-          baseGas: prepared.txData.baseGas,
-          gasPrice: prepared.txData.gasPrice,
-          gasToken: prepared.txData.gasToken,
-          refundReceiver: prepared.txData.refundReceiver,
-        },
-      });
-      const signed = await safe.signTransaction(safeTransaction);
-      const ownerSignature = signed.getSignature(owner)?.data
-        ?? signed.getSignature(owner.toLowerCase())?.data;
-
+      const ownerSignature = await signPreparedSafeExecution(transfer.safeAddress, prepared);
       if (!ownerSignature) {
         setQueueError('MetaMask signed the Safe transaction, but Elios could not read the owner signature.');
         return;
@@ -300,7 +364,7 @@ export default function WalletPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ownerSignature,
-          txData: safeTransaction.data,
+          txData: prepared.txData,
         }),
       });
       const data = await executeRes.json().catch(() => ({}));
@@ -414,6 +478,8 @@ export default function WalletPage() {
                       </div>
                       {agent.walletPolicy ? (
                         <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-white/45">
+                          <p>Standard: {agent.walletStandard ?? 'safe'}</p>
+                          <p>Migration: {agent.walletMigrationState ?? 'legacy'}</p>
                           <p>Threshold: {agent.walletPolicy.threshold}-of-{agent.walletPolicy.owners.length}</p>
                           <p>Daily limit: {agent.walletPolicy.dailySpendLimitEth} ETH</p>
                           <p>Review over: {agent.walletPolicy.reviewThresholdEth} ETH</p>
@@ -425,6 +491,41 @@ export default function WalletPage() {
                 </div>
               )}
             </div>
+
+            {selectedAgent ? (
+              <div className="glass p-5 rounded-2xl">
+                <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)] tracking-wide mb-1">
+                  Safe7579 Migration
+                </h2>
+                <p className="text-[11px] text-white/30 mb-4">
+                  Install the Safe7579 adapter, Smart Sessions validator, guard, and Elios policy hook on this agent wallet.
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-white/45">
+                  <p>Wallet standard: {selectedAgent.walletStandard ?? 'safe'}</p>
+                  <p>Migration state: {selectedAgent.walletMigrationState ?? 'legacy'}</p>
+                  <p>Wallet status: {selectedAgent.walletStatus ?? 'predicted'}</p>
+                  <p>Session key: {selectedAgent.walletSession?.address ? 'configured' : 'not configured'}</p>
+                </div>
+                {maintenanceError ? <p className="mt-4 text-xs text-red-400">{maintenanceError}</p> : null}
+                {maintenanceStatus ? <p className="mt-4 text-xs text-white/55">{maintenanceStatus}</p> : null}
+                {selectedAgent.walletMigrationState !== 'migrated' ? (
+                  <button
+                    type="button"
+                    onClick={handleMigrateAgentWallet}
+                    disabled={migratingAgentId === selectedAgent.id || !selectedAgent.walletAddress}
+                    className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-60"
+                  >
+                    {migratingAgentId === selectedAgent.id ? <Loader2 size={12} className="animate-spin" /> : null}
+                    {migratingAgentId === selectedAgent.id ? 'Installing Safe7579…' : 'Install Safe7579'}
+                  </button>
+                ) : (
+                  <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1.5 text-[11px] text-green-300">
+                    <CheckCircle2 size={12} />
+                    Safe7579 live for this agent
+                  </div>
+                )}
+              </div>
+            ) : null}
 
             {selectedAgent ? (
               <div className="glass p-5 rounded-2xl">

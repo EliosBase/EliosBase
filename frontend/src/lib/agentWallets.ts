@@ -50,6 +50,12 @@ type PreparedAgentWalletTransfer = {
   safeVersion: string;
 };
 
+export type AgentWalletExecutionCall = {
+  to: Address;
+  value: bigint;
+  data: Hex;
+};
+
 export type AgentWalletTransactionData = {
   to: string;
   value: string;
@@ -244,13 +250,9 @@ type AgentWalletTransferShape = {
   amountEth: string;
 };
 
-function toSafeTransferValue(amountEth: string) {
-  return parseEther(amountEth).toString();
-}
-
-async function createSafeTransferTransaction(
+async function createSafeBatchTransaction(
   safeAddress: Address,
-  transfer: AgentWalletTransferShape,
+  calls: AgentWalletExecutionCall[],
   nonce?: number,
   signer?: Hex,
 ) {
@@ -260,12 +262,12 @@ async function createSafeTransferTransaction(
     safeAddress,
   });
   const safeTransaction = await safe.createTransaction({
-    transactions: [{
-      to: transfer.destination,
-      value: toSafeTransferValue(transfer.amountEth),
-      data: '0x',
+    transactions: calls.map((call) => ({
+      to: call.to,
+      value: call.value.toString(),
+      data: call.data,
       operation: 0,
-    }],
+    })),
     options: nonce === undefined ? undefined : { nonce },
   });
 
@@ -276,11 +278,53 @@ export async function prepareAgentWalletTransferExecution(
   transfer: AgentWalletTransferShape,
   nonce?: number,
 ): Promise<PreparedAgentWalletTransfer> {
-  if (!await isSafeDeployed(transfer.safeAddress)) {
+  return prepareAgentWalletExecution({
+    safeAddress: transfer.safeAddress,
+    nonce,
+    calls: [{
+      to: transfer.destination,
+      value: parseEther(transfer.amountEth),
+      data: '0x',
+    }],
+  });
+}
+
+function sameHexValue(left: string, right: string) {
+  return BigInt(left) === BigInt(right);
+}
+
+function validatePreparedSafeTransaction(
+  prepared: AgentWalletTransactionData,
+  expected: AgentWalletTransactionData,
+) {
+  if (!sameHexValue(prepared.value, expected.value)) {
+    throw new Error('Prepared Safe transaction value does not match the approved payload');
+  }
+  if (getAddress(prepared.to) !== getAddress(expected.to)) {
+    throw new Error('Prepared Safe transaction destination does not match the approved payload');
+  }
+  if ((prepared.data ?? '0x') !== (expected.data ?? '0x')) {
+    throw new Error('Prepared Safe transaction calldata does not match the approved payload');
+  }
+  if (prepared.operation !== expected.operation || prepared.nonce !== expected.nonce) {
+    throw new Error('Prepared Safe transaction metadata does not match the approved payload');
+  }
+}
+
+export async function prepareAgentWalletExecution(params: {
+  safeAddress: Address;
+  calls: AgentWalletExecutionCall[];
+  nonce?: number;
+}): Promise<PreparedAgentWalletTransfer> {
+  if (!await isSafeDeployed(params.safeAddress)) {
     throw new Error('Agent Safe is not deployed on Base yet');
   }
 
-  const { safe, safeTransaction } = await createSafeTransferTransaction(transfer.safeAddress, transfer, nonce);
+  const { safe, safeTransaction } = await createSafeBatchTransaction(
+    params.safeAddress,
+    params.calls,
+    params.nonce,
+  );
 
   return {
     safeTxHash: await safe.getTransactionHash(safeTransaction) as Hex,
@@ -290,14 +334,9 @@ export async function prepareAgentWalletTransferExecution(
   };
 }
 
-function sameHexValue(left: string, right: string) {
-  return BigInt(left) === BigInt(right);
-}
-
-export async function executeAgentWalletTransfer(params: {
+export async function executeAgentWalletExecution(params: {
   safeAddress: Address;
-  destination: Address;
-  amountEth: string;
+  calls: AgentWalletExecutionCall[];
   ownerAddress: Address;
   ownerSignature: Hex;
   txData: AgentWalletTransactionData;
@@ -306,26 +345,14 @@ export async function executeAgentWalletTransfer(params: {
     throw new Error('Agent Safe is not deployed on Base yet');
   }
 
-  const { safe, safeTransaction } = await createSafeTransferTransaction(
+  const { safe, safeTransaction } = await createSafeBatchTransaction(
     params.safeAddress,
-    {
-      safeAddress: params.safeAddress,
-      destination: params.destination,
-      amountEth: params.amountEth,
-    },
+    params.calls,
     params.txData.nonce,
     getRequiredPolicySignerPrivateKey(),
   );
 
-  if (!sameHexValue(safeTransaction.data.value, params.txData.value)) {
-    throw new Error('Prepared Safe transfer value does not match the approved transfer');
-  }
-  if (getAddress(safeTransaction.data.to) !== getAddress(params.txData.to)) {
-    throw new Error('Prepared Safe transfer destination does not match the approved transfer');
-  }
-  if ((params.txData.data ?? '0x') !== '0x') {
-    throw new Error('Agent Safe transfers only support direct ETH sends');
-  }
+  validatePreparedSafeTransaction(safeTransaction.data, params.txData);
 
   safeTransaction.addSignature(new EthSafeSignature(getAddress(params.ownerAddress), params.ownerSignature));
   const signedTransaction = await safe.signTransaction(safeTransaction);
@@ -342,6 +369,31 @@ export async function executeAgentWalletTransfer(params: {
     hash: execution.hash as Hex,
     blockNumber: Number(receipt.blockNumber),
   };
+}
+
+export async function executeAgentWalletTransfer(params: {
+  safeAddress: Address;
+  destination: Address;
+  amountEth: string;
+  ownerAddress: Address;
+  ownerSignature: Hex;
+  txData: AgentWalletTransactionData;
+}): Promise<{ hash: Hex; blockNumber: number }> {
+  if ((params.txData.data ?? '0x') !== '0x') {
+    throw new Error('Agent Safe transfers only support direct ETH sends');
+  }
+
+  return executeAgentWalletExecution({
+    safeAddress: params.safeAddress,
+    ownerAddress: params.ownerAddress,
+    ownerSignature: params.ownerSignature,
+    txData: params.txData,
+    calls: [{
+      to: params.destination,
+      value: parseEther(params.amountEth),
+      data: '0x',
+    }],
+  });
 }
 
 function parsePolicyAmount(value: string) {

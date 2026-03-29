@@ -3,7 +3,7 @@ import { getAddress } from 'viem';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { validateOrigin } from '@/lib/csrf';
-import { buildAgentWalletPolicy, resolveAgentWallet } from '@/lib/agentWallets';
+import { buildAgentWalletPolicy, prepareAgentWalletExecution, resolveAgentWallet } from '@/lib/agentWallets';
 import {
   SAFE_7579_GUARD_ADDRESS,
   SAFE_7579_HOOK_ADDRESS,
@@ -105,6 +105,10 @@ export async function POST(
       validUntil,
     }),
   ];
+  const prepared = await prepareAgentWalletExecution({
+    safeAddress: wallet.address,
+    calls: safeCalls,
+  });
 
   const { error: updateError } = await supabase
     .from('agents')
@@ -137,5 +141,9 @@ export async function POST(
     modules,
     safeCalls: safeCalls.map(serializeCall),
     managerCalls: managerCalls.map(serializeCall),
+    safeTxHash: prepared.safeTxHash,
+    txData: prepared.txData,
+    chainId: prepared.chainId,
+    safeVersion: prepared.safeVersion,
   });
 }
