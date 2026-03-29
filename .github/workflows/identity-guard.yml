@@ -16,6 +16,9 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      IDENTITY_GUARD_NAME: ${{ vars.IDENTITY_GUARD_NAME }}
+      IDENTITY_GUARD_EMAIL: ${{ vars.IDENTITY_GUARD_EMAIL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
