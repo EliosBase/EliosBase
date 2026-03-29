@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   createServiceClient: vi.fn(),
   generateId: vi.fn(() => 'tx-1'),
   getSession: vi.fn(),
+  getTransaction: vi.fn(),
   getTransactionReceipt: vi.fn(),
   logActivity: vi.fn(),
   logAudit: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('@/lib/audit', () => ({
 
 vi.mock('@/lib/viemClient', () => ({
   publicClient: {
+    getTransaction: mocks.getTransaction,
     getTransactionReceipt: mocks.getTransactionReceipt,
     readContract: mocks.readContract,
   },
@@ -199,9 +201,11 @@ describe('POST /api/tasks/[id]/release', () => {
 
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
     mocks.readContract.mockResolvedValue(true);
-    mocks.getTransactionReceipt.mockResolvedValue({
+    mocks.getTransaction.mockResolvedValue({
       to: '0x0000000000000000000000000000000000000001',
       from: '0xabc',
+    });
+    mocks.getTransactionReceipt.mockResolvedValue({
       status: 'success',
     });
     mocks.createServiceClient.mockReturnValue(

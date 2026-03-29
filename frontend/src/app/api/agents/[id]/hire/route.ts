@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { logAudit, logActivity, generateId } from '@/lib/audit';
-import { publicClient } from '@/lib/viemClient';
 import { validateOrigin } from '@/lib/csrf';
 import { ESCROW_CONTRACT_ADDRESS } from '@/lib/contracts';
+import { verifyOnchainTransaction } from '@/lib/transactionVerification';
 
 // POST /api/agents/[id]/hire — hire an agent with a verified on-chain escrow tx
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -49,28 +49,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   let txStatus: 'confirmed' | 'pending' = 'pending';
 
   try {
-    const receipt = await publicClient.getTransactionReceipt({
-      hash: body.txHash as `0x${string}`,
-    });
-
-    // Verify the tx went to our escrow contract
-    if (receipt.to?.toLowerCase() !== ESCROW_CONTRACT_ADDRESS.toLowerCase()) {
-      return NextResponse.json({ error: 'Transaction is not to the escrow contract' }, { status: 400 });
+    ({ txStatus } = await verifyOnchainTransaction(body.txHash as `0x${string}`, {
+      expectedFrom: session.walletAddress,
+      expectedTo: ESCROW_CONTRACT_ADDRESS,
+    }));
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Transaction ')) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    // Verify the sender matches the session wallet
-    if (session.walletAddress && receipt.from.toLowerCase() !== session.walletAddress.toLowerCase()) {
-      return NextResponse.json({ error: 'Transaction sender does not match your wallet' }, { status: 400 });
-    }
-
-    if (receipt.status === 'success') {
-      txStatus = 'confirmed';
-    } else {
-      return NextResponse.json({ error: 'Transaction reverted on-chain' }, { status: 400 });
-    }
-  } catch {
-    // Receipt not available yet — tx may still be pending, store as pending
-    txStatus = 'pending';
+    throw error;
   }
 
   // Atomically set agent to busy (prevents double-hire)
