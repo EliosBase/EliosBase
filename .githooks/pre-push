@@ -2,4 +2,4 @@
 
 set -eu
 
-exec scripts/identity_guard.sh pre-push
+exec scripts/identity_guard.sh pre-push "$@"
