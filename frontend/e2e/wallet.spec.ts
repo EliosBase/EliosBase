@@ -87,6 +87,10 @@ test('withdraws eth from the connected wallet and records the payout', async ({ 
   await page.getByRole('button', { name: 'Withdraw ETH' }).click();
 
   await expect(page.getByRole('button', { name: 'Sent' })).toBeVisible();
-  await expect(page.getByText('Payment', { exact: true })).toBeVisible();
-  await expect(page.getByText('0.05 ETH', { exact: true })).toBeVisible();
+  const paymentRow = page
+    .locator('div.flex.items-center.gap-4')
+    .filter({ has: page.getByText('Payment', { exact: true }) })
+    .filter({ has: page.getByText('0.05 ETH', { exact: true }) })
+    .first();
+  await expect(paymentRow).toBeVisible();
 });
