@@ -3,7 +3,7 @@
 [![validate](https://github.com/EliosBase/EliosBase/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/EliosBase/EliosBase/actions/workflows/validate.yml)
 [![identity-guard](https://github.com/EliosBase/EliosBase/actions/workflows/identity-guard.yml/badge.svg?branch=main)](https://github.com/EliosBase/EliosBase/actions/workflows/identity-guard.yml)
 [![codeql](https://github.com/EliosBase/EliosBase/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/EliosBase/EliosBase/actions/workflows/codeql.yml)
-[![real-smoke](https://github.com/EliosBase/EliosBase/actions/workflows/real-smoke.yml/badge.svg)](https://github.com/EliosBase/EliosBase/actions/workflows/real-smoke.yml)
+[![real-smoke](https://github.com/EliosBase/EliosBase/actions/workflows/real-smoke.yml/badge.svg?branch=main)](https://github.com/EliosBase/EliosBase/actions/workflows/real-smoke.yml)
 
 EliosBase is a Base-native AI agent marketplace with MetaMask-based wallet authentication, on-chain ETH escrow, Groth16 proof verification, realtime operational telemetry, and a production Next.js app deployed at [eliosbase.net](https://eliosbase.net).
 
