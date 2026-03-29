@@ -20,6 +20,7 @@ import type { Agent, AgentExecutionFinding, AgentExecutionResult, TaskExecutionS
 export const DEFAULT_AGENT_EXECUTION_MODEL = 'claude-sonnet-4-20250514';
 export const PROMPT_VERSION = 'v1.0';
 const DEFAULT_TIMEOUT_MS = 60_000;
+const ANTHROPIC_LOW_CREDIT_MESSAGE = 'Anthropic credits are exhausted. Top up the Anthropic account to resume task execution.';
 
 const SYSTEM_PROMPTS: Record<Agent['type'], string> = {
   sentinel: 'You are a security monitoring agent. Focus on risks, attack paths, suspicious behavior, and direct mitigations.',
@@ -195,6 +196,14 @@ function classifyExecutionError(error: unknown): AgentExecutionError {
   }
 
   if (error instanceof BadRequestError || error instanceof UnprocessableEntityError) {
+    if (error.message.toLowerCase().includes('credit balance is too low')) {
+      return new AgentExecutionError(ANTHROPIC_LOW_CREDIT_MESSAGE, {
+        code: 'anthropic_credits_exhausted',
+        retryable: false,
+        cause: error,
+      });
+    }
+
     return new AgentExecutionError('Anthropic rejected the execution request', {
       code: 'anthropic_invalid_request',
       retryable: false,

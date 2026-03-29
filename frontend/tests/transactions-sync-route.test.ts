@@ -130,6 +130,84 @@ describe('transactions sync routes', () => {
     });
   });
 
+  it('retries the insert without block_number when the live schema does not have that column', async () => {
+    const insertPayloads: Array<Record<string, unknown>> = [];
+
+    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
+    mocks.getTransactionReceipt.mockResolvedValue({
+      status: 'success',
+      blockNumber: 42n,
+    });
+
+    mocks.createServiceClient.mockReturnValue({
+      from: vi.fn(() => ({
+        insert: vi.fn((payload: Record<string, unknown>) => {
+          insertPayloads.push(payload);
+
+          return {
+            select: vi.fn(() => ({
+              single: vi.fn(async () => {
+                if (insertPayloads.length === 1) {
+                  return {
+                    data: null,
+                    error: {
+                      code: 'PGRST204',
+                      message: "Could not find the 'block_number' column of 'transactions' in the schema cache",
+                    },
+                  };
+                }
+
+                return {
+                  data: {
+                    ...payload,
+                    timestamp: '2026-03-24T12:00:00.000Z',
+                  },
+                  error: null,
+                };
+              }),
+            })),
+          };
+        }),
+      })),
+    });
+
+    const response = await route.POST(makePostRequest({
+      type: 'payment',
+      from: '0xabc',
+      to: '0xdef',
+      amount: '0.000001 ETH',
+      token: 'ETH',
+      txHash: '0x1234',
+    }));
+
+    expect(response.status).toBe(201);
+    expect(insertPayloads).toEqual([
+      {
+        id: 'tx-1',
+        type: 'payment',
+        from: '0xabc',
+        to: '0xdef',
+        amount: '0.000001 ETH',
+        token: 'ETH',
+        status: 'confirmed',
+        tx_hash: '0x1234',
+        user_id: 'user-1',
+        block_number: 42,
+      },
+      {
+        id: 'tx-1',
+        type: 'payment',
+        from: '0xabc',
+        to: '0xdef',
+        amount: '0.000001 ETH',
+        token: 'ETH',
+        status: 'confirmed',
+        tx_hash: '0x1234',
+        user_id: 'user-1',
+      },
+    ]);
+  });
+
   it('rejects a transaction sync when the sender does not match the session wallet', async () => {
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
 
@@ -199,6 +277,44 @@ describe('transactions sync routes', () => {
     expect(updates).toEqual([
       { status: 'confirmed', block_number: 10 },
       { status: 'failed' },
+    ]);
+  });
+
+  it('retries the batch update without block_number when the live schema is missing that column', async () => {
+    const updates: Array<Record<string, unknown>> = [];
+
+    mocks.getSession.mockResolvedValue({ userId: 'user-1' });
+    mocks.getTransactionReceipt.mockResolvedValueOnce({ status: 'success', blockNumber: 10n });
+    mocks.createServiceClient.mockReturnValue({
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            order: vi.fn(async () => ({ data: [{ id: 'tx-1', tx_hash: '0xaaa' }], error: null })),
+          })),
+        })),
+        update: vi.fn((payload: Record<string, unknown>) => {
+          updates.push(payload);
+
+          return {
+            eq: vi.fn(async () => ({
+              error: payload.block_number
+                ? {
+                    code: 'PGRST204',
+                    message: "Could not find the 'block_number' column of 'transactions' in the schema cache",
+                  }
+                : null,
+            })),
+          };
+        }),
+      })),
+    });
+
+    const response = await route.GET();
+
+    expect(response.status).toBe(200);
+    expect(updates).toEqual([
+      { status: 'confirmed', block_number: 10 },
+      { status: 'confirmed' },
     ]);
   });
 });

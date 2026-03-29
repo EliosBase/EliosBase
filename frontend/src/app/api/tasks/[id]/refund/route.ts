@@ -6,6 +6,7 @@ import { publicClient } from '@/lib/viemClient';
 import { ESCROW_CONTRACT_ADDRESS } from '@/lib/contracts';
 import { validateOrigin } from '@/lib/csrf';
 import { buildTaskDisputeSource } from '@/lib/taskDisputes';
+import { insertTransactionRecord } from '@/lib/transactions';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const csrfError = validateOrigin(req);
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const transactionId = generateId('tx');
-  await supabase.from('transactions').insert({
+  const { error: txError } = await insertTransactionRecord(supabase, {
     id: transactionId,
     type: 'escrow_refund',
     from: actor,
@@ -89,7 +90,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     status: txStatus,
     tx_hash: txHash,
     user_id: session.userId,
-  });
+  }, { allowLegacyRefundAlias: true });
+
+  if (txError) {
+    return NextResponse.json({ error: 'Failed to record refund transaction' }, { status: 500 });
+  }
 
   if (txStatus === 'confirmed' && hasOpenDispute) {
     await supabase

@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session';
 import { toTransaction } from '@/lib/transforms';
 import { logAudit, logActivity, txTypeToAuditAction, generateId } from '@/lib/audit';
 import { publicClient } from '@/lib/viemClient';
+import { insertTransactionRecord, updateTransactionRecord } from '@/lib/transactions';
 
 // POST /api/transactions/sync — store a new transaction with on-chain verification
 export async function POST(req: NextRequest) {
@@ -53,24 +54,20 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServiceClient();
   const id = generateId('tx');
-  const { data, error } = await supabase
-    .from('transactions')
-    .insert({
-      id,
-      type: body.type,
-      from: body.from,
-      to: body.to,
-      amount: body.amount,
-      token: body.token,
-      status: body.status || txStatus,
-      tx_hash: body.txHash,
-      user_id: session.userId,
-      block_number: blockNumber,
-    })
-    .select()
-    .single();
+  const { data, error } = await insertTransactionRecord(supabase, {
+    id,
+    type: body.type,
+    from: body.from,
+    to: body.to,
+    amount: body.amount,
+    token: body.token,
+    status: body.status || txStatus,
+    tx_hash: body.txHash,
+    user_id: session.userId,
+    block_number: blockNumber,
+  });
 
-  if (error) {
+  if (error || !data) {
     return NextResponse.json({ error: 'Failed to sync transaction' }, { status: 500 });
   }
 
@@ -111,16 +108,13 @@ export async function GET() {
       });
 
       if (receipt.status === 'success') {
-        await supabase
-          .from('transactions')
-          .update({ status: 'confirmed', block_number: Number(receipt.blockNumber) })
-          .eq('id', tx.id);
+        await updateTransactionRecord(supabase, tx.id, {
+          status: 'confirmed',
+          block_number: Number(receipt.blockNumber),
+        });
         confirmed++;
       } else {
-        await supabase
-          .from('transactions')
-          .update({ status: 'failed' })
-          .eq('id', tx.id);
+        await updateTransactionRecord(supabase, tx.id, { status: 'failed' });
         failed++;
       }
     } catch {
