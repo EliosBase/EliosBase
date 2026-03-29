@@ -1,5 +1,10 @@
 export function readEnv(value: string | null | undefined): string | undefined {
-  const normalized = value?.trim();
+  const normalized = value
+    ?.replace(/\\r\\n/g, '')
+    ?.replace(/\\n/g, '')
+    ?.replace(/\\r/g, '')
+    ?.trim()
+    ?.replace(/^['"]|['"]$/g, '');
   return normalized ? normalized : undefined;
 }
 
