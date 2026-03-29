@@ -128,6 +128,7 @@ Operationally important variables:
 | `SIGNER_MIN_BALANCE_ETH` | No | Low-balance alert threshold |
 | `AGENT_EXECUTION_TIMEOUT_MS` | No | Task execution timeout |
 | `AI_SPEND_CEILING_CENTS` | No | AI spending guardrail |
+| `NEXT_PUBLIC_SENTRY_DSN` | No | Runtime Sentry DSN for browser/server error capture |
 | `SENTRY_AUTH_TOKEN` | No | Uploads Sentry source maps during production builds |
 | `SENTRY_ORG` | No | Sentry org for source map upload |
 | `SENTRY_PROJECT` | No | Sentry project for source map upload |
@@ -183,6 +184,11 @@ The production web app is the [`frontend/`](frontend) project and is deployed on
 
 If you want production-grade debugging, set `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` before building in Vercel. Without them, builds still succeed, but source maps are not uploaded.
 
+Operational reference docs:
+
+- [`ROLLBACK.md`](ROLLBACK.md)
+- [`SECRETS.md`](SECRETS.md)
+
 ## Security And Operational Model
 
 - Wallet auth is enforced through SIWE and session cookies
@@ -202,30 +208,21 @@ What is live and implemented:
 
 What is still missing from a polished open-source program:
 
-- A committed `LICENSE` file
-- A dedicated `CONTRIBUTING.md`
-- A dedicated `SECURITY.md`
-- A dedicated `CODE_OF_CONDUCT.md`
+- Maintainer and support ownership is still lightweight for a public launch
 
-That does not block using the code internally, but it does mean this repository is not yet packaged like a mature public open-source project in the legal and community sense.
+The repository now includes an Apache 2.0 license plus contribution, security, and conduct policy docs.
 
 ## Contributing
 
-Until a dedicated contribution guide exists, use this baseline:
-
-1. Create a branch from `main`.
-2. Keep `git config core.hooksPath .githooks` enabled.
-3. Run the full validation set before opening a pull request.
-4. Include a concise change summary, risk summary, and test evidence in the PR.
-5. Do not bypass the identity guard or commit blocked legacy identifiers.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Troubleshooting
 
-- If the app boots but data is empty, check Supabase keys and RLS expectations first.
+- If the app boots but data is empty, check Supabase keys, bootstrap SQL, and RLS expectations first.
 - If wallet flows fail, verify Base RPC connectivity, deployed contract addresses, and the active chain id.
 - If production deploys succeed but stack traces are weak, check Sentry env configuration.
 - If cron routes return `401`, verify `CRON_SECRET`.
 
 ## License
 
-No license file is committed to this repository today. Until one is added, default copyright rules apply.
+This repository is licensed under the Apache License 2.0. See [`LICENSE`](LICENSE).
