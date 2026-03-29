@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { logAudit, logActivity, generateId } from '@/lib/audit';
-import { publicClient } from '@/lib/viemClient';
 import { ESCROW_CONTRACT_ADDRESS } from '@/lib/contracts';
+import { verifyOnchainTransaction } from '@/lib/transactionVerification';
 
 // POST /api/admin/tasks/[id]/release-escrow — admin override escrow release (skips ZK check)
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -34,20 +34,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Verify the transaction on-chain
   let txStatus: 'confirmed' | 'pending' = 'pending';
   try {
-    const receipt = await publicClient.getTransactionReceipt({
-      hash: txHash as `0x${string}`,
-    });
-
-    if (receipt.to?.toLowerCase() !== ESCROW_CONTRACT_ADDRESS.toLowerCase()) {
-      return NextResponse.json({ error: 'Transaction is not to the escrow contract' }, { status: 400 });
+    ({ txStatus } = await verifyOnchainTransaction(txHash as `0x${string}`, {
+      expectedTo: ESCROW_CONTRACT_ADDRESS,
+    }));
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Transaction ')) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    txStatus = receipt.status === 'success' ? 'confirmed' : 'pending';
-    if (receipt.status !== 'success') {
-      return NextResponse.json({ error: 'Transaction reverted on-chain' }, { status: 400 });
-    }
-  } catch {
-    txStatus = 'pending';
+    throw error;
   }
 
   // Record transaction

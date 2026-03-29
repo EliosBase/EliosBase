@@ -5,6 +5,7 @@ import { toTransaction } from '@/lib/transforms';
 import { logAudit, logActivity, txTypeToAuditAction, generateId } from '@/lib/audit';
 import { publicClient } from '@/lib/viemClient';
 import { insertTransactionRecord, updateTransactionRecord } from '@/lib/transactions';
+import { verifyOnchainTransaction } from '@/lib/transactionVerification';
 
 // POST /api/transactions/sync — store a new transaction with on-chain verification
 export async function POST(req: NextRequest) {
@@ -31,25 +32,15 @@ export async function POST(req: NextRequest) {
   let blockNumber: number | null = null;
 
   try {
-    const receipt = await publicClient.getTransactionReceipt({
-      hash: body.txHash as `0x${string}`,
-    });
-    if (
-      session.walletAddress
-      && typeof receipt.from === 'string'
-      && receipt.from.toLowerCase() !== session.walletAddress.toLowerCase()
-    ) {
-      return NextResponse.json({ error: 'Transaction sender does not match your wallet' }, { status: 400 });
+    ({ txStatus, blockNumber } = await verifyOnchainTransaction(body.txHash as `0x${string}`, {
+      expectedFrom: session.walletAddress,
+    }));
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('Transaction ')) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
     }
-    if (receipt.status === 'success') {
-      txStatus = 'confirmed';
-      blockNumber = Number(receipt.blockNumber);
-    } else if (receipt.status === 'reverted') {
-      txStatus = 'pending'; // will be caught by batch sync later
-    }
-  } catch {
-    // Receipt not yet available — store as pending
-    txStatus = 'pending';
+
+    throw error;
   }
 
   const supabase = createServiceClient();
