@@ -93,13 +93,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Record escrow_release transaction
   const txId = generateId('tx');
-  const agentOperator = task.agents?.users?.wallet_address ?? task.assigned_agent ?? '';
+  const releaseTarget = task.agents?.name ?? task.assigned_agent ?? task.agents?.users?.wallet_address ?? '';
 
   const { error: txError } = await insertTransactionRecord(supabase, {
     id: txId,
     type: 'escrow_release',
-    from: actor,
-    to: agentOperator,
+    from: 'Escrow Vault',
+    to: releaseTarget,
     amount: task.reward,
     token: 'ETH',
     status: txStatus,
