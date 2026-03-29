@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { isAddress } from 'viem';
 import { ArrowUpRight, CheckCircle, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -14,11 +14,12 @@ export default function WalletTransferCard() {
   const queryClient = useQueryClient();
   const { session } = useAuthContext();
   const { isConnected } = useWallet();
-  const { transfer, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useWalletTransfer();
+  const { transfer, txHash, isSigning, isMining, error: contractError, reset } = useWalletTransfer();
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');
   const [step, setStep] = useState<TransferStep>('idle');
   const [error, setError] = useState('');
+  const submittedHash = useRef<`0x${string}` | null>(null);
 
   useEffect(() => {
     if (isSigning && step === 'idle') setStep('signing');
@@ -26,12 +27,19 @@ export default function WalletTransferCard() {
   }, [isSigning, isMining, step]);
 
   useEffect(() => {
-    if (isConfirmed && txHash && step === 'mining') {
-      setStep('confirming');
-      syncTransfer(txHash);
+    if (!txHash || submittedHash.current === txHash) {
+      return;
     }
+
+    if (step !== 'signing' && step !== 'mining') {
+      return;
+    }
+
+    submittedHash.current = txHash;
+    setStep('confirming');
+    syncTransfer(txHash);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConfirmed, txHash]);
+  }, [txHash, step]);
 
   useEffect(() => {
     if (!contractError || step === 'idle' || step === 'sent') {
@@ -77,6 +85,7 @@ export default function WalletTransferCard() {
 
     setError('');
     setStep('idle');
+    submittedHash.current = null;
     reset();
     transfer(trimmedRecipient as `0x${string}`, trimmedAmount);
   }

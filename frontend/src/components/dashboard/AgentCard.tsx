@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type Agent } from '@/lib/types';
 import { Bot, Star, CheckCircle, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -25,9 +25,10 @@ export default function AgentCard({ agent }: AgentCardProps) {
   const [error, setError] = useState('');
   const [showTaskPicker, setShowTaskPicker] = useState(false);
   const selectedTaskId = useRef<string>('');
+  const submittedHash = useRef<`0x${string}` | null>(null);
   const queryClient = useQueryClient();
   const { isAuthenticated, session } = useAuthContext();
-  const { lock, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useEscrowLock();
+  const { lock, txHash, isSigning, isMining, error: contractError, reset } = useEscrowLock();
 
   // Track contract interaction state
   useEffect(() => {
@@ -35,14 +36,20 @@ export default function AgentCard({ agent }: AgentCardProps) {
     if (isMining && step === 'signing') setStep('mining');
   }, [isSigning, isMining, step]);
 
-  // When tx is confirmed on-chain, call the hire API with the real tx hash
   useEffect(() => {
-    if (isConfirmed && txHash && step === 'mining') {
-      setStep('confirming');
-      registerHire(txHash);
+    if (!txHash || submittedHash.current === txHash) {
+      return;
     }
+
+    if (step !== 'signing' && step !== 'mining') {
+      return;
+    }
+
+    submittedHash.current = txHash;
+    setStep('confirming');
+    registerHire(txHash);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConfirmed, txHash]);
+  }, [txHash, step]);
 
   // Handle contract errors
   useEffect(() => {
@@ -73,6 +80,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
       return;
     }
     setError('');
+    submittedHash.current = null;
     reset();
     setShowTaskPicker(true);
   }
@@ -124,6 +132,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
   function retryHire() {
     setStep('idle');
     setError('');
+    submittedHash.current = null;
     reset();
   }
 

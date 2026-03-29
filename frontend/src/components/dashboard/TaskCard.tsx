@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import ProofBadge from './ProofBadge';
 import TaskResultModal from './TaskResultModal';
 import { type Task } from '@/lib/types';
@@ -21,13 +21,12 @@ type EscrowActionStep = 'idle' | 'signing' | 'mining' | 'confirming' | 'released
 export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardProps) {
   const currentStepIndex = TASK_STEPS.indexOf(task.currentStep);
   const queryClient = useQueryClient();
-  const { release, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useEscrowRelease();
+  const { release, txHash, isSigning, isMining, error: contractError, reset } = useEscrowRelease();
   const {
     refundFunds,
     txHash: refundTxHash,
     isSigning: isRefundSigning,
     isMining: isRefundMining,
-    isConfirmed: isRefundConfirmed,
     error: refundContractError,
     reset: resetRefund,
   } = useEscrowRefund();
@@ -42,6 +41,8 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
   const [disputeError, setDisputeError] = useState('');
   const [disputeReason, setDisputeReason] = useState('');
   const [disputeOpened, setDisputeOpened] = useState(false);
+  const submittedReleaseHash = useRef<`0x${string}` | null>(null);
+  const submittedRefundHash = useRef<`0x${string}` | null>(null);
   const { isVerified: onChainVerified } = useProofVerification(task.id);
 
   const hasOpenDispute = task.hasOpenDispute || disputeOpened;
@@ -78,22 +79,35 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
     if (isRefundMining && refundStep === 'signing') setRefundStep('mining');
   }, [isRefundSigning, isRefundMining, refundStep]);
 
-  // When release tx confirmed, call API
   useEffect(() => {
-    if (isConfirmed && txHash && releaseStep === 'mining') {
-      setReleaseStep('confirming');
-      registerRelease(txHash);
+    if (!txHash || submittedReleaseHash.current === txHash) {
+      return;
     }
+
+    if (releaseStep !== 'signing' && releaseStep !== 'mining') {
+      return;
+    }
+
+    submittedReleaseHash.current = txHash;
+    setReleaseStep('confirming');
+    registerRelease(txHash);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConfirmed, txHash]);
+  }, [txHash, releaseStep]);
 
   useEffect(() => {
-    if (isRefundConfirmed && refundTxHash && refundStep === 'mining') {
-      setRefundStep('confirming');
-      registerRefund(refundTxHash);
+    if (!refundTxHash || submittedRefundHash.current === refundTxHash) {
+      return;
     }
+
+    if (refundStep !== 'signing' && refundStep !== 'mining') {
+      return;
+    }
+
+    submittedRefundHash.current = refundTxHash;
+    setRefundStep('confirming');
+    registerRefund(refundTxHash);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRefundConfirmed, refundTxHash]);
+  }, [refundTxHash, refundStep]);
 
   // Handle contract errors
   useEffect(() => {
@@ -120,6 +134,7 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
     if (!canRelease || (releaseStep !== 'idle' && releaseStep !== 'error')) return;
     setReleaseError('');
     setReleaseStep('idle');
+    submittedReleaseHash.current = null;
     reset();
     release(task.id, task.agentOperatorAddress as `0x${string}`);
   }
@@ -128,6 +143,7 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
     if (!canRefund || (refundStep !== 'idle' && refundStep !== 'error')) return;
     setRefundError('');
     setRefundStep('idle');
+    submittedRefundHash.current = null;
     resetRefund();
     refundFunds(task.id);
   }
