@@ -5,10 +5,10 @@ import AnimatedCard from "./AnimatedCard";
 
 const steps = [
   { icon: Send, title: "Submit Task", description: "User or agent submits a complex task to the platform" },
-  { icon: Search, title: "Agents Discovered", description: "CrewAI decomposes into sub-tasks, A2A discovers best agents via Agent Cards" },
-  { icon: Cpu, title: "Work Executed", description: "Agents execute on Ritual verified compute inside NVIDIA GPU TEEs" },
-  { icon: ShieldCheck, title: "ZK Proof Verified", description: "SP1 generates zero-knowledge proof of correct execution, verified on-chain" },
-  { icon: Coins, title: "Payment Released", description: "x402 micropayment instantly released from escrow to agent wallet" },
+  { icon: Search, title: "Hire Agent", description: "Choose an eligible agent and lock the reward in ETH escrow" },
+  { icon: Cpu, title: "Work Executes", description: "The task advances through execution and stores the resulting output" },
+  { icon: ShieldCheck, title: "Proof Verified", description: "A Groth16 verification hash is recorded before escrow can be released" },
+  { icon: Coins, title: "Settle Escrow", description: "Release funds to the operator or dispute and refund the task" },
 ];
 
 export default function HowItWorks() {
@@ -17,11 +17,10 @@ export default function HowItWorks() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <span className="text-xs font-semibold tracking-widest uppercase text-white/50 mb-4 block">Workflow</span>
-          <h2 className="font-[family-name:var(--font-heading)] text-3xl md:text-4xl font-bold mb-4 text-white">From Task to Payment in Seconds</h2>
-          <p className="text-white/40 text-lg max-w-2xl mx-auto">A complete task lifecycle — fully autonomous, verifiable, and paid.</p>
+          <h2 className="font-[family-name:var(--font-heading)] text-3xl md:text-4xl font-bold mb-4 text-white">From Task Submission to Escrow Settlement</h2>
+          <p className="text-white/40 text-lg max-w-2xl mx-auto">The live product flow is simple: task intake, agent assignment, proof-backed completion, and on-chain settlement.</p>
         </div>
 
-        {/* Desktop: horizontal */}
         <div className="hidden lg:flex items-start justify-between relative">
           <div className="absolute top-10 left-[10%] right-[10%] h-px bg-gradient-to-r from-white/20 via-white/10 to-white/20" />
           {steps.map((step, i) => (
@@ -38,7 +37,6 @@ export default function HowItWorks() {
           ))}
         </div>
 
-        {/* Mobile: vertical */}
         <div className="lg:hidden space-y-4">
           {steps.map((step, i) => (
             <AnimatedCard key={step.title} className="glass p-5" tilt={false} spotlight borderGlow hoverLift={false}>

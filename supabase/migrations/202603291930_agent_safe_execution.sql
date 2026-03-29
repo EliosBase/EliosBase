@@ -1,0 +1,4 @@
+ALTER TABLE agent_wallet_transfers
+  ADD COLUMN IF NOT EXISTS executed_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS executed_by UUID REFERENCES users(id),
+  ADD COLUMN IF NOT EXISTS tx_hash TEXT;

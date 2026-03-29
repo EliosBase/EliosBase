@@ -1,4 +1,13 @@
 import type { TaskExecutionState } from './agentExecution';
+import type {
+  AgentWalletExecutionMode,
+  AgentWalletMigrationState,
+  AgentWalletModules,
+  AgentWalletPolicy,
+  AgentWalletStandard,
+  AgentWalletStatus,
+  AgentWalletTransferStatus,
+} from './agentWallet';
 
 export interface DbUser {
   id: string;
@@ -19,6 +28,16 @@ export interface DbAgent {
   status: 'online' | 'busy' | 'offline';
   type: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
   owner_id: string | null;
+  wallet_address?: string | null;
+  wallet_kind?: AgentWalletStandard | null;
+  wallet_standard?: AgentWalletStandard | null;
+  wallet_status?: AgentWalletStatus | null;
+  wallet_migration_state?: AgentWalletMigrationState | null;
+  wallet_policy?: AgentWalletPolicy | null;
+  wallet_modules?: AgentWalletModules | null;
+  session_key_address?: string | null;
+  session_key_expires_at?: string | null;
+  session_key_rotated_at?: string | null;
   created_at: string;
 }
 
@@ -41,6 +60,11 @@ export interface DbTask {
   has_open_dispute?: boolean;
   agents?: {
     name: string;
+    wallet_address?: string | null;
+    wallet_policy?: AgentWalletPolicy | null;
+    wallet_status?: AgentWalletStatus | null;
+    wallet_standard?: AgentWalletStandard | null;
+    wallet_migration_state?: AgentWalletMigrationState | null;
     type?: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
     description?: string;
     capabilities?: string[];
@@ -95,4 +119,32 @@ export interface DbActivityEvent {
   message: string;
   timestamp: string;
   user_id: string | null;
+}
+
+export interface DbAgentWalletTransfer {
+  id: string;
+  agent_id: string;
+  agents?: {
+    name: string;
+  } | null;
+  safe_address: string;
+  destination: string;
+  amount_eth: string;
+  note: string;
+  status: AgentWalletTransferStatus;
+  policy_reason: string | null;
+  approvals_required: number;
+  approvals_received: number;
+  unlock_at: string | null;
+  approved_at: string | null;
+  approved_by: string | null;
+  executed_at: string | null;
+  executed_by: string | null;
+  tx_hash: string | null;
+  execution_mode: AgentWalletExecutionMode | null;
+  intent_hash: string | null;
+  user_op_hash: string | null;
+  policy_tx_hash: string | null;
+  error_message: string | null;
+  created_at: string;
 }

@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { logAudit, logActivity, generateId } from '@/lib/audit';
 import { verifyEscrowActionTransaction } from '@/lib/transactionVerification';
+import { resolveAgentWallet } from '@/lib/agentWallets';
 
 // POST /api/admin/tasks/[id]/release-escrow — admin override escrow release (skips ZK check)
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { data: task, error: taskError } = await supabase
     .from('tasks')
-    .select('*, agents(name, owner_id, users:owner_id(wallet_address))')
+    .select('*, agents(name, owner_id, wallet_address, wallet_policy, wallet_status, users:owner_id(wallet_address))')
     .eq('id', taskId)
     .single();
 
@@ -32,12 +33,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Verify the transaction on-chain
   let txStatus: 'confirmed' | 'pending' = 'pending';
-  const agentOperator = task.agents?.users?.wallet_address ?? task.assigned_agent ?? '';
+  const agentWallet = task.agents
+    ? await resolveAgentWallet({
+      id: task.assigned_agent ?? '',
+      wallet_address: task.agents.wallet_address,
+      wallet_policy: task.agents.wallet_policy,
+      wallet_status: task.agents.wallet_status,
+      users: task.agents.users ?? undefined,
+    })
+    : null;
+  const agentOperator = agentWallet?.address ?? task.agents?.users?.wallet_address ?? task.assigned_agent ?? '';
   try {
     ({ txStatus } = await verifyEscrowActionTransaction(txHash as `0x${string}`, {
       action: 'release',
       taskId,
-      recipient: task.agents?.users?.wallet_address ?? undefined,
+      recipient: agentWallet?.address ?? task.agents?.users?.wallet_address ?? undefined,
     }));
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('Transaction ')) {
@@ -53,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     id: txId,
     type: 'escrow_release',
     from: actor,
-    to: agentOperator,
+    to: agentWallet ? `${task.agents?.name ?? task.assigned_agent ?? 'Agent'} Safe` : agentOperator,
     amount: task.reward,
     token: 'ETH',
     status: txStatus,

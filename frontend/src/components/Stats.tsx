@@ -4,12 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import AnimatedCard from "./AnimatedCard";
 
 const stats = [
-  { value: "30+", label: "Technologies Integrated" },
-  { value: "150+", label: "Blockchains Connected" },
-  { value: "$0.0001", label: "Transaction Cost" },
-  { value: "124M+", label: "ZK Proofs Generated" },
-  { value: "$100B+", label: "Assets Secured (Safe)" },
-  { value: "50+", label: "Enterprise Partners" },
+  { value: "Base", label: "Mainnet Launch" },
+  { value: "ETH", label: "Escrow Asset" },
+  { value: "Groth16", label: "Proof Format" },
+  { value: "SIWE", label: "Wallet Auth" },
+  { value: "Roles", label: "Submitter / Operator / Admin" },
+  { value: "Cron", label: "Ops Checks" },
 ];
 
 export default function Stats() {

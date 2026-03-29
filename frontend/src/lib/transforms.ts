@@ -1,5 +1,23 @@
-import type { DbAgent, DbTask, DbTransaction, DbSecurityAlert, DbGuardrail, DbAuditLogEntry, DbActivityEvent } from './types/database';
-import type { Agent, Task, Transaction, SecurityAlert, Guardrail, AuditLogEntry, ActivityEvent } from './types';
+import type {
+  DbAgent,
+  DbTask,
+  DbTransaction,
+  DbSecurityAlert,
+  DbGuardrail,
+  DbAuditLogEntry,
+  DbActivityEvent,
+  DbAgentWalletTransfer,
+} from './types/database';
+import type {
+  Agent,
+  Task,
+  Transaction,
+  SecurityAlert,
+  Guardrail,
+  AuditLogEntry,
+  ActivityEvent,
+  AgentWalletTransfer,
+} from './types';
 import { getExecutionFailure, getExecutionResult } from './types/agentExecution';
 import { normalizeTransactionType } from './transactions';
 
@@ -15,6 +33,20 @@ export function toAgent(row: DbAgent): Agent {
     status: row.status,
     type: row.type,
     ownerId: row.owner_id ?? undefined,
+    walletAddress: row.wallet_address ?? undefined,
+    walletKind: row.wallet_kind ?? undefined,
+    walletStandard: row.wallet_standard ?? row.wallet_kind ?? undefined,
+    walletStatus: row.wallet_status ?? undefined,
+    walletMigrationState: row.wallet_migration_state ?? undefined,
+    walletPolicy: row.wallet_policy ?? undefined,
+    walletModules: row.wallet_modules ?? undefined,
+    walletSession: row.session_key_address
+      ? {
+        address: row.session_key_address,
+        validUntil: row.session_key_expires_at ?? undefined,
+        rotatedAt: row.session_key_rotated_at ?? undefined,
+      }
+      : undefined,
   };
 }
 
@@ -40,6 +72,8 @@ export function toTask(row: DbTask): Task {
     executionFailureRetryable: executionFailure?.retryable,
     submitterId: row.submitter_id,
     agentOperatorAddress: row.agents?.users?.wallet_address ?? undefined,
+    agentPayoutAddress: row.agents?.wallet_address ?? row.agents?.users?.wallet_address ?? undefined,
+    agentWalletAddress: row.agents?.wallet_address ?? undefined,
     hasOpenDispute: row.has_open_dispute ?? false,
   };
 }
@@ -98,6 +132,34 @@ export function toActivityEvent(row: DbActivityEvent): ActivityEvent {
     type: row.type,
     message: row.message,
     timestamp: timeAgo(row.timestamp),
+  };
+}
+
+export function toAgentWalletTransfer(row: DbAgentWalletTransfer): AgentWalletTransfer {
+  return {
+    id: row.id,
+    agentId: row.agent_id,
+    agentName: row.agents?.name ?? undefined,
+    safeAddress: row.safe_address,
+    destination: row.destination,
+    amountEth: row.amount_eth,
+    note: row.note,
+    status: row.status,
+    policyReason: row.policy_reason ?? undefined,
+    approvalsRequired: row.approvals_required,
+    approvalsReceived: row.approvals_received,
+    unlockAt: row.unlock_at ?? undefined,
+    approvedAt: row.approved_at ?? undefined,
+    approvedBy: row.approved_by ?? undefined,
+    executedAt: row.executed_at ?? undefined,
+    executedBy: row.executed_by ?? undefined,
+    txHash: row.tx_hash ?? undefined,
+    executionMode: row.execution_mode ?? undefined,
+    intentHash: row.intent_hash ?? undefined,
+    userOpHash: row.user_op_hash ?? undefined,
+    policyTxHash: row.policy_tx_hash ?? undefined,
+    errorMessage: row.error_message ?? undefined,
+    createdAt: row.created_at,
   };
 }
 

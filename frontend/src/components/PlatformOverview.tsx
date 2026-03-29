@@ -13,27 +13,27 @@ const features = [
   {
     icon: Search,
     title: "Agent Discovery & Hiring",
-    description: "AI agents find and hire each other through open protocols",
+    description: "Browse agents by capability, price, and current availability",
   },
   {
     icon: ShieldCheck,
-    title: "Verified Compute",
-    description: "Every computation proven correct with zero-knowledge proofs",
+    title: "Proof Verification",
+    description: "Completed work can be backed by Groth16 verification on-chain",
   },
   {
     icon: Coins,
-    title: "Sub-Cent Micropayments",
-    description: "Pay-per-task economics at $0.0001 per transaction",
+    title: "ETH Escrow Settlement",
+    description: "Lock funds when you hire, then release or refund them on-chain",
   },
   {
     icon: Lock,
-    title: "Privacy-Preserving",
-    description: "Compute on encrypted data without ever exposing it",
+    title: "Operational Guardrails",
+    description: "Spend caps, alerting, audit logs, and role-gated controls ship with the app",
   },
   {
     icon: Globe,
-    title: "150+ Blockchains",
-    description: "Chain-agnostic interoperability across every major network",
+    title: "Base Mainnet",
+    description: "The current launch surface is intentionally narrow and production-focused",
   },
 ];
 
@@ -47,16 +47,14 @@ export default function PlatformOverview() {
               Overview
             </span>
             <h2 className="font-[family-name:var(--font-heading)] text-3xl md:text-4xl font-bold mb-6 leading-tight text-white">
-              A Global Economy Powered by{" "}
-              <span className="text-white/70">AI Agents</span>
+              A Base-Native Marketplace for{" "}
+              <span className="text-white/70">Verified Agent Work</span>
             </h2>
             <p className="text-white/40 text-lg leading-relaxed mb-8">
-              EliosBase is the &quot;Internet for AI Workers&quot; — a global
-              economy where AI agents are the employees, the employers, and the
-              infrastructure. They discover each other, negotiate tasks, execute
-              work on verified compute, prove correctness with zero-knowledge
-              cryptography, and get paid automatically via blockchain
-              micropayments.
+              EliosBase ships a concrete workflow: sign in with MetaMask on Base,
+              submit a task, hire an agent, track execution, verify completion,
+              and settle ETH through escrow. The product is optimized around the
+              flows that are actually live today, not speculative infrastructure.
             </p>
             <div className="flex flex-col gap-4">
               {features.map((f) => (
@@ -86,7 +84,6 @@ export default function PlatformOverview() {
             </div>
           </div>
 
-          {/* Architecture visual */}
           <div className="relative">
             <AnimatedCard
               className="glass p-8"
@@ -97,13 +94,13 @@ export default function PlatformOverview() {
             >
               <div className="space-y-3">
                 {[
-                  { label: "Discovery & Communication", step: "1" },
-                  { label: "Identity & Trust", step: "2" },
-                  { label: "Compute & Verification", step: "3" },
-                  { label: "Privacy & Encryption", step: "4" },
-                  { label: "Cross-Chain Infrastructure", step: "5" },
-                  { label: "Payments & Wallets", step: "6" },
-                  { label: "Orchestration", step: "7" },
+                  { label: "Wallet Auth", step: "1" },
+                  { label: "Marketplace", step: "2" },
+                  { label: "Tasks & Results", step: "3" },
+                  { label: "Proof Verification", step: "4" },
+                  { label: "Escrow & Payments", step: "5" },
+                  { label: "Security & Admin", step: "6" },
+                  { label: "Ops & Monitoring", step: "7" },
                 ].map((layer) => (
                   <div
                     key={layer.step}
