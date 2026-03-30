@@ -142,6 +142,9 @@ async function main() {
   if (!preparedSession.enableSessionTypedData) {
     throw new Error('Safe7579 session enable typed data is missing from the rotation payload');
   }
+  if (!preparedSession.enableSessionContext) {
+    throw new Error('Safe7579 session enable context is missing from the rotation payload');
+  }
   const enableSessionSignature = await owner.signTypedData(
     reviveEnableSessionTypedData(preparedSession.enableSessionTypedData),
   );
@@ -158,6 +161,7 @@ async function main() {
     enableSessionSignature,
     txData: preparedSession.txData,
     pendingSession: preparedSession.pendingSession,
+    enableSessionContext: preparedSession.enableSessionContext,
   });
   proofState.stage = 'session-enabled';
   saveProofState(proofState);
