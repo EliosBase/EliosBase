@@ -33,6 +33,19 @@ type PreparedExecution = {
   safeVersion?: string;
 };
 
+type PreparedSessionExecution = PreparedExecution & {
+  enableSessionHash?: string;
+  pendingSession?: {
+    address: string;
+    ciphertext: string;
+    nonce: string;
+    tag: string;
+    validUntil: string;
+    rotatedAt: string;
+    sessionSalt: string;
+  };
+};
+
 const smartWalletFeatures = [
   {
     icon: WalletCards,
@@ -84,6 +97,7 @@ export default function WalletPage() {
   const [approvingTransferId, setApprovingTransferId] = useState('');
   const [executingTransferId, setExecutingTransferId] = useState('');
   const [migratingAgentId, setMigratingAgentId] = useState('');
+  const [rotatingSessionAgentId, setRotatingSessionAgentId] = useState('');
 
   const ownedAgents = useMemo(
     () => agentWalletData?.agents ?? [],
@@ -193,6 +207,22 @@ export default function WalletPage() {
       ?? null;
   }
 
+  async function signEnableSessionHash(enableSessionHash: string) {
+    if (!session?.walletAddress) {
+      throw new Error('Sign in with the Safe owner wallet first.');
+    }
+
+    const injected = getInjectedProvider(window as Window & WalletWindow, 'metaMask');
+    if (!injected?.request) {
+      throw new Error('MetaMask is required to authorize the Smart Sessions validator.');
+    }
+
+    return injected.request({
+      method: 'personal_sign',
+      params: [enableSessionHash, getAddress(session.walletAddress)],
+    }) as Promise<string>;
+  }
+
   async function handleSafeTransferSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedAgent) {
@@ -274,6 +304,7 @@ export default function WalletPage() {
     setMigratingAgentId(selectedAgent.id);
 
     try {
+      const safeAddress = selectedAgent.walletAddress;
       const prepareRes = await fetch(`/api/agents/${selectedAgent.id}/wallet/safe7579/prepare`, {
         method: 'POST',
       });
@@ -283,7 +314,7 @@ export default function WalletPage() {
         return;
       }
 
-      const ownerSignature = await signPreparedSafeExecution(selectedAgent.walletAddress, prepared);
+      const ownerSignature = await signPreparedSafeExecution(safeAddress, prepared);
       if (!ownerSignature) {
         setMaintenanceError('MetaMask signed the Safe migration transaction, but Elios could not read the owner signature.');
         return;
@@ -304,13 +335,74 @@ export default function WalletPage() {
         return;
       }
 
-      setMaintenanceStatus('Safe7579 is now active for this agent wallet.');
+      await bootstrapSessionKey(selectedAgent.id, safeAddress);
+      setMaintenanceStatus('Safe7579 and Smart Sessions are now live for this agent wallet.');
       await refreshWalletViews();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to migrate the agent wallet to Safe7579.';
       setMaintenanceError(message);
     } finally {
       setMigratingAgentId('');
+    }
+  }
+
+  async function bootstrapSessionKey(agentId: string, safeAddress: string) {
+    const prepareRes = await fetch(`/api/agents/${agentId}/wallet/session/rotate`, {
+      method: 'POST',
+    });
+    const prepared = await prepareRes.json().catch(() => ({} as PreparedSessionExecution & { error?: string }));
+    if (!prepareRes.ok) {
+      throw new Error(prepared.error || 'Failed to prepare the Safe7579 session key.');
+    }
+    if (!prepared.pendingSession) {
+      throw new Error('Pending Safe7579 session metadata is missing.');
+    }
+    if (!prepared.enableSessionHash) {
+      throw new Error('Safe7579 session enable hash is missing.');
+    }
+
+    const ownerSignature = await signPreparedSafeExecution(safeAddress, prepared);
+    if (!ownerSignature) {
+      throw new Error('MetaMask signed the session transaction, but Elios could not read the owner signature.');
+    }
+    const enableSessionSignature = await signEnableSessionHash(prepared.enableSessionHash);
+
+    const executeRes = await fetch(`/api/agents/${agentId}/wallet/session/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ownerSignature,
+        enableSessionSignature,
+        txData: prepared.txData,
+        pendingSession: prepared.pendingSession,
+      }),
+    });
+    const data = await executeRes.json().catch(() => ({}));
+
+    if (!executeRes.ok) {
+      throw new Error(data.error || 'Failed to enable the Safe7579 session key.');
+    }
+  }
+
+  async function handleRotateSessionKey() {
+    if (!selectedAgent?.walletAddress) {
+      setMaintenanceError('Select an agent with a Safe wallet first.');
+      return;
+    }
+
+    setMaintenanceError('');
+    setMaintenanceStatus('');
+    setRotatingSessionAgentId(selectedAgent.id);
+
+    try {
+      await bootstrapSessionKey(selectedAgent.id, selectedAgent.walletAddress);
+      setMaintenanceStatus('Safe7579 session key rotated onchain.');
+      await refreshWalletViews();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to rotate the Safe7579 session key.';
+      setMaintenanceError(message);
+    } finally {
+      setRotatingSessionAgentId('');
     }
   }
 
@@ -519,9 +611,20 @@ export default function WalletPage() {
                     {migratingAgentId === selectedAgent.id ? 'Installing Safe7579…' : 'Install Safe7579'}
                   </button>
                 ) : (
-                  <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1.5 text-[11px] text-green-300">
-                    <CheckCircle2 size={12} />
-                    Safe7579 live for this agent
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1.5 text-[11px] text-green-300">
+                      <CheckCircle2 size={12} />
+                      Safe7579 live for this agent
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRotateSessionKey}
+                      disabled={rotatingSessionAgentId === selectedAgent.id}
+                      className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-white/10 disabled:opacity-60"
+                    >
+                      {rotatingSessionAgentId === selectedAgent.id ? <Loader2 size={12} className="animate-spin" /> : null}
+                      {rotatingSessionAgentId === selectedAgent.id ? 'Rotating session…' : 'Rotate session key'}
+                    </button>
                   </div>
                 )}
               </div>

@@ -25,23 +25,36 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import {
   getAccount as getModuleAccount,
+  encodeSmartSessionSignature,
+  type EnableSessionData,
   getPermissionId,
   isSessionEnabled,
   SmartSessionMode,
 } from '@rhinestone/module-sdk';
 import type { Session as RhinestoneSession } from '@rhinestone/sdk';
-import { buildMockSignature } from '@rhinestone/sdk/smart-sessions';
+import {
+  buildMockSignature,
+  SMART_SESSION_EMISSARY_ADDRESS,
+} from '@rhinestone/sdk/smart-sessions';
 import { decryptSessionKey } from '@/lib/agentWalletSecrets';
+import { getMaxPendingNonce } from '@/lib/baseRpc';
 import { readEnv, readRequiredEnv } from '@/lib/env';
 import {
   buildStoredSafe7579Session,
   ELIOS_POLICY_MANAGER_ABI,
+  getSafe7579EnableSessionDetails,
   readSafe7579PolicySignerPrivateKey,
+  readSafe7579EmissarySessionEnabled,
   SAFE_7579_POLICY_MANAGER_ADDRESS,
-  SAFE_7579_SMART_SESSIONS_ADDRESS,
   safe7579PublicClient,
   safeWalletChain,
+  safeWalletRpcUrl,
 } from '@/lib/agentWallet7579';
+import {
+  estimateGasLimitWithHeadroom,
+  getPendingEip1559TxParams,
+  isUnderpricedTransactionError,
+} from '@/lib/txFees';
 import type { AgentWalletModules, AgentWalletPolicy } from '@/lib/types';
 
 const bundlerUrl = readEnv(process.env.SAFE7579_BUNDLER_URL)
@@ -66,9 +79,9 @@ export async function executePolicySignerCall(call: {
   const walletClient = createWalletClient({
     account,
     chain: safeWalletChain,
-    transport: http(readRequiredEnv('BASE_RPC_URL', process.env.BASE_RPC_URL)),
+    transport: http(safeWalletRpcUrl),
   });
-  const hash = await walletClient.sendTransaction({
+  const hash = await sendPolicySignerTransaction(walletClient, getAddress(account.address), {
     account,
     to: call.to,
     value: call.value,
@@ -131,17 +144,21 @@ function getValidatorNonceKey(validatorAddress: Address) {
   return BigInt(encodePacked(['address', 'bytes4'], [validatorAddress, '0x00000000']));
 }
 
+function normalizeValidatorSignature(signature: Hex) {
+  const { r, s, v } = parseSignature(signature);
+  if (v === undefined) {
+    return signature;
+  }
+
+  return encodePacked(['bytes32', 'bytes32', 'uint8'], [r, s, Number(v + 4n)]) as Hex;
+}
+
 async function signSessionHash(sessionPrivateKey: Hex, hash: Hex) {
   const account = privateKeyToAccount(sessionPrivateKey);
   const signature = await account.signMessage({
     message: { raw: hash },
   });
-  const { r, s, v } = parseSignature(signature);
-  if (v === undefined) {
-    throw new Error('Invalid session signature');
-  }
-
-  return encodePacked(['bytes32', 'bytes32', 'uint8'], [r, s, Number(v + 4n)]) as Hex;
+  return normalizeValidatorSignature(signature);
 }
 
 function createSafe7579BundlerClient() {
@@ -156,17 +173,107 @@ function createSafe7579BundlerClient() {
   });
 }
 
+function formatUserOperationRequest(request: {
+  sender: Address;
+  nonce: bigint;
+  factory?: Address;
+  factoryData?: Hex;
+  callData: Hex;
+  callGasLimit: bigint;
+  verificationGasLimit: bigint;
+  preVerificationGas: bigint;
+  maxPriorityFeePerGas: bigint;
+  maxFeePerGas: bigint;
+  paymaster?: Address;
+  paymasterVerificationGasLimit?: bigint;
+  paymasterPostOpGasLimit?: bigint;
+  paymasterData?: Hex;
+}, signature: Hex) {
+  return {
+    sender: request.sender,
+    nonce: toHex(request.nonce),
+    factory: request.factory,
+    factoryData: request.factoryData,
+    callData: request.callData,
+    callGasLimit: toHex(request.callGasLimit),
+    verificationGasLimit: toHex(request.verificationGasLimit),
+    preVerificationGas: toHex(request.preVerificationGas),
+    maxPriorityFeePerGas: toHex(request.maxPriorityFeePerGas),
+    maxFeePerGas: toHex(request.maxFeePerGas),
+    paymaster: request.paymaster,
+    paymasterVerificationGasLimit: request.paymasterVerificationGasLimit
+      ? toHex(request.paymasterVerificationGasLimit)
+      : undefined,
+    paymasterPostOpGasLimit: request.paymasterPostOpGasLimit
+      ? toHex(request.paymasterPostOpGasLimit)
+      : undefined,
+    paymasterData: request.paymasterData,
+    signature,
+  };
+}
+
+function mergeEstimatedUserOperationGas<
+  TRequest extends {
+    callGasLimit: bigint;
+    verificationGasLimit: bigint;
+    preVerificationGas: bigint;
+    paymasterVerificationGasLimit?: bigint;
+    paymasterPostOpGasLimit?: bigint;
+  },
+>(
+  request: TRequest,
+  gas: {
+    callGasLimit?: Hex;
+    verificationGasLimit?: Hex;
+    preVerificationGas?: Hex;
+    paymasterVerificationGasLimit?: Hex;
+    paymasterPostOpGasLimit?: Hex;
+  },
+): TRequest {
+  return {
+    ...request,
+    callGasLimit: gas.callGasLimit ? BigInt(gas.callGasLimit) : request.callGasLimit,
+    verificationGasLimit: gas.verificationGasLimit
+      ? BigInt(gas.verificationGasLimit)
+      : request.verificationGasLimit,
+    preVerificationGas: gas.preVerificationGas
+      ? BigInt(gas.preVerificationGas)
+      : request.preVerificationGas,
+    paymasterVerificationGasLimit: gas.paymasterVerificationGasLimit
+      ? BigInt(gas.paymasterVerificationGasLimit)
+      : request.paymasterVerificationGasLimit,
+    paymasterPostOpGasLimit: gas.paymasterPostOpGasLimit
+      ? BigInt(gas.paymasterPostOpGasLimit)
+      : request.paymasterPostOpGasLimit,
+  };
+}
+
+function isSafe7579SessionValidationError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('AA24')
+    || message.includes('signature error')
+    || message.includes('InvalidSession')
+    || message.includes('InvalidSessionKeySignature');
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function createSessionSmartAccount(params: {
   safeAddress: Address;
-  validatorAddress: Address;
   sessionPrivateKey: Hex;
   sessionKeyAddress: Address;
+  sessionKeyValidAfter?: number;
   sessionKeyValidUntil: number;
   policy: AgentWalletPolicy;
   modules: AgentWalletModules;
+  enableSessionData?: EnableSessionData;
 }) {
+  const validatorAddress = getAddress(SMART_SESSION_EMISSARY_ADDRESS);
   const session = buildStoredSafe7579Session({
     sessionKeyAddress: params.sessionKeyAddress,
+    sessionKeyValidAfter: params.sessionKeyValidAfter,
     sessionKeyValidUntil: params.sessionKeyValidUntil,
     policy: params.policy,
     modules: params.modules,
@@ -214,7 +321,7 @@ async function createSessionSmartAccount(params: {
           address: entryPoint07Address,
           abi: entryPoint07Abi,
           functionName: 'getNonce',
-          args: [params.safeAddress, getValidatorNonceKey(params.validatorAddress)],
+          args: [params.safeAddress, getValidatorNonceKey(validatorAddress)],
         });
       },
       async getStubSignature() {
@@ -239,15 +346,170 @@ async function createSessionSmartAccount(params: {
           chainId,
         });
         const signature = await signSessionHash(params.sessionPrivateKey, hash);
+        const smartSessionSignature = params.enableSessionData
+          ? encodeSmartSessionSignature({
+            mode: SmartSessionMode.ENABLE,
+            permissionId,
+            signature,
+            enableSessionData: {
+              ...params.enableSessionData,
+              enableSession: {
+                ...params.enableSessionData.enableSession,
+                permissionEnableSig: normalizeValidatorSignature(
+                  params.enableSessionData.enableSession.permissionEnableSig,
+                ),
+              },
+            },
+          })
+          : encodeSmartSessionSignature({
+            mode: SmartSessionMode.USE,
+            permissionId,
+            signature,
+          });
         return encodePacked(
-          ['bytes1', 'bytes32', 'bytes'],
-          [SmartSessionMode.USE, permissionId, signature],
+          ['address', 'bytes'],
+          [validatorAddress, smartSessionSignature],
         ) as Hex;
       },
     }),
     permissionId,
     session,
   };
+}
+
+async function sendSafe7579SessionUserOperation(params: {
+  smartAccount: Awaited<ReturnType<typeof toSmartAccount>>;
+  calls: {
+    to: Address;
+    value: bigint;
+    data: Hex;
+  }[];
+}) {
+  const bundlerClient = createSafe7579BundlerClient();
+  const deadline = Date.now() + 20_000;
+  let userOpHash: Hex | undefined;
+  let lastError: unknown;
+
+  while (Date.now() < deadline) {
+    const prepared = await bundlerClient.prepareUserOperation({
+      account: params.smartAccount,
+      calls: params.calls,
+    });
+    const initialSignature = await params.smartAccount.signUserOperation(prepared);
+
+    try {
+      const estimatedGas = await bundlerClient.request({
+        method: 'eth_estimateUserOperationGas',
+        params: [
+          formatUserOperationRequest(prepared, initialSignature),
+          entryPoint07Address,
+        ],
+      }) as {
+        callGasLimit?: Hex;
+        verificationGasLimit?: Hex;
+        preVerificationGas?: Hex;
+        paymasterVerificationGasLimit?: Hex;
+        paymasterPostOpGasLimit?: Hex;
+      };
+
+      const readyRequest = mergeEstimatedUserOperationGas(prepared, estimatedGas);
+      const readySignature = await params.smartAccount.signUserOperation(readyRequest);
+
+      userOpHash = await bundlerClient.request({
+        method: 'eth_sendUserOperation',
+        params: [
+          formatUserOperationRequest(readyRequest, readySignature),
+          entryPoint07Address,
+        ],
+      }) as Hex;
+      break;
+    } catch (error) {
+      lastError = error;
+      if (!isSafe7579SessionValidationError(error)) {
+        throw error;
+      }
+
+      await sleep(1_500);
+    }
+  }
+
+  if (!userOpHash) {
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('Safe7579 session validation did not converge before timeout');
+  }
+
+  const receipt = await bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+  if (!receipt.receipt || receipt.receipt.status !== 'success') {
+    throw new Error('Safe7579 session transfer reverted');
+  }
+
+  return {
+    userOpHash,
+    txHash: receipt.receipt.transactionHash,
+    blockNumber: Number(receipt.receipt.blockNumber),
+  };
+}
+
+export async function bootstrapSafe7579SessionEnable(params: {
+  safeAddress: Address;
+  ownerEnableSignature: Hex;
+  ownerWalletAddress: Address;
+  policy: AgentWalletPolicy;
+  modules: AgentWalletModules;
+  sessionKeyAddress: Address;
+  sessionKeyValidAfter?: number;
+  sessionKeyValidUntil: number;
+  sessionKeyCiphertext: string;
+  sessionKeyNonce: string;
+  sessionKeyTag: string;
+}) {
+  const sessionPrivateKey = decryptSessionKey({
+    ciphertext: params.sessionKeyCiphertext,
+    nonce: params.sessionKeyNonce,
+    tag: params.sessionKeyTag,
+  });
+  const sessionKeyAccount = privateKeyToAccount(sessionPrivateKey);
+  if (getAddress(sessionKeyAccount.address) !== getAddress(params.sessionKeyAddress)) {
+    throw new Error('Stored Safe7579 session key does not match the recorded session address');
+  }
+
+  const session = buildStoredSafe7579Session({
+    sessionKeyAddress: params.sessionKeyAddress,
+    sessionKeyValidAfter: params.sessionKeyValidAfter,
+    sessionKeyValidUntil: params.sessionKeyValidUntil,
+    policy: params.policy,
+    modules: params.modules,
+  });
+  const enableDetails = await getSafe7579EnableSessionDetails({
+    safeAddress: params.safeAddress,
+    session,
+  });
+  const { smartAccount } = await createSessionSmartAccount({
+    safeAddress: params.safeAddress,
+    sessionPrivateKey,
+    sessionKeyAddress: params.sessionKeyAddress,
+    sessionKeyValidAfter: params.sessionKeyValidAfter,
+    sessionKeyValidUntil: params.sessionKeyValidUntil,
+    policy: params.policy,
+    modules: params.modules,
+    enableSessionData: {
+      ...enableDetails.enableSessionData,
+      enableSession: {
+        ...enableDetails.enableSessionData.enableSession,
+        permissionEnableSig: params.ownerEnableSignature,
+      },
+    },
+  });
+
+  return sendSafe7579SessionUserOperation({
+    smartAccount,
+    calls: [{
+      to: getAddress(params.ownerWalletAddress),
+      value: 0n,
+      data: '0x',
+    }],
+  });
 }
 
 export async function queueSafe7579ReviewedIntent(params: {
@@ -264,7 +526,7 @@ export async function queueSafe7579ReviewedIntent(params: {
   const walletClient = createWalletClient({
     account,
     chain: safeWalletChain,
-    transport: http(readRequiredEnv('BASE_RPC_URL', process.env.BASE_RPC_URL)),
+    transport: http(safeWalletRpcUrl),
   });
   const value = parseEther(params.amountEth);
   const intentHash = keccak256(
@@ -277,7 +539,7 @@ export async function queueSafe7579ReviewedIntent(params: {
       [params.safeAddress, params.destination, value],
     ),
   );
-  const hash = await walletClient.sendTransaction({
+  const hash = await sendPolicySignerTransaction(walletClient, getAddress(account.address), {
     account,
     to: getAddress(SAFE_7579_POLICY_MANAGER_ADDRESS),
     value: 0n,
@@ -309,9 +571,9 @@ export async function approveSafe7579ReviewedIntent(intentHash: Hex) {
   const walletClient = createWalletClient({
     account,
     chain: safeWalletChain,
-    transport: http(readRequiredEnv('BASE_RPC_URL', process.env.BASE_RPC_URL)),
+    transport: http(safeWalletRpcUrl),
   });
-  const hash = await walletClient.sendTransaction({
+  const hash = await sendPolicySignerTransaction(walletClient, getAddress(account.address), {
     account,
     to: getAddress(SAFE_7579_POLICY_MANAGER_ADDRESS),
     value: 0n,
@@ -336,6 +598,7 @@ export async function executeSafe7579SessionTransfer(params: {
   policy: AgentWalletPolicy;
   modules: AgentWalletModules;
   sessionKeyAddress: Address;
+  sessionKeyValidAfter?: number;
   sessionKeyValidUntil: number;
   sessionKeyCiphertext: string;
   sessionKeyNonce: string;
@@ -351,14 +614,11 @@ export async function executeSafe7579SessionTransfer(params: {
     throw new Error('Stored Safe7579 session key does not match the recorded session address');
   }
 
-  const validatorAddress = getAddress(
-    params.modules.smartSessionsValidator ?? SAFE_7579_SMART_SESSIONS_ADDRESS,
-  );
-  const { smartAccount, permissionId } = await createSessionSmartAccount({
+  const { smartAccount, permissionId, session } = await createSessionSmartAccount({
     safeAddress: params.safeAddress,
-    validatorAddress,
     sessionPrivateKey,
     sessionKeyAddress: params.sessionKeyAddress,
+    sessionKeyValidAfter: params.sessionKeyValidAfter,
     sessionKeyValidUntil: params.sessionKeyValidUntil,
     policy: params.policy,
     modules: params.modules,
@@ -376,25 +636,62 @@ export async function executeSafe7579SessionTransfer(params: {
   if (!enabled) {
     throw new Error('Safe7579 session is not enabled onchain');
   }
+  const emissaryEnabled = await readSafe7579EmissarySessionEnabled({
+    safeAddress: params.safeAddress,
+    session,
+  });
+  if (!emissaryEnabled) {
+    throw new Error('Safe7579 session validator is not enabled onchain');
+  }
 
-  const bundlerClient = createSafe7579BundlerClient();
-  const userOpHash = await bundlerClient.sendUserOperation({
-    account: smartAccount,
+  return sendSafe7579SessionUserOperation({
+    smartAccount,
     calls: [{
       to: params.destination,
       value: parseEther(params.amountEth),
       data: '0x',
     }],
   });
-  const receipt = await bundlerClient.waitForUserOperationReceipt({ hash: userOpHash });
+}
 
-  if (!receipt.receipt || receipt.receipt.status !== 'success') {
-    throw new Error('Safe7579 session transfer reverted');
+async function sendPolicySignerTransaction(
+  walletClient: ReturnType<typeof createWalletClient>,
+  address: Address,
+  request: {
+    account: ReturnType<typeof getPolicySignerAccount>;
+    to: Address;
+    value: bigint;
+    data: Hex;
+  },
+) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const tx = await getPendingEip1559TxParams(
+      safe7579PublicClient,
+      address as `0x${string}`,
+      attempt,
+      (target) => getMaxPendingNonce(safeWalletChain.id !== 8453, target),
+    );
+
+    try {
+      const gas = await estimateGasLimitWithHeadroom(safe7579PublicClient, {
+        account: address as `0x${string}`,
+        to: request.to as `0x${string}`,
+        value: request.value,
+        data: request.data as `0x${string}`,
+      });
+
+      return await walletClient.sendTransaction({
+        ...request,
+        ...tx,
+        gas,
+        chain: safeWalletChain,
+      });
+    } catch (error) {
+      if (attempt === 2 || !isUnderpricedTransactionError(error)) {
+        throw error;
+      }
+    }
   }
 
-  return {
-    userOpHash,
-    txHash: receipt.receipt.transactionHash,
-    blockNumber: Number(receipt.receipt.blockNumber),
-  };
+  throw new Error('Policy signer transaction fee retries exhausted');
 }

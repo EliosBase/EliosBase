@@ -92,6 +92,7 @@ contract EliosSafe7579Test is Test {
     EliosPolicyHook private hook;
     MockSafe7579Account private safe;
     MockContractRecipient private contractRecipient;
+    MockContractRecipient private smartSessionsModule;
     address payable private recipient;
 
     address private safeOwner = address(0xA11CE);
@@ -105,6 +106,7 @@ contract EliosSafe7579Test is Test {
         hook = new EliosPolicyHook(address(manager));
         safe = new MockSafe7579Account(address(guard));
         contractRecipient = new MockContractRecipient();
+        smartSessionsModule = new MockContractRecipient();
         recipient = payable(makeAddr("recipient"));
 
         vm.deal(address(safe), 10 ether);
@@ -130,7 +132,7 @@ contract EliosSafe7579Test is Test {
             EliosPolicyManager.ModuleConfig({
                 adapter: address(0x1001),
                 ownerValidator: address(0x1002),
-                smartSessionsValidator: address(0x1003),
+                smartSessionsValidator: address(smartSessionsModule),
                 compatibilityFallback: address(0x1004),
                 hook: address(hook),
                 guard: address(guard),
@@ -157,6 +159,17 @@ contract EliosSafe7579Test is Test {
             0.1 ether,
             abi.encodeWithSelector(MockContractRecipient.ping.selector)
         );
+    }
+
+    function testDirectExecutionAllowsInstalledModuleTargets() public {
+        bool success = safe.execGuarded(
+            payable(address(smartSessionsModule)),
+            0,
+            abi.encodeWithSelector(MockContractRecipient.ping.selector)
+        );
+
+        assertTrue(success);
+        assertEq(smartSessionsModule.pings(), 1);
     }
 
     function testDirectExecutionEnforcesReviewedIntentApprovalAndTimelock() public {

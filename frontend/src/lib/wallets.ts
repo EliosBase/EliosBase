@@ -14,6 +14,7 @@ export type MaybeProvider = {
   isCoinbaseWallet?: boolean;
   isRabby?: boolean;
   providers?: MaybeProvider[];
+  request?: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
 };
 
 export type WalletWindow = {

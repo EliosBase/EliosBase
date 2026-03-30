@@ -3,19 +3,16 @@ import { getAddress } from 'viem';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { validateOrigin } from '@/lib/csrf';
-import { buildAgentWalletPolicy, prepareAgentWalletExecution, resolveAgentWallet } from '@/lib/agentWallets';
+import { buildAgentWalletPolicy, prepareAgentWalletExecution, provisionAgentWallet } from '@/lib/agentWallets';
 import {
   SAFE_7579_GUARD_ADDRESS,
   SAFE_7579_HOOK_ADDRESS,
   SAFE_7579_POLICY_MANAGER_ADDRESS,
   buildPolicyManagerConfigureCall,
-  buildRotateSessionKeyCall,
   buildSafe7579MigrationCalls,
   buildSafe7579ModuleMetadata,
   buildSafe7579Policy,
-  buildSessionDefinition,
 } from '@/lib/agentWallet7579';
-import { generateEncryptedSessionKey } from '@/lib/agentWalletSecrets';
 import { mergeSafe7579Compatibility } from '@/lib/agentWalletCompat';
 
 function serializeCall(call: { to: string; value: { toString(): string }; data: `0x${string}` }) {
@@ -58,53 +55,40 @@ export async function POST(
     return NextResponse.json({ error: 'Only the agent owner can prepare Safe7579 migration' }, { status: 403 });
   }
 
-  const wallet = await resolveAgentWallet(agent);
-  if (!wallet) {
-    return NextResponse.json({ error: 'Agent wallet is not configured' }, { status: 400 });
+  const ownerWallet = getAddress(session.walletAddress);
+  let wallet;
+  try {
+    wallet = await provisionAgentWallet(id, ownerWallet);
+  } catch (walletError) {
+    console.error('[agent-wallet] failed to deploy Safe before Safe7579 prepare:', walletError);
+    return NextResponse.json({ error: 'Failed to deploy the agent Safe before Safe7579 migration' }, { status: 500 });
   }
 
-  const ownerWallet = getAddress(session.walletAddress);
+  if (wallet.status !== 'active') {
+    return NextResponse.json({ error: 'Agent Safe is not deployed on Base yet' }, { status: 409 });
+  }
+
   const legacyPolicy = agent.wallet_policy ?? buildAgentWalletPolicy(ownerWallet);
   const policy = {
     ...buildSafe7579Policy(ownerWallet),
     blockedDestinations: legacyPolicy.blockedDestinations,
     allowlistedContracts: legacyPolicy.allowlistedContracts ?? [],
   };
-
-  const encryptedSession = generateEncryptedSessionKey();
-  const validUntil = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
-  const sessionDefinition = buildSessionDefinition({
-    sessionKeyAddress: encryptedSession.address,
-    policy,
-    hookAddress: getAddress(SAFE_7579_HOOK_ADDRESS),
-    validUntil,
-  });
   const modules = buildSafe7579ModuleMetadata({
     policyManager: getAddress(SAFE_7579_POLICY_MANAGER_ADDRESS),
     guard: getAddress(SAFE_7579_GUARD_ADDRESS),
     hook: getAddress(SAFE_7579_HOOK_ADDRESS),
-    sessionSalt: sessionDefinition.salt,
   });
-  const sessionKeyExpiresAt = new Date(validUntil * 1000).toISOString();
-  const sessionKeyRotatedAt = new Date().toISOString();
   const nextPolicy = mergeSafe7579Compatibility(policy, {
     migrationState: 'pending',
     modules,
-    session: {
-      address: encryptedSession.address,
-      ciphertext: encryptedSession.ciphertext,
-      nonce: encryptedSession.nonce,
-      tag: encryptedSession.tag,
-      validUntil: sessionKeyExpiresAt,
-      rotatedAt: sessionKeyRotatedAt,
-    },
+    session: null,
     revision: 2,
   });
 
   const safeCalls = buildSafe7579MigrationCalls({
     safeAddress: wallet.address,
     ownerWallet,
-    session: sessionDefinition,
     hookAddress: getAddress(SAFE_7579_HOOK_ADDRESS),
     guardAddress: getAddress(SAFE_7579_GUARD_ADDRESS),
   });
@@ -114,11 +98,6 @@ export async function POST(
       safeAddress: wallet.address,
       policy,
       modules,
-    }),
-    buildRotateSessionKeyCall({
-      safeAddress: wallet.address,
-      sessionKeyAddress: encryptedSession.address,
-      validUntil,
     }),
   ];
   const prepared = await prepareAgentWalletExecution({
@@ -141,10 +120,8 @@ export async function POST(
   return NextResponse.json({
     agentId: id,
     safeAddress: wallet.address,
-    walletStandard: 'safe7579',
+    walletStandard: 'safe',
     migrationState: 'pending',
-    sessionKeyAddress: encryptedSession.address,
-    sessionKeyExpiresAt,
     modules,
     safeCalls: safeCalls.map(serializeCall),
     managerCalls: managerCalls.map(serializeCall),
