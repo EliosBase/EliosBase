@@ -14,6 +14,7 @@ import {
   buildSafe7579Policy,
 } from '@/lib/agentWallet7579';
 import { mergeSafe7579Compatibility } from '@/lib/agentWalletCompat';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 function serializeCall(call: { to: string; value: { toString(): string }; data: `0x${string}` }) {
   return {
@@ -34,6 +35,9 @@ export async function POST(
   if (!session.userId || !session.walletAddress) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.walletMutation, session.userId);
+  if (rateLimitError) return rateLimitError;
 
   if (!SAFE_7579_POLICY_MANAGER_ADDRESS || !SAFE_7579_GUARD_ADDRESS || !SAFE_7579_HOOK_ADDRESS) {
     return NextResponse.json({ error: 'Safe7579 contracts are not configured on the server' }, { status: 500 });

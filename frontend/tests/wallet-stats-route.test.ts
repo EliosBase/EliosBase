@@ -1,28 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  createServiceClient: vi.fn(),
+  createUserServerClient: vi.fn(),
   getSession: vi.fn(),
   getBalance: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
-  createServiceClient: mocks.createServiceClient,
+  createUserServerClient: mocks.createUserServerClient,
 }));
 
 vi.mock('@/lib/session', () => ({
   getSession: mocks.getSession,
 }));
 
-vi.mock('viem', async () => {
-  const actual = await vi.importActual<typeof import('viem')>('viem');
-  return {
-    ...actual,
-    createPublicClient: vi.fn(() => ({
-      getBalance: mocks.getBalance,
-    })),
-  };
-});
+vi.mock('@/lib/viemClient', () => ({
+  publicClient: {
+    getBalance: mocks.getBalance,
+  },
+}));
 
 const { GET } = await import('@/app/api/wallet/stats/route');
 
@@ -37,7 +33,7 @@ describe('GET /api/wallet/stats', () => {
       walletAddress: '0xabc',
     });
     mocks.getBalance.mockResolvedValue(1_000_000_000_000_000n);
-    mocks.createServiceClient.mockReturnValue({
+    mocks.createUserServerClient.mockReturnValue({
       from: vi.fn(() => ({
         select: vi.fn(() => ({
           eq: vi.fn(async () => ({

@@ -6,6 +6,7 @@ import { logActivity, logAudit } from '@/lib/audit';
 import { approveSafe7579ReviewedIntent } from '@/lib/agentWallet7579Transfers';
 import { toAgentWalletTransfer } from '@/lib/transforms';
 import { deriveReviewedIntentHash, inferTransferExecutionMode, isMigratedSafe7579 } from '@/lib/agentWalletCompat';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 export async function POST(
   req: NextRequest,
@@ -13,6 +14,9 @@ export async function POST(
 ) {
   const auth = await requireAdminOrOperator(req);
   if (auth.error) return auth.error;
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.walletTransferMutation, auth.session.userId);
+  if (rateLimitError) return rateLimitError;
 
   const { id, transferId } = await params;
   const supabase = createServiceClient();

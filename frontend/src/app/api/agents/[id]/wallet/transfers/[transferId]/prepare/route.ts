@@ -11,6 +11,7 @@ import {
   inferTransferExecutionMode,
   isMigratedSafe7579,
 } from '@/lib/agentWalletCompat';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 export async function POST(
   req: NextRequest,
@@ -23,6 +24,9 @@ export async function POST(
   if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.walletTransferMutation, session.userId);
+  if (rateLimitError) return rateLimitError;
 
   const { id, transferId } = await params;
   const supabase = createServiceClient();

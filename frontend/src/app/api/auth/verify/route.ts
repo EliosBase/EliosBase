@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SiweMessage } from 'siwe';
 import { readIntEnv } from '@/lib/env';
 import { getSession } from '@/lib/session';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createUserServerClient } from '@/lib/supabase/server';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
+import { getConfiguredSiteUrl, isProductionRuntime } from '@/lib/runtimeConfig';
 
 export async function POST(req: NextRequest) {
   try {
+    const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.authVerify);
+    if (rateLimitError) return rateLimitError;
+
     const { message, signature } = await req.json();
     const session = await getSession();
 
@@ -21,7 +26,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Wrong chain. Please switch to Base network.' }, { status: 422 });
     }
 
-    const supabase = createServiceClient();
+    const siteUrl = getConfiguredSiteUrl();
+    if (!siteUrl && isProductionRuntime()) {
+      return NextResponse.json({ error: 'NEXT_PUBLIC_SITE_URL not configured' }, { status: 500 });
+    }
+
+    if (siteUrl) {
+      const expectedUrl = new URL(siteUrl);
+      const actualDomain = String(fields.domain ?? '');
+      const actualOrigin = new URL(String(fields.uri ?? '')).origin;
+
+      if (actualDomain !== expectedUrl.host) {
+        return NextResponse.json({ error: 'SIWE domain does not match the configured site domain' }, { status: 422 });
+      }
+
+      if (actualOrigin !== expectedUrl.origin) {
+        return NextResponse.json({ error: 'SIWE URI does not match the configured site origin' }, { status: 422 });
+      }
+    }
+
+    const supabase = createUserServerClient();
     const walletAddress = fields.address.toLowerCase();
 
     const { data: user, error } = await supabase
