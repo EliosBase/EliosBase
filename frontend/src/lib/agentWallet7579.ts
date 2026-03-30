@@ -7,6 +7,7 @@ import {
   getEnableSessionDetails as getModuleEnableSessionDetails,
   getEnableSessionsAction,
   getOwnableValidator,
+  getSudoPolicy,
   getSessionNonce,
   getPermissionId,
   getRemoveSessionAction,
@@ -18,7 +19,11 @@ import {
   type Session,
   type EnableSessionData,
 } from '@rhinestone/module-sdk';
-import { SMART_SESSION_EMISSARY_ADDRESS } from '@rhinestone/sdk/smart-sessions';
+import {
+  SMART_SESSION_EMISSARY_ADDRESS,
+  SMART_SESSIONS_FALLBACK_TARGET_FLAG,
+  SMART_SESSIONS_FALLBACK_TARGET_SELECTOR_FLAG,
+} from '@rhinestone/sdk/smart-sessions';
 import {
   concatHex,
   encodeFunctionData,
@@ -215,6 +220,7 @@ export function buildSessionDefinition(params: {
     owners: [getAddress(params.sessionKeyAddress)],
     hook: params.hookAddress,
   });
+  const sudoPolicy = getSudoPolicy();
 
   return {
     sessionValidator: getAddress(sessionValidator.address),
@@ -233,7 +239,18 @@ export function buildSessionDefinition(params: {
       allowedERC7739Content: [],
       erc1271Policies: [],
     },
-    actions: [],
+    actions: [
+      {
+        actionTargetSelector: SMART_SESSIONS_FALLBACK_TARGET_SELECTOR_FLAG,
+        actionTarget: SMART_SESSIONS_FALLBACK_TARGET_FLAG,
+        actionPolicies: [
+          {
+            policy: getAddress(sudoPolicy.address),
+            initData: sudoPolicy.initData,
+          },
+        ],
+      },
+    ],
     permitERC4337Paymaster: false,
     chainId: BigInt(safeWalletChain.id),
   };
