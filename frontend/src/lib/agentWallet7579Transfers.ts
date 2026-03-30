@@ -7,6 +7,7 @@ import {
   toSmartAccount,
 } from 'viem/account-abstraction';
 import {
+  concat,
   createWalletClient,
   encodeAbiParameters,
   encodeFunctionData,
@@ -14,6 +15,7 @@ import {
   getAddress,
   http,
   keccak256,
+  parseSignature,
   parseEther,
   stringToHex,
   toBytes,
@@ -141,9 +143,15 @@ function getValidatorNonceKey(validatorAddress: Address) {
 
 async function signSessionHash(sessionPrivateKey: Hex, hash: Hex) {
   const account = privateKeyToAccount(sessionPrivateKey);
-  return account.signMessage({
+  const originalSignature = await account.signMessage({
     message: { raw: hash },
   });
+  const { r, s, v } = parseSignature(originalSignature);
+  if (!v) {
+    throw new Error('Invalid Safe7579 session signature');
+  }
+
+  return concat([r, s, toHex(v + 4n)]);
 }
 
 function createSafe7579BundlerClient() {

@@ -117,7 +117,7 @@ async function main() {
   let agent;
   let safeAddress;
   let policy;
-  const fundAmountEth = process.env.SAFE7579_PROOF_FUND_AMOUNT_ETH ?? '0.0000015';
+  let fundAmountEth = process.env.SAFE7579_PROOF_FUND_AMOUNT_ETH ?? null;
   let migration = null;
   let fundHash = null;
   let fundReceipt = null;
@@ -128,6 +128,7 @@ async function main() {
     agent = await registerAgent(ownerJar);
     safeAddress = getAddress(agent.walletAddress);
     policy = agent.walletPolicy;
+    fundAmountEth = fundAmountEth ?? deriveProofFundingAmount(policy);
     updateProofState(proofState, 'agent-registered', {
       agentId: agent.id,
       safeAddress,
@@ -165,6 +166,7 @@ async function main() {
     agent = await fetchAgent(proofState.agentId);
     safeAddress = getAddress(proofState.safeAddress);
     policy = proofState.walletPolicy ?? agent.wallet_policy;
+    fundAmountEth = fundAmountEth ?? deriveProofFundingAmount(policy);
     updateProofState(proofState, proofState.stage, { walletPolicy: policy });
   }
 
@@ -223,7 +225,10 @@ async function main() {
     throw new Error('Safe7579 module stack is not fully installed onchain after migration');
   }
 
-  const sessionTransferAmount = normalizeAmount(policy.autoApproveThresholdEth);
+  const sessionTransferAmount = amountBelowThresholds(
+    policy.autoApproveThresholdEth,
+    policy.reviewThresholdEth,
+  );
   logStep('creating session transfer');
   const sessionTransfer = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/transfers`, {
     destination: sessionDestination,
@@ -660,7 +665,11 @@ async function listInstalledValidators(safeAddress) {
 
     pageValidators.forEach((validator) => validators.add(getAddress(validator)));
 
-    if (nextCursor === SENTINEL_ADDRESS || pageValidators.length === 0) {
+    if (
+      nextCursor === SENTINEL_ADDRESS
+      || pageValidators.length === 0
+      || BigInt(pageValidators.length) < VALIDATOR_PAGE_SIZE
+    ) {
       break;
     }
 
@@ -687,12 +696,35 @@ async function getStorageAddress(safeAddress, slot) {
   return getAddress(`0x${value.slice(-40)}`);
 }
 
-function normalizeAmount(amountEth) {
-  return formatEther(parseEther(amountEth));
-}
-
 function bumpAmount(amountEth, weiDelta) {
   return formatEther(parseEther(amountEth) + weiDelta);
+}
+
+function amountBelowThresholds(...amountsEth) {
+  const thresholds = amountsEth
+    .filter(Boolean)
+    .map((amountEth) => parseEther(amountEth));
+
+  if (thresholds.length === 0) {
+    throw new Error('At least one threshold is required to derive a proof amount');
+  }
+
+  const floorWei = thresholds.reduce((min, value) => (value < min ? value : min));
+  if (floorWei <= 1n) {
+    throw new Error('Proof thresholds are too small to derive a positive transfer amount');
+  }
+
+  return formatEther(floorWei - 1n);
+}
+
+function deriveProofFundingAmount(policy) {
+  const gasReserveWei = parseEther(process.env.SAFE7579_PROOF_GAS_RESERVE_ETH ?? '0.00001');
+  const sessionTransferWei = parseEther(
+    amountBelowThresholds(policy.autoApproveThresholdEth, policy.reviewThresholdEth),
+  );
+  const reviewedTransferWei = parseEther(bumpAmount(policy.timelockThresholdEth, 1n));
+
+  return formatEther(sessionTransferWei + reviewedTransferWei + gasReserveWei);
 }
 
 function sleep(ms) {

@@ -64,20 +64,52 @@ describe('agentWallet7579', () => {
     expect(calls.every((call) => typeof call.data === 'string' && call.data.startsWith('0x'))).toBe(true);
   });
 
+  it('adds the generic fallback action Smart Sessions needs for arbitrary calls', async () => {
+    process.env.SAFE_POLICY_SIGNER_PRIVATE_KEY = '0x59c6995e998f97a5a0044966f0945382d7d07b8f2b6ff9d0d7f9c21d3df0d7a1';
+
+    const { getSudoPolicy } = await import('@rhinestone/module-sdk');
+    const {
+      SMART_SESSIONS_FALLBACK_TARGET_FLAG,
+      SMART_SESSIONS_FALLBACK_TARGET_SELECTOR_FLAG,
+    } = await import('@rhinestone/sdk/smart-sessions');
+    const { buildSafe7579Policy, buildSessionDefinition } = await import('@/lib/agentWallet7579');
+
+    const policy = buildSafe7579Policy('0x00000000000000000000000000000000000000cc');
+    const session = buildSessionDefinition({
+      sessionKeyAddress: '0x00000000000000000000000000000000000000dd',
+      policy,
+      hookAddress: '0x00000000000000000000000000000000000000ee',
+      validUntil: Math.floor(Date.now() / 1000) + 3600,
+    });
+    const sudoPolicy = getSudoPolicy();
+
+    expect(session.actions).toEqual([
+      {
+        actionTargetSelector: SMART_SESSIONS_FALLBACK_TARGET_SELECTOR_FLAG,
+        actionTarget: SMART_SESSIONS_FALLBACK_TARGET_FLAG,
+        actionPolicies: [
+          {
+            policy: sudoPolicy.address,
+            initData: sudoPolicy.initData,
+          },
+        ],
+      },
+    ]);
+  });
+
   it('rebuilds stored migration sessions with the original validAfter timestamp', async () => {
     process.env.SAFE_POLICY_SIGNER_PRIVATE_KEY = '0x59c6995e998f97a5a0044966f0945382d7d07b8f2b6ff9d0d7f9c21d3df0d7a1';
 
     const {
-      buildSafe7579MigrationCalls,
       buildSafe7579ModuleMetadata,
       buildSafe7579Policy,
       buildSessionDefinition,
       buildStoredSafe7579Session,
+      getSafe7579SessionPermissionId,
     } = await import('@/lib/agentWallet7579');
 
     const ownerWallet = '0x00000000000000000000000000000000000000cc';
     const hookAddress = '0x00000000000000000000000000000000000000ee';
-    const safeAddress = '0x00000000000000000000000000000000000000aa';
     const policy = buildSafe7579Policy(ownerWallet);
     const validAfter = 1_774_823_286;
     const validUntil = validAfter + 3600;
@@ -104,23 +136,8 @@ describe('agentWallet7579', () => {
       modules,
     });
 
-    expect(
-      buildSafe7579MigrationCalls({
-        safeAddress,
-        ownerWallet,
-        session,
-        hookAddress,
-        guardAddress: '0x5C248059762079Cb30FBc312C382d34839ccb5ba',
-      }),
-    ).toEqual(
-      buildSafe7579MigrationCalls({
-        safeAddress,
-        ownerWallet,
-        session: rebuilt,
-        hookAddress,
-        guardAddress: '0x5C248059762079Cb30FBc312C382d34839ccb5ba',
-      }),
-    );
+    expect(rebuilt).toEqual(session);
+    expect(getSafe7579SessionPermissionId(rebuilt)).toBe(getSafe7579SessionPermissionId(session));
   });
 
   it('uses the stored session when rebuilding the smart sessions validator', async () => {
