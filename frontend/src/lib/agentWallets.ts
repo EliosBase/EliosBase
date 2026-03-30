@@ -4,6 +4,7 @@ import Safe, {
 } from '@safe-global/protocol-kit';
 import {
   createWalletClient,
+  formatEther,
   getAddress,
   isAddress,
   keccak256,
@@ -17,7 +18,13 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { base, baseSepolia } from 'viem/chains';
 import { ESCROW_CONTRACT_ADDRESS, VERIFIER_CONTRACT_ADDRESS } from '@/lib/contracts';
-import { readEnv, readFloatEnv, readIntEnv, readRequiredEnv } from '@/lib/env';
+import { getBaseRpcUrl, getMaxPendingNonce } from '@/lib/baseRpc';
+import { readEnv, readIntEnv, readRequiredEnv } from '@/lib/env';
+import {
+  estimateGasLimitWithHeadroom,
+  getPendingEip1559TxParams,
+  isUnderpricedTransactionError,
+} from '@/lib/txFees';
 import { publicClient } from '@/lib/viemClient';
 import type { AgentWalletPolicy, AgentWalletStatus } from '@/lib/types';
 
@@ -71,8 +78,7 @@ export type AgentWalletTransactionData = {
 
 const isTestnet = readEnv(process.env.NEXT_PUBLIC_CHAIN) === 'testnet';
 const chain = isTestnet ? baseSepolia : base;
-const rpcUrl = readEnv(process.env.BASE_RPC_URL)
-  || (isTestnet ? 'https://sepolia.base.org' : 'https://mainnet.base.org');
+const rpcUrl = getBaseRpcUrl(isTestnet);
 
 function getOptionalPolicySignerPrivateKey() {
   return readEnv(process.env.SAFE_POLICY_SIGNER_PRIVATE_KEY)
@@ -122,6 +128,19 @@ function getDefaultBlockedDestinations() {
   );
 }
 
+function readPolicyAmountEnv(value: string | null | undefined, fallback: string) {
+  const normalized = readEnv(value);
+  if (!normalized) {
+    return fallback;
+  }
+
+  try {
+    return formatEther(parseEther(normalized));
+  } catch {
+    return fallback;
+  }
+}
+
 export function buildAgentWalletPolicy(ownerWallet: Address): AgentWalletPolicy {
   const owners = getWalletOwners(ownerWallet);
 
@@ -131,13 +150,13 @@ export function buildAgentWalletPolicy(ownerWallet: Address): AgentWalletPolicy 
     policySigner: owners[1],
     owners,
     threshold: 2,
-    dailySpendLimitEth: readFloatEnv(process.env.AGENT_WALLET_DAILY_LIMIT_ETH, 0.5).toFixed(2),
-    autoApproveThresholdEth: readFloatEnv(
+    dailySpendLimitEth: readPolicyAmountEnv(process.env.AGENT_WALLET_DAILY_LIMIT_ETH, '0.5'),
+    autoApproveThresholdEth: readPolicyAmountEnv(
       process.env.AGENT_WALLET_AUTO_APPROVE_THRESHOLD_ETH || process.env.AGENT_WALLET_COSIGN_THRESHOLD_ETH,
-      0.25,
-    ).toFixed(2),
-    reviewThresholdEth: readFloatEnv(process.env.AGENT_WALLET_COSIGN_THRESHOLD_ETH, 0.25).toFixed(2),
-    timelockThresholdEth: readFloatEnv(process.env.AGENT_WALLET_TIMELOCK_THRESHOLD_ETH, 1).toFixed(2),
+      '0.25',
+    ),
+    reviewThresholdEth: readPolicyAmountEnv(process.env.AGENT_WALLET_COSIGN_THRESHOLD_ETH, '0.25'),
+    timelockThresholdEth: readPolicyAmountEnv(process.env.AGENT_WALLET_TIMELOCK_THRESHOLD_ETH, '1'),
     timelockSeconds: readIntEnv(process.env.AGENT_WALLET_TIMELOCK_SECONDS, 24 * 60 * 60),
     blockedDestinations: getDefaultBlockedDestinations(),
     allowlistedContracts: [],
@@ -191,7 +210,7 @@ async function deployPredictedSafe(agentId: string, ownerWallet: Address, addres
     transport: http(rpcUrl),
   });
 
-  const hash = await walletClient.sendTransaction({
+  const hash = await sendPolicySignerTransaction(walletClient, getAddress(account.address), {
     account,
     to: getAddress(deployment.to),
     data: deployment.data as Hex,
@@ -204,6 +223,48 @@ async function deployPredictedSafe(agentId: string, ownerWallet: Address, addres
   }
 
   return 'active' as const;
+}
+
+async function sendPolicySignerTransaction(
+  walletClient: ReturnType<typeof createWalletClient>,
+  address: Address,
+  request: {
+    account: ReturnType<typeof privateKeyToAccount>;
+    to: Address;
+    data: Hex;
+    value: bigint;
+  },
+) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const tx = await getPendingEip1559TxParams(
+      publicClient,
+      address as `0x${string}`,
+      attempt,
+      (target) => getMaxPendingNonce(isTestnet, target),
+    );
+
+    try {
+      const gas = await estimateGasLimitWithHeadroom(publicClient, {
+        account: address as `0x${string}`,
+        to: request.to as `0x${string}`,
+        value: request.value,
+        data: request.data as `0x${string}`,
+      });
+
+      return await walletClient.sendTransaction({
+        ...request,
+        ...tx,
+        gas,
+        chain,
+      });
+    } catch (error) {
+      if (attempt === 2 || !isUnderpricedTransactionError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error('Safe deployment fee retries exhausted');
 }
 
 export async function provisionAgentWallet(agentId: string, ownerWallet: Address): Promise<AgentWalletProvisioning> {

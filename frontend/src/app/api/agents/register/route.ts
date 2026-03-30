@@ -47,6 +47,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to provision the agent Safe wallet' }, { status: 500 });
   }
 
+  if (wallet.status !== 'active') {
+    return NextResponse.json({ error: 'Agent Safe deployment did not complete. Please try again.' }, { status: 503 });
+  }
+
   const { data, error } = await supabase
     .from('agents')
     .insert({
