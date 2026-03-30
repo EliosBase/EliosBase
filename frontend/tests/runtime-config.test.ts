@@ -60,4 +60,36 @@ describe('getRuntimeConfigurationStatus', () => {
     expect(status.configured).toBe(true);
     expect(status.missing).not.toContain('SIGNER_KEY');
   });
+
+  it('accepts Vercel KV environment aliases for Upstash rate limiting', () => {
+    configureRuntimeEnv({
+      UPSTASH_REDIS_REST_URL: undefined,
+      UPSTASH_REDIS_REST_TOKEN: undefined,
+      KV_REST_API_URL: 'https://kv.example.com',
+      KV_REST_API_TOKEN: 'kv-token',
+    });
+
+    const status = getRuntimeConfigurationStatus();
+
+    expect(status.configured).toBe(true);
+    expect(status.missing).not.toContain('UPSTASH_REDIS_REST_URL');
+    expect(status.missing).not.toContain('UPSTASH_REDIS_REST_TOKEN');
+  });
+
+  it('treats built-in Safe7579 module addresses as configured defaults', () => {
+    configureRuntimeEnv({
+      SAFE7579_ADAPTER_ADDRESS: undefined,
+      SAFE7579_OWNER_VALIDATOR_ADDRESS: undefined,
+      SAFE7579_SMART_SESSIONS_ADDRESS: undefined,
+      SAFE7579_COMPATIBILITY_FALLBACK_ADDRESS: undefined,
+    });
+
+    const status = getRuntimeConfigurationStatus();
+
+    expect(status.configured).toBe(true);
+    expect(status.missing).not.toContain('SAFE7579_ADAPTER_ADDRESS');
+    expect(status.missing).not.toContain('SAFE7579_OWNER_VALIDATOR_ADDRESS');
+    expect(status.missing).not.toContain('SAFE7579_SMART_SESSIONS_ADDRESS');
+    expect(status.missing).not.toContain('SAFE7579_COMPATIBILITY_FALLBACK_ADDRESS');
+  });
 });
