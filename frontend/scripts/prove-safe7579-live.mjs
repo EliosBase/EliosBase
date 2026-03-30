@@ -696,10 +696,6 @@ async function getStorageAddress(safeAddress, slot) {
   return getAddress(`0x${value.slice(-40)}`);
 }
 
-function normalizeAmount(amountEth) {
-  return formatEther(parseEther(amountEth));
-}
-
 function bumpAmount(amountEth, weiDelta) {
   return formatEther(parseEther(amountEth) + weiDelta);
 }
