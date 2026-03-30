@@ -11,6 +11,7 @@ import {
   buildStoredSafe7579Session,
   getSafe7579SessionPermissionId,
   readSafe7579EmissarySessionEnabled,
+  reviveSafe7579EnableSessionData,
   safe7579PublicClient,
   safeWalletChain,
 } from '@/lib/agentWallet7579';
@@ -69,7 +70,8 @@ export async function POST(
   const enableSessionSignature = body.enableSessionSignature as Hex | undefined;
   const txData = body.txData as AgentWalletTransactionData | undefined;
   const pendingSession = body.pendingSession;
-  if (!ownerSignature || !enableSessionSignature || !txData || !isPendingSessionPayload(pendingSession)) {
+  const enableSessionContext = reviveSafe7579EnableSessionData(body.enableSessionContext);
+  if (!ownerSignature || !enableSessionSignature || !txData || !isPendingSessionPayload(pendingSession) || !enableSessionContext) {
     return NextResponse.json({ error: 'Owner signatures, prepared Safe transaction data, and pending session metadata are required' }, { status: 400 });
   }
 
@@ -155,6 +157,7 @@ export async function POST(
       ownerWalletAddress: ownerWallet,
       policy: agent.wallet_policy,
       modules: nextModules,
+      enableSessionData: enableSessionContext,
       sessionKeyAddress: getAddress(pendingSession.address),
       sessionKeyValidAfter: Math.floor(rotatedAtMs / 1000),
       sessionKeyValidUntil: Math.floor(validUntilMs / 1000),

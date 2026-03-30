@@ -16,6 +16,7 @@ import {
   getValueLimitPolicy,
   moduleTypeIds,
   type Session,
+  type EnableSessionData,
 } from '@rhinestone/module-sdk';
 import { SMART_SESSION_EMISSARY_ADDRESS } from '@rhinestone/sdk/smart-sessions';
 import {
@@ -128,6 +129,48 @@ type Safe7579EnableSessionTypedData = {
     }>;
   };
 };
+
+function serializeBigInts(value: unknown): unknown {
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (Array.isArray(value)) {
+    return value.map(serializeBigInts);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, serializeBigInts(entry)]),
+    );
+  }
+  return value;
+}
+
+function reviveBigInts(value: unknown): unknown {
+  if (typeof value === 'string' && /^\d+$/.test(value)) {
+    return BigInt(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(reviveBigInts);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, reviveBigInts(entry)]),
+    );
+  }
+  return value;
+}
+
+export function serializeSafe7579EnableSessionData(enableSessionData: EnableSessionData) {
+  return serializeBigInts(enableSessionData) as Record<string, unknown>;
+}
+
+export function reviveSafe7579EnableSessionData(value: unknown) {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  return reviveBigInts(value) as EnableSessionData;
+}
 
 export function readSafe7579PolicySignerPrivateKey() {
   return readEnv(process.env.SAFE_POLICY_SIGNER_PRIVATE_KEY)

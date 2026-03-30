@@ -37,7 +37,6 @@ import { readEnv, readRequiredEnv } from '@/lib/env';
 import {
   buildStoredSafe7579Session,
   ELIOS_POLICY_MANAGER_ABI,
-  getSafe7579EnableSessionDetails,
   readSafe7579PolicySignerPrivateKey,
   readSafe7579EmissarySessionEnabled,
   SAFE_7579_SMART_SESSIONS_ADDRESS,
@@ -442,6 +441,7 @@ export async function bootstrapSafe7579SessionEnable(params: {
   ownerWalletAddress: Address;
   policy: AgentWalletPolicy;
   modules: AgentWalletModules;
+  enableSessionData: EnableSessionData;
   sessionKeyAddress: Address;
   sessionKeyValidAfter?: number;
   sessionKeyValidUntil: number;
@@ -466,10 +466,14 @@ export async function bootstrapSafe7579SessionEnable(params: {
     policy: params.policy,
     modules: params.modules,
   });
-  const enableDetails = await getSafe7579EnableSessionDetails({
-    safeAddress: params.safeAddress,
-    session,
-  });
+  const preparedSession = params.enableSessionData.enableSession.sessionToEnable;
+  if (
+    getAddress(preparedSession.sessionValidator) !== getAddress(session.sessionValidator)
+    || preparedSession.sessionValidatorInitData !== session.sessionValidatorInitData
+    || preparedSession.salt !== session.salt
+  ) {
+    throw new Error('Prepared Safe7579 session context does not match the stored session metadata');
+  }
   const { smartAccount } = await createSessionSmartAccount({
     safeAddress: params.safeAddress,
     sessionPrivateKey,
@@ -479,9 +483,9 @@ export async function bootstrapSafe7579SessionEnable(params: {
     policy: params.policy,
     modules: params.modules,
     enableSessionData: {
-      ...enableDetails.enableSessionData,
+      ...params.enableSessionData,
       enableSession: {
-        ...enableDetails.enableSessionData.enableSession,
+        ...params.enableSessionData.enableSession,
         permissionEnableSig: params.ownerEnableSignature,
       },
     },
