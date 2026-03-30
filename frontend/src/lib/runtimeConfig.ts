@@ -34,13 +34,31 @@ const REQUIRED_SENTRY_ENV = [
   'SENTRY_PROJECT',
 ] as const;
 
+const RUNTIME_ENV_ALIASES = {
+  UPSTASH_REDIS_REST_URL: ['KV_REST_API_URL'],
+  UPSTASH_REDIS_REST_TOKEN: ['KV_REST_API_TOKEN'],
+} as const;
+
+const SAFE7579_DEFAULT_RUNTIME_ENV = {
+  SAFE7579_ADAPTER_ADDRESS: '0x7579f2ad53b01c3d8779fe17928e0d48885b0003',
+  SAFE7579_OWNER_VALIDATOR_ADDRESS: '0x000000000013fdB5234E4E3162a810F54d9f7E98',
+  SAFE7579_SMART_SESSIONS_ADDRESS: '0x00000000008bDABA73cD9815d79069c247Eb4bDA',
+  SAFE7579_COMPATIBILITY_FALLBACK_ADDRESS: '0x000000000052e9685932845660777DF43C2dC496',
+} as const;
+
 const SIGNER_ENV = [
   'SAFE_POLICY_SIGNER_PRIVATE_KEY',
   'PROOF_SUBMITTER_PRIVATE_KEY',
 ] as const;
 
 function readConfiguredEnv(name: string) {
-  return readEnv(process.env[name]);
+  const configured =
+    readEnv(process.env[name]) ??
+    RUNTIME_ENV_ALIASES[name as keyof typeof RUNTIME_ENV_ALIASES]
+      ?.map((alias) => readEnv(process.env[alias]))
+      .find(Boolean);
+
+  return configured ?? SAFE7579_DEFAULT_RUNTIME_ENV[name as keyof typeof SAFE7579_DEFAULT_RUNTIME_ENV];
 }
 
 export function isProductionRuntime() {
