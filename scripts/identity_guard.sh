@@ -28,7 +28,8 @@ resolve_pre_push_base() {
   local_sha="$2"
   remote_sha="$3"
 
-  if [ -n "$remote_sha" ] && [ "$remote_sha" != "$zero_sha" ]; then
+  if [ -n "$remote_sha" ] && [ "$remote_sha" != "$zero_sha" ] &&
+    git rev-parse --verify "${remote_sha}^{commit}" >/dev/null 2>&1; then
     printf '%s' "$remote_sha"
     return 0
   fi
