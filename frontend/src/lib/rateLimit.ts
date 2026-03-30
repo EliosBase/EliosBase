@@ -26,13 +26,24 @@ const RATE_LIMITS = {
 let redisClient: Redis | null | undefined;
 const ratelimiters = new Map<string, Ratelimit>();
 
+function readRedisEnv(...names: string[]) {
+  for (const name of names) {
+    const value = readEnv(process.env[name]);
+    if (value) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
 function getRedisClient() {
   if (redisClient !== undefined) {
     return redisClient;
   }
 
-  const url = readEnv(process.env.UPSTASH_REDIS_REST_URL);
-  const token = readEnv(process.env.UPSTASH_REDIS_REST_TOKEN);
+  const url = readRedisEnv('UPSTASH_REDIS_REST_URL', 'KV_REST_API_URL');
+  const token = readRedisEnv('UPSTASH_REDIS_REST_TOKEN', 'KV_REST_API_TOKEN');
   if (!url || !token) {
     redisClient = null;
     return redisClient;
