@@ -11,6 +11,8 @@ const ACCOUNT_7579_STATE_ABI = parseAbi([
   'function getActiveHook() external view returns (address)',
 ]);
 const SENTINEL_ADDRESS = '0x0000000000000000000000000000000000000001' as const;
+const VALIDATOR_PAGE_SIZE = 20n;
+const MAX_VALIDATOR_PAGES = 8;
 
 export async function getSafeGuardAddress(safeAddress: Address) {
   const value = await safe7579PublicClient.getStorageAt({
@@ -43,18 +45,42 @@ export async function isSafe7579ValidatorInstalled(
   validatorAddress: Address,
 ) {
   try {
+    const validators = await listSafe7579Validators(safeAddress);
+    return validators.includes(getAddress(validatorAddress));
+  } catch {
+    return false;
+  }
+}
+
+async function listSafe7579Validators(safeAddress: Address) {
+  const validators = new Set<Address>();
+  const seenCursors = new Set<Address>();
+  let cursor: Address = SENTINEL_ADDRESS;
+
+  for (let page = 0; page < MAX_VALIDATOR_PAGES; page += 1) {
+    if (seenCursors.has(cursor)) {
+      break;
+    }
+    seenCursors.add(cursor);
+
     const result = await safe7579PublicClient.readContract({
       address: safeAddress,
       abi: ACCOUNT_7579_STATE_ABI,
       functionName: 'getValidatorsPaginated',
-      args: [SENTINEL_ADDRESS, 20n],
+      args: [cursor, VALIDATOR_PAGE_SIZE],
     });
-    const [validators] = result as unknown as [Address[], Address];
+    const [pageValidators, nextCursor] = result as unknown as [Address[], Address];
 
-    return validators.some((validator) => getAddress(validator) === getAddress(validatorAddress));
-  } catch {
-    return false;
+    pageValidators.forEach((validator) => validators.add(getAddress(validator)));
+
+    if (nextCursor === SENTINEL_ADDRESS || pageValidators.length === 0) {
+      break;
+    }
+
+    cursor = getAddress(nextCursor);
   }
+
+  return [...validators];
 }
 
 export async function isSafe7579FallbackInstalled(
