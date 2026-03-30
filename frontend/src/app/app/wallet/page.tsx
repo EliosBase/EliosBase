@@ -35,6 +35,12 @@ type PreparedExecution = {
 
 type PreparedSessionExecution = PreparedExecution & {
   enableSessionHash?: string;
+  enableSessionTypedData?: {
+    domain: Record<string, unknown>;
+    types: Record<string, unknown>;
+    primaryType: string;
+    message: Record<string, unknown>;
+  };
   pendingSession?: {
     address: string;
     ciphertext: string;
@@ -207,9 +213,12 @@ export default function WalletPage() {
       ?? null;
   }
 
-  async function signEnableSessionHash(enableSessionHash: string) {
+  async function signEnableSessionTypedData(typedData: PreparedSessionExecution['enableSessionTypedData']) {
     if (!session?.walletAddress) {
       throw new Error('Sign in with the Safe owner wallet first.');
+    }
+    if (!typedData) {
+      throw new Error('Safe7579 session typed data is missing.');
     }
 
     const injected = getInjectedProvider(window as Window & WalletWindow, 'metaMask');
@@ -218,8 +227,11 @@ export default function WalletPage() {
     }
 
     return injected.request({
-      method: 'personal_sign',
-      params: [enableSessionHash, getAddress(session.walletAddress)],
+      method: 'eth_signTypedData_v4',
+      params: [
+        getAddress(session.walletAddress),
+        JSON.stringify(typedData),
+      ],
     }) as Promise<string>;
   }
 
@@ -357,15 +369,15 @@ export default function WalletPage() {
     if (!prepared.pendingSession) {
       throw new Error('Pending Safe7579 session metadata is missing.');
     }
-    if (!prepared.enableSessionHash) {
-      throw new Error('Safe7579 session enable hash is missing.');
+    if (!prepared.enableSessionTypedData) {
+      throw new Error('Safe7579 session enable typed data is missing.');
     }
 
     const ownerSignature = await signPreparedSafeExecution(safeAddress, prepared);
     if (!ownerSignature) {
       throw new Error('MetaMask signed the session transaction, but Elios could not read the owner signature.');
     }
-    const enableSessionSignature = await signEnableSessionHash(prepared.enableSessionHash);
+    const enableSessionSignature = await signEnableSessionTypedData(prepared.enableSessionTypedData);
 
     const executeRes = await fetch(`/api/agents/${agentId}/wallet/session/execute`, {
       method: 'POST',

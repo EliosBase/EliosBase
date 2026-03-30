@@ -4,10 +4,12 @@ import Safe, {
 } from '@safe-global/protocol-kit';
 import {
   createWalletClient,
+  encodeFunctionData,
   formatEther,
   getAddress,
   isAddress,
   keccak256,
+  parseAbi,
   parseEther,
   stringToHex,
   zeroAddress,
@@ -21,7 +23,8 @@ import { ESCROW_CONTRACT_ADDRESS, VERIFIER_CONTRACT_ADDRESS } from '@/lib/contra
 import { getBaseRpcUrl, getMaxPendingNonce } from '@/lib/baseRpc';
 import { readEnv, readIntEnv, readRequiredEnv } from '@/lib/env';
 import {
-  estimateGasLimitWithHeadroom,
+  estimateGasLimitWithinBalance,
+  fitEip1559FeesWithinBalance,
   getPendingEip1559TxParams,
   isUnderpricedTransactionError,
 } from '@/lib/txFees';
@@ -40,6 +43,7 @@ type AgentWalletProvisioning = {
   address: Address;
   policy: AgentWalletPolicy;
   status: AgentWalletStatus;
+  failureReason?: string;
 };
 
 type AgentWalletTransferDecision = {
@@ -244,16 +248,33 @@ async function sendPolicySignerTransaction(
     );
 
     try {
-      const gas = await estimateGasLimitWithHeadroom(publicClient, {
+      const requestArgs = {
         account: address as `0x${string}`,
         to: request.to as `0x${string}`,
         value: request.value,
         data: request.data as `0x${string}`,
+      };
+      const [gasEstimate, balance] = await Promise.all([
+        publicClient.estimateGas(requestArgs),
+        publicClient.getBalance({ address: address as `0x${string}` }),
+      ]);
+      const fees = fitEip1559FeesWithinBalance({
+        balance,
+        value: request.value,
+        gasEstimate,
+        baseFeePerGas: tx.baseFeePerGas,
+        maxFeePerGas: tx.maxFeePerGas,
+        maxPriorityFeePerGas: tx.maxPriorityFeePerGas,
+      });
+      const gas = await estimateGasLimitWithinBalance(publicClient, requestArgs, {
+        address: address as `0x${string}`,
+        maxFeePerGas: fees.maxFeePerGas,
       });
 
       return await walletClient.sendTransaction({
         ...request,
-        ...tx,
+        nonce: tx.nonce,
+        ...fees,
         gas,
         chain,
       });
@@ -276,7 +297,12 @@ export async function provisionAgentWallet(agentId: string, ownerWallet: Address
     return { address, policy, status };
   } catch (error) {
     console.error('[agent-wallet] failed to deploy Safe:', error);
-    return { address, policy, status: 'predicted' };
+    return {
+      address,
+      policy,
+      status: 'predicted',
+      failureReason: error instanceof Error ? error.message : String(error),
+    };
   }
 }
 
@@ -417,9 +443,38 @@ export async function executeAgentWalletExecution(params: {
 
   safeTransaction.addSignature(new EthSafeSignature(getAddress(params.ownerAddress), params.ownerSignature));
   const signedTransaction = await safe.signTransaction(safeTransaction);
-  const execution = await safe.executeTransaction(signedTransaction);
+  const privateKey = getRequiredPolicySignerPrivateKey();
+  const account = privateKeyToAccount(privateKey);
+  const walletClient = createWalletClient({
+    account,
+    chain,
+    transport: http(rpcUrl),
+  });
+  const executionHash = await sendPolicySignerTransaction(walletClient, getAddress(account.address), {
+    account,
+    to: params.safeAddress,
+    value: 0n,
+    data: encodeFunctionData({
+      abi: parseAbi([
+        'function execTransaction(address to,uint256 value,bytes data,uint8 operation,uint256 safeTxGas,uint256 baseGas,uint256 gasPrice,address gasToken,address refundReceiver,bytes signatures) returns (bool success)',
+      ]),
+      functionName: 'execTransaction',
+      args: [
+        getAddress(signedTransaction.data.to),
+        BigInt(signedTransaction.data.value),
+        (signedTransaction.data.data ?? '0x') as Hex,
+        signedTransaction.data.operation,
+        BigInt(signedTransaction.data.safeTxGas),
+        BigInt(signedTransaction.data.baseGas),
+        BigInt(signedTransaction.data.gasPrice),
+        getAddress(signedTransaction.data.gasToken),
+        getAddress(signedTransaction.data.refundReceiver),
+        signedTransaction.encodedSignatures() as Hex,
+      ],
+    }),
+  });
   const receipt = await publicClient.waitForTransactionReceipt({
-    hash: execution.hash as Hex,
+    hash: executionHash,
   });
 
   if (receipt.status !== 'success') {
@@ -427,7 +482,7 @@ export async function executeAgentWalletExecution(params: {
   }
 
   return {
-    hash: execution.hash as Hex,
+    hash: executionHash,
     blockNumber: Number(receipt.blockNumber),
   };
 }

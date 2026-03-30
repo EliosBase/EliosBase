@@ -139,5 +139,6 @@ export async function POST(
     safeVersion: prepared.safeVersion,
     managerCall: serializeCall(rotateCall),
     enableSessionHash: enableSessionDetails.permissionEnableHash,
+    enableSessionTypedData: enableSessionDetails.enableSessionTypedData,
   });
 }

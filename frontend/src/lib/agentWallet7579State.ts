@@ -105,6 +105,7 @@ export async function readSafe7579InstallationState(
   });
   const compatibilityFunctionSig = modules.compatibilityFallback.functionSig ?? '0x00000000';
   const checks = await Promise.all([
+    isSafe7579ValidatorInstalled(params.safeAddress, getAddress(modules.ownerValidator.module)),
     isSafe7579ValidatorInstalled(params.safeAddress, getAddress(modules.smartSessions.module)),
     isSafe7579FallbackInstalled(
       params.safeAddress,
@@ -117,6 +118,7 @@ export async function readSafe7579InstallationState(
   ]);
 
   const [
+    ownerValidator,
     smartSessionsValidator,
     compatibilityFallback,
     hook,
@@ -125,6 +127,7 @@ export async function readSafe7579InstallationState(
   ] = checks;
 
   return {
+    ownerValidator,
     smartSessionsValidator,
     compatibilityFallback,
     hook: getAddress(hook) === getAddress(params.hookAddress),
