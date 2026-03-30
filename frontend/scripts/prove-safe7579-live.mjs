@@ -64,6 +64,8 @@ const ACCOUNT_7579_STATE_ABI = parseAbi([
   'function getActiveHook() external view returns (address)',
 ]);
 const SENTINEL_ADDRESS = '0x0000000000000000000000000000000000000001';
+const VALIDATOR_PAGE_SIZE = 20n;
+const MAX_VALIDATOR_PAGES = 8;
 
 async function main() {
   logStep('authenticating owner');
@@ -550,12 +552,7 @@ async function readInstalledModules(safeAddress, hookAddress) {
     functionSig: rawCompatibilityFallback.selector,
   };
   const [validators, fallbackInstalled, hookInstalled] = await Promise.all([
-    publicClient.readContract({
-      address: getAddress(safeAddress),
-      abi: ACCOUNT_7579_STATE_ABI,
-      functionName: 'getValidatorsPaginated',
-      args: [SENTINEL_ADDRESS, 20n],
-    }).catch(() => [[], SENTINEL_ADDRESS]),
+    listInstalledValidators(safeAddress).catch(() => []),
     publicClient.readContract({
       address: getAddress(safeAddress),
       abi: ACCOUNT_7579_STATE_ABI,
@@ -572,12 +569,9 @@ async function readInstalledModules(safeAddress, hookAddress) {
       functionName: 'getActiveHook',
     }).then((activeHook) => getAddress(activeHook) === getAddress(hookAddress)).catch(() => false),
   ]);
-  const [installedValidators] = validators;
-  const normalizedValidators = installedValidators.map((validator) => getAddress(validator));
+  const normalizedValidators = validators.map((validator) => getAddress(validator));
   const ownerValidatorInstalled = normalizedValidators.includes(getAddress(ownerValidator.module));
-  const smartSessionsInstalled = installedValidators
-    .map((validator) => getAddress(validator))
-    .includes(getAddress(smartSessions.module));
+  const smartSessionsInstalled = normalizedValidators.includes(getAddress(smartSessions.module));
 
   return {
     ownerValidator: ownerValidatorInstalled,
@@ -585,6 +579,36 @@ async function readInstalledModules(safeAddress, hookAddress) {
     compatibilityFallback: fallbackInstalled,
     hook: hookInstalled,
   };
+}
+
+async function listInstalledValidators(safeAddress) {
+  const validators = new Set();
+  const seenCursors = new Set();
+  let cursor = SENTINEL_ADDRESS;
+
+  for (let page = 0; page < MAX_VALIDATOR_PAGES; page += 1) {
+    if (seenCursors.has(cursor)) {
+      break;
+    }
+    seenCursors.add(cursor);
+
+    const [pageValidators, nextCursor] = await publicClient.readContract({
+      address: getAddress(safeAddress),
+      abi: ACCOUNT_7579_STATE_ABI,
+      functionName: 'getValidatorsPaginated',
+      args: [cursor, VALIDATOR_PAGE_SIZE],
+    });
+
+    pageValidators.forEach((validator) => validators.add(getAddress(validator)));
+
+    if (nextCursor === SENTINEL_ADDRESS || pageValidators.length === 0) {
+      break;
+    }
+
+    cursor = getAddress(nextCursor);
+  }
+
+  return [...validators];
 }
 
 async function getFallbackHandlerAddress(safeAddress) {
