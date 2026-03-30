@@ -35,6 +35,7 @@ type PreparedExecution = {
 
 type PreparedSessionExecution = PreparedExecution & {
   enableSessionHash?: string;
+  enableSessionContext?: Record<string, unknown>;
   enableSessionTypedData?: {
     domain: Record<string, unknown>;
     types: Record<string, unknown>;
@@ -372,6 +373,9 @@ export default function WalletPage() {
     if (!prepared.enableSessionTypedData) {
       throw new Error('Safe7579 session enable typed data is missing.');
     }
+    if (!prepared.enableSessionContext) {
+      throw new Error('Safe7579 session enable context is missing.');
+    }
 
     const ownerSignature = await signPreparedSafeExecution(safeAddress, prepared);
     if (!ownerSignature) {
@@ -387,6 +391,7 @@ export default function WalletPage() {
         enableSessionSignature,
         txData: prepared.txData,
         pendingSession: prepared.pendingSession,
+        enableSessionContext: prepared.enableSessionContext,
       }),
     });
     const data = await executeRes.json().catch(() => ({}));
