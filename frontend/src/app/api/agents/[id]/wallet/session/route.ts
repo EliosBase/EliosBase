@@ -5,7 +5,6 @@ import { createServiceClient } from '@/lib/supabase/server';
 import {
   buildStoredSafe7579Session,
   getSafe7579SessionPermissionId,
-  readSafe7579EmissarySessionEnabled,
   safe7579PublicClient,
   safeWalletChain,
 } from '@/lib/agentWallet7579';
@@ -39,7 +38,6 @@ export async function GET(
 
   let sessionEnabled: boolean | null = null;
   let moduleSessionEnabled: boolean | null = null;
-  let emissarySessionEnabled: boolean | null = null;
   let permissionId: `0x${string}` | null = null;
   const walletStandard = getAgentWalletStandard(agent);
   const migrationState = getAgentWalletMigrationState(agent);
@@ -77,15 +75,10 @@ export async function GET(
         account,
         permissionId,
       });
-      emissarySessionEnabled = await readSafe7579EmissarySessionEnabled({
-        safeAddress: getAddress(agent.wallet_address),
-        session: storedSession,
-      });
-      sessionEnabled = Boolean(moduleSessionEnabled && emissarySessionEnabled);
+      sessionEnabled = Boolean(moduleSessionEnabled);
     } catch {
       sessionEnabled = false;
       moduleSessionEnabled = false;
-      emissarySessionEnabled = false;
     }
   }
 
@@ -100,6 +93,6 @@ export async function GET(
     sessionPermissionId: permissionId,
     sessionEnabled,
     moduleSessionEnabled,
-    emissarySessionEnabled,
+    emissarySessionEnabled: null,
   });
 }

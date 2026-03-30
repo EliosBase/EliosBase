@@ -38,7 +38,6 @@ import {
   buildStoredSafe7579Session,
   ELIOS_POLICY_MANAGER_ABI,
   readSafe7579PolicySignerPrivateKey,
-  readSafe7579EmissarySessionEnabled,
   SAFE_7579_SMART_SESSIONS_ADDRESS,
   SAFE_7579_POLICY_MANAGER_ADDRESS,
   safe7579PublicClient,
@@ -603,7 +602,7 @@ export async function executeSafe7579SessionTransfer(params: {
     throw new Error('Stored Safe7579 session key does not match the recorded session address');
   }
 
-  const { smartAccount, permissionId, session } = await createSessionSmartAccount({
+  const { smartAccount, permissionId } = await createSessionSmartAccount({
     safeAddress: params.safeAddress,
     sessionPrivateKey,
     sessionKeyAddress: params.sessionKeyAddress,
@@ -624,13 +623,6 @@ export async function executeSafe7579SessionTransfer(params: {
   });
   if (!enabled) {
     throw new Error('Safe7579 session is not enabled onchain');
-  }
-  const emissaryEnabled = await readSafe7579EmissarySessionEnabled({
-    safeAddress: params.safeAddress,
-    session,
-  });
-  if (!emissaryEnabled) {
-    throw new Error('Safe7579 session validator is not enabled onchain');
   }
 
   return sendSafe7579SessionUserOperation({
