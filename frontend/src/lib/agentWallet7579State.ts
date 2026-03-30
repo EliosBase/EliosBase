@@ -73,7 +73,11 @@ async function listSafe7579Validators(safeAddress: Address) {
 
     pageValidators.forEach((validator) => validators.add(getAddress(validator)));
 
-    if (nextCursor === SENTINEL_ADDRESS || pageValidators.length === 0) {
+    if (
+      nextCursor === SENTINEL_ADDRESS
+      || pageValidators.length === 0
+      || BigInt(pageValidators.length) < VALIDATOR_PAGE_SIZE
+    ) {
       break;
     }
 
