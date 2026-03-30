@@ -1,7 +1,6 @@
 # EliosBase
 
 [![validate](https://github.com/EliosBase/EliosBase/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/EliosBase/EliosBase/actions/workflows/validate.yml)
-[![identity-guard](https://github.com/EliosBase/EliosBase/actions/workflows/identity-guard.yml/badge.svg?branch=main)](https://github.com/EliosBase/EliosBase/actions/workflows/identity-guard.yml)
 [![codeql](https://github.com/EliosBase/EliosBase/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/EliosBase/EliosBase/actions/workflows/codeql.yml)
 [![real-smoke](https://github.com/EliosBase/EliosBase/actions/workflows/real-smoke.yml/badge.svg?branch=main)](https://github.com/EliosBase/EliosBase/actions/workflows/real-smoke.yml)
 

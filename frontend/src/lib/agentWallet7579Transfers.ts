@@ -15,7 +15,6 @@ import {
   http,
   keccak256,
   parseEther,
-  parseSignature,
   stringToHex,
   toBytes,
   toHex,
@@ -28,14 +27,10 @@ import {
   encodeSmartSessionSignature,
   type EnableSessionData,
   getPermissionId,
+  getOwnableValidatorMockSignature,
   isSessionEnabled,
   SmartSessionMode,
 } from '@rhinestone/module-sdk';
-import type { Session as RhinestoneSession } from '@rhinestone/sdk';
-import {
-  buildMockSignature,
-  SMART_SESSION_EMISSARY_ADDRESS,
-} from '@rhinestone/sdk/smart-sessions';
 import { decryptSessionKey } from '@/lib/agentWalletSecrets';
 import { getMaxPendingNonce } from '@/lib/baseRpc';
 import { readEnv, readRequiredEnv } from '@/lib/env';
@@ -45,13 +40,15 @@ import {
   getSafe7579EnableSessionDetails,
   readSafe7579PolicySignerPrivateKey,
   readSafe7579EmissarySessionEnabled,
+  SAFE_7579_SMART_SESSIONS_ADDRESS,
   SAFE_7579_POLICY_MANAGER_ADDRESS,
   safe7579PublicClient,
   safeWalletChain,
   safeWalletRpcUrl,
 } from '@/lib/agentWallet7579';
 import {
-  estimateGasLimitWithHeadroom,
+  estimateGasLimitWithinBalance,
+  fitEip1559FeesWithinBalance,
   getPendingEip1559TxParams,
   isUnderpricedTransactionError,
 } from '@/lib/txFees';
@@ -144,21 +141,11 @@ function getValidatorNonceKey(validatorAddress: Address) {
   return BigInt(encodePacked(['address', 'bytes4'], [validatorAddress, '0x00000000']));
 }
 
-function normalizeValidatorSignature(signature: Hex) {
-  const { r, s, v } = parseSignature(signature);
-  if (v === undefined) {
-    return signature;
-  }
-
-  return encodePacked(['bytes32', 'bytes32', 'uint8'], [r, s, Number(v + 4n)]) as Hex;
-}
-
 async function signSessionHash(sessionPrivateKey: Hex, hash: Hex) {
   const account = privateKeyToAccount(sessionPrivateKey);
-  const signature = await account.signMessage({
+  return account.signMessage({
     message: { raw: hash },
   });
-  return normalizeValidatorSignature(signature);
 }
 
 function createSafe7579BundlerClient() {
@@ -270,7 +257,7 @@ async function createSessionSmartAccount(params: {
   modules: AgentWalletModules;
   enableSessionData?: EnableSessionData;
 }) {
-  const validatorAddress = getAddress(SMART_SESSION_EMISSARY_ADDRESS);
+  const validatorAddress = getAddress(SAFE_7579_SMART_SESSIONS_ADDRESS);
   const session = buildStoredSafe7579Session({
     sessionKeyAddress: params.sessionKeyAddress,
     sessionKeyValidAfter: params.sessionKeyValidAfter,
@@ -279,13 +266,7 @@ async function createSessionSmartAccount(params: {
     modules: params.modules,
   });
   const permissionId = getPermissionId({ session });
-  const mockSession: RhinestoneSession = {
-    chain: safeWalletChain,
-    owners: {
-      type: 'ecdsa',
-      accounts: [privateKeyToAccount(params.sessionPrivateKey)],
-    },
-  };
+  const mockSignature = getOwnableValidatorMockSignature({ threshold: 1 });
 
   return {
     smartAccount: await toSmartAccount({
@@ -325,7 +306,20 @@ async function createSessionSmartAccount(params: {
         });
       },
       async getStubSignature() {
-        return buildMockSignature(mockSession);
+        return params.enableSessionData
+          ? encodeSmartSessionSignature({
+            mode: SmartSessionMode.ENABLE,
+            permissionId,
+            signature: mockSignature,
+            enableSessionData: {
+              ...params.enableSessionData,
+            },
+          })
+          : encodeSmartSessionSignature({
+            mode: SmartSessionMode.USE,
+            permissionId,
+            signature: mockSignature,
+          });
       },
       async signMessage() {
         throw new Error('Message signing is not implemented for Safe7579 session execution');
@@ -353,12 +347,6 @@ async function createSessionSmartAccount(params: {
             signature,
             enableSessionData: {
               ...params.enableSessionData,
-              enableSession: {
-                ...params.enableSessionData.enableSession,
-                permissionEnableSig: normalizeValidatorSignature(
-                  params.enableSessionData.enableSession.permissionEnableSig,
-                ),
-              },
             },
           })
           : encodeSmartSessionSignature({
@@ -366,10 +354,7 @@ async function createSessionSmartAccount(params: {
             permissionId,
             signature,
           });
-        return encodePacked(
-          ['address', 'bytes'],
-          [validatorAddress, smartSessionSignature],
-        ) as Hex;
+        return smartSessionSignature;
       },
     }),
     permissionId,
@@ -673,16 +658,33 @@ async function sendPolicySignerTransaction(
     );
 
     try {
-      const gas = await estimateGasLimitWithHeadroom(safe7579PublicClient, {
+      const requestArgs = {
         account: address as `0x${string}`,
         to: request.to as `0x${string}`,
         value: request.value,
         data: request.data as `0x${string}`,
+      };
+      const [gasEstimate, balance] = await Promise.all([
+        safe7579PublicClient.estimateGas(requestArgs),
+        safe7579PublicClient.getBalance({ address: address as `0x${string}` }),
+      ]);
+      const fees = fitEip1559FeesWithinBalance({
+        balance,
+        value: request.value,
+        gasEstimate,
+        baseFeePerGas: tx.baseFeePerGas,
+        maxFeePerGas: tx.maxFeePerGas,
+        maxPriorityFeePerGas: tx.maxPriorityFeePerGas,
+      });
+      const gas = await estimateGasLimitWithinBalance(safe7579PublicClient, requestArgs, {
+        address: address as `0x${string}`,
+        maxFeePerGas: fees.maxFeePerGas,
       });
 
       return await walletClient.sendTransaction({
         ...request,
-        ...tx,
+        nonce: tx.nonce,
+        ...fees,
         gas,
         chain: safeWalletChain,
       });

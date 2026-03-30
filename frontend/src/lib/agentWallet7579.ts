@@ -7,6 +7,7 @@ import {
   getEnableSessionDetails as getModuleEnableSessionDetails,
   getEnableSessionsAction,
   getOwnableValidator,
+  getSessionNonce,
   getPermissionId,
   getRemoveSessionAction,
   getSmartSessionsCompatibilityFallback,
@@ -85,6 +86,47 @@ type SafeInstallModule = ReturnType<typeof getOwnableValidator> & {
   selector?: Hex;
   functionSig?: Hex;
   callType?: CallType;
+};
+
+type Safe7579EnableSessionTypedData = {
+  domain: {
+    name: string;
+    version: string;
+  };
+  primaryType: 'MultiChainSession';
+  types: {
+    EIP712Domain: Array<{ name: string; type: string }>;
+    PolicyData: Array<{ name: string; type: string }>;
+    ActionData: Array<{ name: string; type: string }>;
+    ERC7739Context: Array<{ name: string; type: string }>;
+    ERC7739Data: Array<{ name: string; type: string }>;
+    SignedPermissions: Array<{ name: string; type: string }>;
+    SignedSession: Array<{ name: string; type: string }>;
+    ChainSession: Array<{ name: string; type: string }>;
+    MultiChainSession: Array<{ name: string; type: string }>;
+  };
+  message: {
+    sessionsAndChainIds: Array<{
+      chainId: string;
+      session: {
+        account: Address;
+        permissions: {
+          permitGenericPolicy: boolean;
+          permitAdminAccess: boolean;
+          ignoreSecurityAttestations: boolean;
+          permitERC4337Paymaster: boolean;
+          userOpPolicies: Session['userOpPolicies'];
+          erc7739Policies: Session['erc7739Policies'];
+          actions: Session['actions'];
+        };
+        sessionValidator: Address;
+        sessionValidatorInitData: Hex;
+        salt: Hex;
+        smartSession: Address;
+        nonce: string;
+      };
+    }>;
+  };
 };
 
 export function readSafe7579PolicySignerPrivateKey() {
@@ -259,12 +301,96 @@ export async function getSafe7579EnableSessionDetails(params: {
     account,
     clients: [safe7579PublicClient as never],
     enableValidatorAddress: SAFE_7579_OWNER_VALIDATOR_ADDRESS,
+    permitGenericPolicy: true,
   });
+  const sessionNonce = await getSessionNonce({
+    client: safe7579PublicClient as never,
+    account,
+    permissionId: details.permissionId,
+  });
+  const enableSessionTypedData: Safe7579EnableSessionTypedData = {
+    domain: {
+      name: 'SmartSession',
+      version: '1',
+    },
+    primaryType: 'MultiChainSession',
+    types: {
+      EIP712Domain: [
+        { name: 'name', type: 'string' },
+        { name: 'version', type: 'string' },
+      ],
+      PolicyData: [
+        { name: 'policy', type: 'address' },
+        { name: 'initData', type: 'bytes' },
+      ],
+      ActionData: [
+        { name: 'actionTargetSelector', type: 'bytes4' },
+        { name: 'actionTarget', type: 'address' },
+        { name: 'actionPolicies', type: 'PolicyData[]' },
+      ],
+      ERC7739Context: [
+        { name: 'appDomainSeparator', type: 'bytes32' },
+        { name: 'contentName', type: 'string[]' },
+      ],
+      ERC7739Data: [
+        { name: 'allowedERC7739Content', type: 'ERC7739Context[]' },
+        { name: 'erc1271Policies', type: 'PolicyData[]' },
+      ],
+      SignedPermissions: [
+        { name: 'permitGenericPolicy', type: 'bool' },
+        { name: 'permitAdminAccess', type: 'bool' },
+        { name: 'ignoreSecurityAttestations', type: 'bool' },
+        { name: 'permitERC4337Paymaster', type: 'bool' },
+        { name: 'userOpPolicies', type: 'PolicyData[]' },
+        { name: 'erc7739Policies', type: 'ERC7739Data' },
+        { name: 'actions', type: 'ActionData[]' },
+      ],
+      SignedSession: [
+        { name: 'account', type: 'address' },
+        { name: 'permissions', type: 'SignedPermissions' },
+        { name: 'sessionValidator', type: 'address' },
+        { name: 'sessionValidatorInitData', type: 'bytes' },
+        { name: 'salt', type: 'bytes32' },
+        { name: 'smartSession', type: 'address' },
+        { name: 'nonce', type: 'uint256' },
+      ],
+      ChainSession: [
+        { name: 'chainId', type: 'uint64' },
+        { name: 'session', type: 'SignedSession' },
+      ],
+      MultiChainSession: [
+        { name: 'sessionsAndChainIds', type: 'ChainSession[]' },
+      ],
+    },
+    message: {
+      sessionsAndChainIds: [{
+        chainId: params.session.chainId.toString(),
+        session: {
+          account: account.address,
+          permissions: {
+            permitGenericPolicy: true,
+            permitAdminAccess: false,
+            ignoreSecurityAttestations: false,
+            permitERC4337Paymaster: params.session.permitERC4337Paymaster,
+            userOpPolicies: params.session.userOpPolicies,
+            erc7739Policies: params.session.erc7739Policies,
+            actions: params.session.actions,
+          },
+          sessionValidator: params.session.sessionValidator,
+          sessionValidatorInitData: params.session.sessionValidatorInitData,
+          salt: params.session.salt,
+          smartSession: SAFE_7579_SMART_SESSIONS_ADDRESS,
+          nonce: sessionNonce.toString(),
+        },
+      }],
+    },
+  };
 
   return {
     permissionEnableHash: details.permissionEnableHash,
     permissionId: details.permissionId,
     enableSessionData: details.enableSessionData,
+    enableSessionTypedData,
   };
 }
 
@@ -322,6 +448,7 @@ export function buildSafe7579MigrationCalls(params: {
   });
 
   const moduleCalls = [
+    modules.ownerValidator,
     modules.smartSessions,
     modules.compatibilityFallback,
     modules.hookModule,

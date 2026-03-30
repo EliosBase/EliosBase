@@ -48,7 +48,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (wallet.status !== 'active') {
-    return NextResponse.json({ error: 'Agent Safe deployment did not complete. Please try again.' }, { status: 503 });
+    return NextResponse.json({
+      error: wallet.failureReason
+        ? `Agent Safe deployment did not complete: ${wallet.failureReason}`
+        : 'Agent Safe deployment did not complete. Please try again.',
+    }, { status: 503 });
   }
 
   const { data, error } = await supabase
