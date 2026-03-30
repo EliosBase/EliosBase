@@ -12,6 +12,7 @@ import {
   buildSessionDefinition,
   buildStoredSafe7579Session,
   getSafe7579SessionPermissionId,
+  serializeSafe7579EnableSessionData,
   SAFE_7579_POLICY_MANAGER_ADDRESS,
   SAFE_7579_HOOK_ADDRESS,
 } from '@/lib/agentWallet7579';
@@ -26,6 +27,8 @@ function serializeCall(call: { to: string; value: { toString(): string }; data: 
     data: call.data,
   };
 }
+
+const SESSION_VALID_AFTER_SKEW_SECONDS = 120;
 
 export async function POST(
   req: NextRequest,
@@ -79,66 +82,73 @@ export async function POST(
     return NextResponse.json({ error: 'Safe7579 hook is not configured for this agent' }, { status: 409 });
   }
 
-  const encryptedSession = generateEncryptedSessionKey();
-  const validAfter = Math.floor(Date.now() / 1000);
-  const validUntil = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
-  const sessionDefinition = buildSessionDefinition({
-    sessionKeyAddress: encryptedSession.address,
-    policy,
-    hookAddress: getAddress(hookAddress),
-    validAfter,
-    validUntil,
-  });
-  const rotateCall = buildRotateSessionKeyCall({
-    safeAddress: getAddress(agent.wallet_address),
-    sessionKeyAddress: encryptedSession.address,
-    validUntil,
-  });
-  const safeCalls = [];
-
-  if (currentSession?.address && currentSession.validUntil && modules?.sessionSalt) {
-    const storedSession = buildStoredSafe7579Session({
-      sessionKeyAddress: getAddress(currentSession.address),
-      sessionKeyValidAfter: currentSession.rotatedAt
-        ? Math.floor(new Date(currentSession.rotatedAt).getTime() / 1000)
-        : undefined,
-      sessionKeyValidUntil: Math.floor(new Date(currentSession.validUntil).getTime() / 1000),
+  try {
+    const encryptedSession = generateEncryptedSessionKey();
+    const now = Math.floor(Date.now() / 1000);
+    const validAfter = Math.max(0, now - SESSION_VALID_AFTER_SKEW_SECONDS);
+    const validUntil = now + 7 * 24 * 60 * 60;
+    const sessionDefinition = buildSessionDefinition({
+      sessionKeyAddress: encryptedSession.address,
       policy,
-      modules,
+      hookAddress: getAddress(hookAddress),
+      validAfter,
+      validUntil,
     });
-    safeCalls.push(buildRemoveSessionCall(getSafe7579SessionPermissionId(storedSession)));
+    const rotateCall = buildRotateSessionKeyCall({
+      safeAddress: getAddress(agent.wallet_address),
+      sessionKeyAddress: encryptedSession.address,
+      validUntil,
+    });
+    const safeCalls = [];
+
+    if (currentSession?.address && currentSession.validUntil && modules?.sessionSalt) {
+      const storedSession = buildStoredSafe7579Session({
+        sessionKeyAddress: getAddress(currentSession.address),
+        sessionKeyValidAfter: currentSession.rotatedAt
+          ? Math.floor(new Date(currentSession.rotatedAt).getTime() / 1000)
+          : undefined,
+        sessionKeyValidUntil: Math.floor(new Date(currentSession.validUntil).getTime() / 1000),
+        policy,
+        modules,
+      });
+      safeCalls.push(buildRemoveSessionCall(getSafe7579SessionPermissionId(storedSession)));
+    }
+
+    safeCalls.push(buildEnableSessionCall(sessionDefinition));
+
+    const prepared = await prepareAgentWalletExecution({
+      safeAddress: getAddress(agent.wallet_address),
+      calls: safeCalls,
+    });
+    const enableSessionDetails = await getSafe7579EnableSessionDetails({
+      safeAddress: getAddress(agent.wallet_address),
+      session: sessionDefinition,
+    });
+
+    return NextResponse.json({
+      agentId: id,
+      sessionKeyAddress: encryptedSession.address,
+      sessionKeyExpiresAt: new Date(validUntil * 1000).toISOString(),
+      pendingSession: {
+        address: encryptedSession.address,
+        ciphertext: encryptedSession.ciphertext,
+        nonce: encryptedSession.nonce,
+        tag: encryptedSession.tag,
+        validUntil: new Date(validUntil * 1000).toISOString(),
+        rotatedAt: new Date(validAfter * 1000).toISOString(),
+        sessionSalt: sessionDefinition.salt,
+      },
+      safeTxHash: prepared.safeTxHash,
+      txData: prepared.txData,
+      chainId: prepared.chainId,
+      safeVersion: prepared.safeVersion,
+      managerCall: serializeCall(rotateCall),
+      enableSessionHash: enableSessionDetails.permissionEnableHash,
+      enableSessionTypedData: enableSessionDetails.enableSessionTypedData,
+      enableSessionContext: serializeSafe7579EnableSessionData(enableSessionDetails.enableSessionData),
+    });
+  } catch (prepareError) {
+    const message = prepareError instanceof Error ? prepareError.message : 'Failed to prepare the Safe7579 session key';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  safeCalls.push(buildEnableSessionCall(sessionDefinition));
-
-  const prepared = await prepareAgentWalletExecution({
-    safeAddress: getAddress(agent.wallet_address),
-    calls: safeCalls,
-  });
-  const enableSessionDetails = await getSafe7579EnableSessionDetails({
-    safeAddress: getAddress(agent.wallet_address),
-    session: sessionDefinition,
-  });
-
-  return NextResponse.json({
-    agentId: id,
-    sessionKeyAddress: encryptedSession.address,
-    sessionKeyExpiresAt: new Date(validUntil * 1000).toISOString(),
-    pendingSession: {
-      address: encryptedSession.address,
-      ciphertext: encryptedSession.ciphertext,
-      nonce: encryptedSession.nonce,
-      tag: encryptedSession.tag,
-      validUntil: new Date(validUntil * 1000).toISOString(),
-      rotatedAt: new Date(validAfter * 1000).toISOString(),
-      sessionSalt: sessionDefinition.salt,
-    },
-    safeTxHash: prepared.safeTxHash,
-    txData: prepared.txData,
-    chainId: prepared.chainId,
-    safeVersion: prepared.safeVersion,
-    managerCall: serializeCall(rotateCall),
-    enableSessionHash: enableSessionDetails.permissionEnableHash,
-    enableSessionTypedData: enableSessionDetails.enableSessionTypedData,
-  });
 }
