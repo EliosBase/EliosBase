@@ -7,6 +7,7 @@ import {
   buildEnableSessionCall,
   buildRemoveSessionCall,
   buildRotateSessionKeyCall,
+  getSafe7579EnableSessionDetails,
   buildSafe7579Policy,
   buildSessionDefinition,
   buildStoredSafe7579Session,
@@ -114,6 +115,10 @@ export async function POST(
     safeAddress: getAddress(agent.wallet_address),
     calls: safeCalls,
   });
+  const enableSessionDetails = await getSafe7579EnableSessionDetails({
+    safeAddress: getAddress(agent.wallet_address),
+    session: sessionDefinition,
+  });
 
   return NextResponse.json({
     agentId: id,
@@ -133,5 +138,6 @@ export async function POST(
     chainId: prepared.chainId,
     safeVersion: prepared.safeVersion,
     managerCall: serializeCall(rotateCall),
+    enableSessionHash: enableSessionDetails.permissionEnableHash,
   });
 }

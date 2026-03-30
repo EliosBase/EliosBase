@@ -21,6 +21,7 @@ import { ESCROW_CONTRACT_ADDRESS, VERIFIER_CONTRACT_ADDRESS } from '@/lib/contra
 import { getBaseRpcUrl, getMaxPendingNonce } from '@/lib/baseRpc';
 import { readEnv, readIntEnv, readRequiredEnv } from '@/lib/env';
 import {
+  estimateGasLimitWithHeadroom,
   getPendingEip1559TxParams,
   isUnderpricedTransactionError,
 } from '@/lib/txFees';
@@ -243,9 +244,17 @@ async function sendPolicySignerTransaction(
     );
 
     try {
+      const gas = await estimateGasLimitWithHeadroom(publicClient, {
+        account: address as `0x${string}`,
+        to: request.to as `0x${string}`,
+        value: request.value,
+        data: request.data as `0x${string}`,
+      });
+
       return await walletClient.sendTransaction({
         ...request,
         ...tx,
+        gas,
         chain,
       });
     } catch (error) {

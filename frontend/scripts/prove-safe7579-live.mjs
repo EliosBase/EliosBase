@@ -109,9 +109,16 @@ async function main() {
   const preparedSession = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/session/rotate`);
   logStep('signing session rotation');
   const sessionSignature = await signPreparedSafeExecution(ownerPrivateKey, safeAddress, preparedSession);
+  if (!preparedSession.enableSessionHash) {
+    throw new Error('Safe7579 session enable hash is missing from the rotation payload');
+  }
+  const enableSessionSignature = await owner.signMessage({
+    message: { raw: preparedSession.enableSessionHash },
+  });
   logStep('executing session rotation');
   const enabledSession = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/session/execute`, {
     ownerSignature: sessionSignature,
+    enableSessionSignature,
     txData: preparedSession.txData,
     pendingSession: preparedSession.pendingSession,
   });
@@ -527,9 +534,17 @@ async function sendPolicyTransaction(walletClient, address, request) {
     const tx = await getPendingEip1559TxParams(address, attempt);
 
     try {
+      const gas = ceilRatio(await publicClient.estimateGas({
+        account: address,
+        to: request.to,
+        value: request.value,
+        data: request.data,
+      }), 15n, 10n);
+
       return await walletClient.sendTransaction({
         ...request,
         ...tx,
+        gas,
       });
     } catch (error) {
       if (attempt === 2 || !isUnderpricedTransactionError(error)) {
@@ -555,7 +570,7 @@ async function getPendingEip1559TxParams(address, attempt = 0) {
 
   let maxPriorityFeePerGas = max(
     estimatedPriorityFee,
-    1_000_000_000n * multiplier,
+    1_000_000n * multiplier,
   );
   let maxFeePerGas = max(
     estimatedMaxFee,

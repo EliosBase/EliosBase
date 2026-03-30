@@ -4,6 +4,7 @@ import {
   SafeHookType,
   encodeModuleInstallationData,
   getAccount,
+  getEnableSessionDetails as getModuleEnableSessionDetails,
   getEnableSessionsAction,
   getOwnableValidator,
   getPermissionId,
@@ -15,6 +16,7 @@ import {
   moduleTypeIds,
   type Session,
 } from '@rhinestone/module-sdk';
+import { SMART_SESSION_EMISSARY_ADDRESS } from '@rhinestone/sdk/smart-sessions';
 import {
   concatHex,
   encodeFunctionData,
@@ -241,6 +243,55 @@ export function buildEnableSessionCall(session: Session) {
     value: BigInt(action.value.toString()),
     data: hexOrEmpty(action.data),
   };
+}
+
+export async function getSafe7579EnableSessionDetails(params: {
+  safeAddress: Address;
+  session: Session;
+}) {
+  const account = getAccount({
+    address: getAddress(params.safeAddress),
+    type: 'safe',
+    deployedOnChains: [safeWalletChain.id],
+  });
+  const details = await getModuleEnableSessionDetails({
+    sessions: [params.session],
+    account,
+    clients: [safe7579PublicClient as never],
+    enableValidatorAddress: SAFE_7579_OWNER_VALIDATOR_ADDRESS,
+  });
+
+  return {
+    permissionEnableHash: details.permissionEnableHash,
+    permissionId: details.permissionId,
+    enableSessionData: details.enableSessionData,
+  };
+}
+
+export async function readSafe7579EmissarySessionEnabled(params: {
+  safeAddress: Address;
+  session: Session;
+}) {
+  return safe7579PublicClient.readContract({
+    address: getAddress(SMART_SESSION_EMISSARY_ADDRESS),
+    abi: [
+      {
+        type: 'function',
+        name: 'isPermissionEnabled',
+        inputs: [
+          { name: 'account', type: 'address' },
+          { name: 'permissionId', type: 'bytes32' },
+        ],
+        outputs: [{ name: 'isEnabled', type: 'bool' }],
+        stateMutability: 'view',
+      },
+    ],
+    functionName: 'isPermissionEnabled',
+    args: [
+      getAddress(params.safeAddress),
+      getSafe7579SessionPermissionId(params.session),
+    ],
+  });
 }
 
 export function buildRemoveSessionCall(permissionId: Hex) {

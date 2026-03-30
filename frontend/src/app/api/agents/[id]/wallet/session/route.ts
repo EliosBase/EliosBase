@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAddress } from 'viem';
 import { getAccount, isSessionEnabled } from '@rhinestone/module-sdk';
 import { createServiceClient } from '@/lib/supabase/server';
-import { buildStoredSafe7579Session, getSafe7579SessionPermissionId, safe7579PublicClient, safeWalletChain } from '@/lib/agentWallet7579';
+import {
+  buildStoredSafe7579Session,
+  getSafe7579SessionPermissionId,
+  readSafe7579EmissarySessionEnabled,
+  safe7579PublicClient,
+  safeWalletChain,
+} from '@/lib/agentWallet7579';
 import { getAgentWalletMigrationState, getAgentWalletModules, getAgentWalletSession, getAgentWalletStandard } from '@/lib/agentWalletCompat';
 import { getSession } from '@/lib/session';
 
@@ -32,6 +38,8 @@ export async function GET(
   }
 
   let sessionEnabled: boolean | null = null;
+  let moduleSessionEnabled: boolean | null = null;
+  let emissarySessionEnabled: boolean | null = null;
   let permissionId: `0x${string}` | null = null;
   const walletStandard = getAgentWalletStandard(agent);
   const migrationState = getAgentWalletMigrationState(agent);
@@ -64,13 +72,20 @@ export async function GET(
       });
 
       permissionId = getSafe7579SessionPermissionId(storedSession);
-      sessionEnabled = await isSessionEnabled({
+      moduleSessionEnabled = await isSessionEnabled({
         client: safe7579PublicClient as never,
         account,
         permissionId,
       });
+      emissarySessionEnabled = await readSafe7579EmissarySessionEnabled({
+        safeAddress: getAddress(agent.wallet_address),
+        session: storedSession,
+      });
+      sessionEnabled = Boolean(moduleSessionEnabled && emissarySessionEnabled);
     } catch {
       sessionEnabled = false;
+      moduleSessionEnabled = false;
+      emissarySessionEnabled = false;
     }
   }
 
@@ -84,5 +99,7 @@ export async function GET(
     sessionKeyRotatedAt: sessionState?.rotatedAt,
     sessionPermissionId: permissionId,
     sessionEnabled,
+    moduleSessionEnabled,
+    emissarySessionEnabled,
   });
 }

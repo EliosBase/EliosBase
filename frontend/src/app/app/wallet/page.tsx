@@ -34,6 +34,7 @@ type PreparedExecution = {
 };
 
 type PreparedSessionExecution = PreparedExecution & {
+  enableSessionHash?: string;
   pendingSession?: {
     address: string;
     ciphertext: string;
@@ -206,6 +207,22 @@ export default function WalletPage() {
       ?? null;
   }
 
+  async function signEnableSessionHash(enableSessionHash: string) {
+    if (!session?.walletAddress) {
+      throw new Error('Sign in with the Safe owner wallet first.');
+    }
+
+    const injected = getInjectedProvider(window as Window & WalletWindow, 'metaMask');
+    if (!injected?.request) {
+      throw new Error('MetaMask is required to authorize the Smart Sessions validator.');
+    }
+
+    return injected.request({
+      method: 'personal_sign',
+      params: [enableSessionHash, getAddress(session.walletAddress)],
+    }) as Promise<string>;
+  }
+
   async function handleSafeTransferSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedAgent) {
@@ -340,17 +357,22 @@ export default function WalletPage() {
     if (!prepared.pendingSession) {
       throw new Error('Pending Safe7579 session metadata is missing.');
     }
+    if (!prepared.enableSessionHash) {
+      throw new Error('Safe7579 session enable hash is missing.');
+    }
 
     const ownerSignature = await signPreparedSafeExecution(safeAddress, prepared);
     if (!ownerSignature) {
       throw new Error('MetaMask signed the session transaction, but Elios could not read the owner signature.');
     }
+    const enableSessionSignature = await signEnableSessionHash(prepared.enableSessionHash);
 
     const executeRes = await fetch(`/api/agents/${agentId}/wallet/session/execute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ownerSignature,
+        enableSessionSignature,
         txData: prepared.txData,
         pendingSession: prepared.pendingSession,
       }),

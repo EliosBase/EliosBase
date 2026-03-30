@@ -1,4 +1,4 @@
-const MIN_PRIORITY_FEE_PER_GAS = 1_000_000_000n;
+const MIN_PRIORITY_FEE_PER_GAS = 1_000_000n;
 
 type FeeClient = {
   estimateFeesPerGas(args: { type: 'eip1559' }): Promise<{
@@ -12,6 +12,15 @@ type FeeClient = {
     address: `0x${string}`;
     blockTag: 'pending';
   }): Promise<number>;
+};
+
+type GasEstimateClient = {
+  estimateGas(args: {
+    account?: `0x${string}`;
+    to: `0x${string}`;
+    value?: bigint;
+    data?: `0x${string}`;
+  }): Promise<bigint>;
 };
 
 export type Eip1559Fees = {
@@ -66,6 +75,21 @@ export function isUnderpricedTransactionError(error: unknown) {
   return normalized.includes('underpriced')
     || normalized.includes('replacement transaction underpriced')
     || normalized.includes('fee too low');
+}
+
+export async function estimateGasLimitWithHeadroom(
+  client: GasEstimateClient,
+  request: {
+    account?: `0x${string}`;
+    to: `0x${string}`;
+    value?: bigint;
+    data?: `0x${string}`;
+  },
+  numerator = 15n,
+  denominator = 10n,
+) {
+  const gas = await client.estimateGas(request);
+  return ceilRatio(gas, numerator, denominator);
 }
 
 function ceilRatio(value: bigint, numerator: bigint, denominator: bigint) {
