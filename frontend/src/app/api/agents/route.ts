@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createPublicServerClient } from '@/lib/supabase/server';
 import { toAgent } from '@/lib/transforms';
+import { parsePagination } from '@/lib/pagination';
+import { jsonWithCache, PUBLIC_COLLECTION_CACHE_CONTROL } from '@/lib/httpCache';
 
 export async function GET(req: NextRequest) {
-  const supabase = createServiceClient();
+  const supabase = createPublicServerClient();
   const { searchParams } = req.nextUrl;
+  const { limit, offset } = parsePagination(searchParams);
 
   let query = supabase.from('agents').select('*');
 
@@ -19,11 +22,13 @@ export async function GET(req: NextRequest) {
     query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
   }
 
-  const { data, error } = await query.order('reputation', { ascending: false });
+  const { data, error } = await query
+    .order('reputation', { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data.map(toAgent));
+  return jsonWithCache(data.map(toAgent), PUBLIC_COLLECTION_CACHE_CONTROL);
 }

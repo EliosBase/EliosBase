@@ -24,6 +24,7 @@ import {
   mergeSafe7579Compatibility,
 } from '@/lib/agentWalletCompat';
 import { executeAgentWalletExecution, type AgentWalletTransactionData } from '@/lib/agentWallets';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 type PendingSessionPayload = {
   address: string;
@@ -61,6 +62,9 @@ export async function POST(
   if (!session.userId || !session.walletAddress) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.walletMutation, session.userId);
+  if (rateLimitError) return rateLimitError;
 
   const body = await req.json().catch(() => ({}));
   const ownerSignature = body.ownerSignature as Hex | undefined;

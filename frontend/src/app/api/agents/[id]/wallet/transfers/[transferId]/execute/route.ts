@@ -18,6 +18,7 @@ import {
   inferTransferExecutionMode,
   isMigratedSafe7579,
 } from '@/lib/agentWalletCompat';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 function isSafeTxData(value: unknown): value is AgentWalletTransactionData {
   if (!value || typeof value !== 'object') {
@@ -48,6 +49,9 @@ export async function POST(
   if (!session.userId || !session.walletAddress) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.walletTransferMutation, session.userId);
+  if (rateLimitError) return rateLimitError;
 
   const body = await req.json().catch(() => ({}));
   const ownerSignature = String(body.ownerSignature ?? '').trim();

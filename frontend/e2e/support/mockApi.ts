@@ -43,8 +43,8 @@ const defaultSecurityStats = {
   guardrailsTrend: '+1',
   proofsVerified: 98,
   proofsTrend: '+8%',
-  uptime: '99.98%',
-  uptimeTrend: '+0.02%',
+  auditEntries: 4721,
+  auditEntriesTrend: '41 today',
 };
 
 const defaultDashboardStats = {

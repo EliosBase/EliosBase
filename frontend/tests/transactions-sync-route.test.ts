@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  createServiceClient: vi.fn(),
+  createUserServerClient: vi.fn(),
+  enforceRateLimit: vi.fn(),
   generateId: vi.fn(() => 'tx-1'),
   getSession: vi.fn(),
   getTransactionReceipt: vi.fn(),
@@ -13,7 +14,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
-  createServiceClient: mocks.createServiceClient,
+  createUserServerClient: mocks.createUserServerClient,
 }));
 
 vi.mock('@/lib/session', () => ({
@@ -37,6 +38,14 @@ vi.mock('@/lib/viemClient', () => ({
   },
 }));
 
+vi.mock('@/lib/rateLimit', () => ({
+  RATE_LIMITS: {
+    transactionSyncRead: {},
+    transactionSyncWrite: {},
+  },
+  enforceRateLimit: mocks.enforceRateLimit,
+}));
+
 const route = await import('@/app/api/transactions/sync/route');
 
 function makePostRequest(body: Record<string, unknown>) {
@@ -47,9 +56,14 @@ function makePostRequest(body: Record<string, unknown>) {
   });
 }
 
+function makeGetRequest() {
+  return new NextRequest('https://eliosbase.test/api/transactions/sync');
+}
+
 describe('transactions sync routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.enforceRateLimit.mockResolvedValue(null);
   });
 
   it('returns 401 for unauthenticated POST requests', async () => {
@@ -77,7 +91,7 @@ describe('transactions sync routes', () => {
 
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
     mocks.verifyOnchainTransaction.mockResolvedValue({ txStatus: 'confirmed', blockNumber: 42 });
-    mocks.createServiceClient.mockReturnValue({
+    mocks.createUserServerClient.mockReturnValue({
       from: vi.fn(() => ({
         insert: vi.fn((payload: Record<string, unknown>) => {
           insertedPayload = payload;
@@ -138,7 +152,7 @@ describe('transactions sync routes', () => {
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
     mocks.verifyOnchainTransaction.mockResolvedValue({ txStatus: 'confirmed', blockNumber: 42 });
 
-    mocks.createServiceClient.mockReturnValue({
+    mocks.createUserServerClient.mockReturnValue({
       from: vi.fn(() => ({
         insert: vi.fn((payload: Record<string, unknown>) => {
           insertPayloads.push(payload);
@@ -207,6 +221,41 @@ describe('transactions sync routes', () => {
     ]);
   });
 
+  it('ignores caller-supplied transaction status and persists the verified on-chain status', async () => {
+    let insertedPayload: Record<string, unknown> | undefined;
+
+    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
+    mocks.verifyOnchainTransaction.mockResolvedValue({ txStatus: 'pending', blockNumber: null });
+    mocks.createUserServerClient.mockReturnValue({
+      from: vi.fn(() => ({
+        insert: vi.fn((payload: Record<string, unknown>) => {
+          insertedPayload = payload;
+          return {
+            select: vi.fn(() => ({
+              single: vi.fn(async () => ({
+                data: { ...payload, timestamp: '2026-03-24T12:00:00.000Z' },
+                error: null,
+              })),
+            })),
+          };
+        }),
+      })),
+    });
+
+    const response = await route.POST(makePostRequest({
+      type: 'payment',
+      from: '0xabc',
+      to: '0xdef',
+      amount: '0.1 ETH',
+      token: 'ETH',
+      txHash: '0x1234',
+      status: 'confirmed',
+    }));
+
+    expect(response.status).toBe(201);
+    expect(insertedPayload?.status).toBe('pending');
+  });
+
   it('rejects a transaction sync when the sender does not match the session wallet', async () => {
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
 
@@ -228,7 +277,7 @@ describe('transactions sync routes', () => {
   it('returns 401 for unauthenticated batch sync requests', async () => {
     mocks.getSession.mockResolvedValue({});
 
-    const response = await route.GET();
+    const response = await route.GET(makeGetRequest());
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
@@ -247,12 +296,17 @@ describe('transactions sync routes', () => {
       .mockResolvedValueOnce({ status: 'success', blockNumber: 10n })
       .mockResolvedValueOnce({ status: 'reverted' })
       .mockRejectedValueOnce(new Error('pending'));
-    mocks.createServiceClient.mockReturnValue({
+    const eqUserId = vi.fn(() => ({
+      order: vi.fn(async () => ({ data: pending, error: null })),
+    }));
+    const eqStatus = vi.fn(() => ({
+      eq: eqUserId,
+    }));
+
+    mocks.createUserServerClient.mockReturnValue({
       from: vi.fn(() => ({
         select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            order: vi.fn(async () => ({ data: pending, error: null })),
-          })),
+          eq: eqStatus,
         })),
         update: vi.fn((payload: Record<string, unknown>) => {
           updates.push(payload);
@@ -263,7 +317,7 @@ describe('transactions sync routes', () => {
       })),
     });
 
-    const response = await route.GET();
+    const response = await route.GET(makeGetRequest());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -277,6 +331,8 @@ describe('transactions sync routes', () => {
       { status: 'confirmed', block_number: 10 },
       { status: 'failed' },
     ]);
+    expect(eqStatus).toHaveBeenCalledWith('status', 'pending');
+    expect(eqUserId).toHaveBeenCalledWith('user_id', 'user-1');
   });
 
   it('retries the batch update without block_number when the live schema is missing that column', async () => {
@@ -284,12 +340,17 @@ describe('transactions sync routes', () => {
 
     mocks.getSession.mockResolvedValue({ userId: 'user-1' });
     mocks.getTransactionReceipt.mockResolvedValueOnce({ status: 'success', blockNumber: 10n });
-    mocks.createServiceClient.mockReturnValue({
+    const eqUserId = vi.fn(() => ({
+      order: vi.fn(async () => ({ data: [{ id: 'tx-1', tx_hash: '0xaaa' }], error: null })),
+    }));
+    const eqStatus = vi.fn(() => ({
+      eq: eqUserId,
+    }));
+
+    mocks.createUserServerClient.mockReturnValue({
       from: vi.fn(() => ({
         select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            order: vi.fn(async () => ({ data: [{ id: 'tx-1', tx_hash: '0xaaa' }], error: null })),
-          })),
+          eq: eqStatus,
         })),
         update: vi.fn((payload: Record<string, unknown>) => {
           updates.push(payload);
@@ -308,12 +369,13 @@ describe('transactions sync routes', () => {
       })),
     });
 
-    const response = await route.GET();
+    const response = await route.GET(makeGetRequest());
 
     expect(response.status).toBe(200);
     expect(updates).toEqual([
       { status: 'confirmed', block_number: 10 },
       { status: 'confirmed' },
     ]);
+    expect(eqUserId).toHaveBeenCalledWith('user_id', 'user-1');
   });
 });

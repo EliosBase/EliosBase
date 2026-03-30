@@ -21,9 +21,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          status=$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.security_and_analysis.dependency_graph.status // ""' 2>/dev/null || true)
+          status=$(gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/sbom" --jq '.sbom.spdxVersion // ""' 2>/dev/null || true)
 
-          if [ "$status" = "enabled" ]; then
+          if [ -n "$status" ]; then
             echo "enabled=true" >>"$GITHUB_OUTPUT"
             exit 0
           fi
@@ -43,6 +43,8 @@ jobs:
           fail-on-severity: high
           fail-on-scopes: runtime
 
-      - name: Skip when dependency graph is unavailable
+      - name: Require dependency graph support
         if: steps.support.outputs.enabled != 'true'
-        run: echo "Dependency graph is disabled for this repository; skipping dependency review."
+        run: |
+          echo "GitHub dependency graph must be enabled for dependency-review to run." >&2
+          exit 1

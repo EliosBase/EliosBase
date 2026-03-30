@@ -49,3 +49,8 @@ jobs:
           SMOKE_TASK_ID: ${{ inputs.task_id }}
           SMOKE_CRON_SECRET: ${{ secrets.SMOKE_CRON_SECRET }}
           SMOKE_SESSION_COOKIE: ${{ secrets.SMOKE_SESSION_COOKIE }}
+          SMOKE_SIWE_PRIVATE_KEY: ${{ secrets.SMOKE_SIWE_PRIVATE_KEY }}
+          SMOKE_AGENT_ID: ${{ secrets.SMOKE_AGENT_ID }}
+          SMOKE_TASK_CREATE_BODY: ${{ secrets.SMOKE_TASK_CREATE_BODY }}
+          SMOKE_HIRE_BODY: ${{ secrets.SMOKE_HIRE_BODY }}
+          SMOKE_TX_SYNC_BODY: ${{ secrets.SMOKE_TX_SYNC_BODY }}

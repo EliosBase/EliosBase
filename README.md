@@ -115,6 +115,7 @@ Core runtime variables:
 | `NEXT_PUBLIC_ESCROW_ADDRESS` | Yes | Deployed `EliosEscrow` address |
 | `NEXT_PUBLIC_VERIFIER_ADDRESS` | Yes | Deployed `EliosProofVerifier` address |
 | `PROOF_SUBMITTER_PRIVATE_KEY` | Yes | Signer used for proof submission |
+| `SAFE_POLICY_SIGNER_PRIVATE_KEY` | Recommended | Dedicated signer for Safe policy and migration execution |
 | `NEXT_PUBLIC_SITE_URL` | Yes | Canonical site URL used for origin validation |
 | `CRON_SECRET` | Yes | Authorization for cron routes |
 | `ANTHROPIC_API_KEY` | Yes | AI task execution backend |
@@ -123,14 +124,16 @@ Operationally important variables:
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
+| `UPSTASH_REDIS_REST_URL` | Yes | Upstash Redis REST URL for request rate limiting |
+| `UPSTASH_REDIS_REST_TOKEN` | Yes | Upstash Redis REST token for request rate limiting |
 | `ALERT_WEBHOOK_URL` | No | Alert delivery integration |
 | `SIGNER_MIN_BALANCE_ETH` | No | Low-balance alert threshold |
 | `AGENT_EXECUTION_TIMEOUT_MS` | No | Task execution timeout |
 | `AI_SPEND_CEILING_CENTS` | No | AI spending guardrail |
-| `NEXT_PUBLIC_SENTRY_DSN` | No | Runtime Sentry DSN for browser/server error capture |
-| `SENTRY_AUTH_TOKEN` | No | Uploads Sentry source maps during production builds |
-| `SENTRY_ORG` | No | Sentry org for source map upload |
-| `SENTRY_PROJECT` | No | Sentry project for source map upload |
+| `NEXT_PUBLIC_SENTRY_DSN` | Yes | Runtime Sentry DSN for browser/server error capture |
+| `SENTRY_AUTH_TOKEN` | Yes | Uploads Sentry source maps during production builds |
+| `SENTRY_ORG` | Yes | Sentry org for source map upload |
+| `SENTRY_PROJECT` | Yes | Sentry project for source map upload |
 | `NEXT_PUBLIC_E2E_MODE` | No | Enables browser test shims |
 
 ## Validation
@@ -151,6 +154,15 @@ Live smoke:
 cd frontend
 SMOKE_BASE_URL=https://eliosbase.net npm run smoke:real
 ```
+
+Public launch smoke now expects:
+
+- `/api/health` and `/api/ready` to pass
+- public auth nonce issuance and optional SIWE login coverage
+- public legal pages at `/privacy`, `/terms`, and `/support`
+- authenticated security stats to return `auditEntries`
+- cron routes to reject unauthorized requests before accepting signed ones
+- optional authenticated smoke coverage for wallet session state, wallet transfers, task creation, verified hire, and transaction sync when the matching `SMOKE_*` secrets are configured in GitHub Actions
 
 Contract tests:
 
@@ -181,7 +193,7 @@ The production web app is the [`frontend/`](frontend) project and is deployed on
 - Primary chain target: Base mainnet
 - The repo now uses separate CI, code scanning, dependency review, and post-deploy smoke workflows rather than one overloaded validation job
 
-If you want production-grade debugging, set `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, and `SENTRY_PROJECT` before building in Vercel. Without them, builds still succeed, but source maps are not uploaded.
+Public GA requires Sentry source map upload and Upstash-backed rate limiting. `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN` must be configured in production.
 
 Operational reference docs:
 
@@ -210,6 +222,12 @@ What is still missing from a polished open-source program:
 - Maintainer and support ownership is still lightweight for a public launch
 
 The repository now includes an Apache 2.0 license plus contribution, security, and conduct policy docs.
+
+Hosted-service policy pages:
+
+- [`frontend/src/app/privacy/page.tsx`](frontend/src/app/privacy/page.tsx)
+- [`frontend/src/app/terms/page.tsx`](frontend/src/app/terms/page.tsx)
+- [`frontend/src/app/support/page.tsx`](frontend/src/app/support/page.tsx)
 
 ## Contributing
 

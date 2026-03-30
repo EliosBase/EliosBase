@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createUserServerClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
-import { createPublicClient, http, formatEther } from 'viem';
-import { base } from 'viem/chains';
+import { formatEther } from 'viem';
 import { normalizeTransactionType } from '@/lib/transactions';
+import { publicClient } from '@/lib/viemClient';
 
 // GET /api/wallet/stats — live wallet statistics for the authenticated user
 export async function GET() {
@@ -12,17 +12,13 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createServiceClient();
+  const supabase = createUserServerClient();
   const walletAddress = session.walletAddress as `0x${string}`;
 
   // Fetch on-chain ETH balance from Base network
   let ethBalance = '0';
   try {
-    const client = createPublicClient({
-      chain: base,
-      transport: http(),
-    });
-    const balanceWei = await client.getBalance({ address: walletAddress });
+    const balanceWei = await publicClient.getBalance({ address: walletAddress });
     ethBalance = parseFloat(formatEther(balanceWei)).toFixed(4);
   } catch {
     // If RPC fails, fall back to 0

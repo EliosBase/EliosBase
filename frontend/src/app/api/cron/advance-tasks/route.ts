@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readEnv } from '@/lib/env';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getConfiguredCronSecret, getConfiguredSiteUrl, isProductionRuntime } from '@/lib/runtimeConfig';
 
 // GET /api/cron/advance-tasks — batch-advance all eligible active tasks
 // Can be called by Vercel cron, external scheduler, or manual trigger
 export async function GET(req: NextRequest) {
-  // Verify cron secret in production
-  const cronSecret = readEnv(process.env.CRON_SECRET);
+  const cronSecret = getConfiguredCronSecret();
+  if (!cronSecret && isProductionRuntime()) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+  }
+
   if (cronSecret) {
     const authHeader = req.headers.get('authorization');
     if (authHeader !== `Bearer ${cronSecret}`) {
@@ -30,8 +34,7 @@ export async function GET(req: NextRequest) {
 
   for (const task of tasks) {
     try {
-      // Call the individual advance endpoint internally
-      const baseUrl = readEnv(process.env.NEXT_PUBLIC_SITE_URL) || 'http://localhost:3000';
+      const baseUrl = getConfiguredSiteUrl() || readEnv(process.env.NEXT_PUBLIC_SITE_URL) || 'http://localhost:3000';
       const res = await fetch(`${baseUrl}/api/tasks/${task.id}/advance`, {
         method: 'POST',
         headers: cronSecret ? { authorization: `Bearer ${cronSecret}` } : undefined,

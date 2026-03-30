@@ -29,6 +29,10 @@ const footerLinks = [
     links: [
       { label: "Launch App", href: "/app" },
       { label: "Marketplace", href: "/app/marketplace" },
+      { label: "Privacy", href: "/privacy" },
+      { label: "Terms", href: "/terms" },
+      { label: "Support", href: "/support" },
+      { label: "Security", href: "/support#security" },
     ],
   },
 ];

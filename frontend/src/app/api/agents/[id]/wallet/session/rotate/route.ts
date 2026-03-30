@@ -19,6 +19,7 @@ import {
 import { generateEncryptedSessionKey } from '@/lib/agentWalletSecrets';
 import { prepareAgentWalletExecution } from '@/lib/agentWallets';
 import { getAgentWalletMigrationState, getAgentWalletModules, getAgentWalletSession, getAgentWalletStandard } from '@/lib/agentWalletCompat';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 function serializeCall(call: { to: string; value: { toString(): string }; data: string }) {
   return {
@@ -41,6 +42,9 @@ export async function POST(
   if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.walletMutation, session.userId);
+  if (rateLimitError) return rateLimitError;
 
   if (!SAFE_7579_POLICY_MANAGER_ADDRESS) {
     return NextResponse.json({ error: 'Safe7579 policy manager is not configured' }, { status: 500 });

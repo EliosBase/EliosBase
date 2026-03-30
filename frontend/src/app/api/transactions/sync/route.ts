@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createUserServerClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { toTransaction } from '@/lib/transforms';
 import { logAudit, logActivity, txTypeToAuditAction, generateId } from '@/lib/audit';
 import { publicClient } from '@/lib/viemClient';
 import { insertTransactionRecord, updateTransactionRecord } from '@/lib/transactions';
 import { verifyOnchainTransaction } from '@/lib/transactionVerification';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 // POST /api/transactions/sync — store a new transaction with on-chain verification
 export async function POST(req: NextRequest) {
@@ -13,6 +14,9 @@ export async function POST(req: NextRequest) {
   if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.transactionSyncWrite, session.userId);
+  if (rateLimitError) return rateLimitError;
 
   const body = await req.json();
 
@@ -44,7 +48,7 @@ export async function POST(req: NextRequest) {
     throw error;
   }
 
-  const supabase = createServiceClient();
+  const supabase = createUserServerClient();
   const id = generateId('tx');
   const { data, error } = await insertTransactionRecord(supabase, {
     id,
@@ -53,7 +57,7 @@ export async function POST(req: NextRequest) {
     to: body.to,
     amount: body.amount,
     token: body.token,
-    status: body.status || txStatus,
+    status: txStatus,
     tx_hash: body.txHash,
     user_id: session.userId,
     block_number: blockNumber,
@@ -71,19 +75,22 @@ export async function POST(req: NextRequest) {
 }
 
 // GET /api/transactions/sync — batch-verify all pending transactions on-chain
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createServiceClient();
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.transactionSyncRead, session.userId);
+  if (rateLimitError) return rateLimitError;
 
-  // Fetch all pending transactions
+  const supabase = createUserServerClient();
+
   const { data: pending, error: fetchError } = await supabase
     .from('transactions')
     .select('*')
     .eq('status', 'pending')
+    .eq('user_id', session.userId)
     .order('timestamp', { ascending: true });
 
   if (fetchError || !pending) {

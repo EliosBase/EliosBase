@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  createServiceClient: vi.fn(),
+  createUserServerClient: vi.fn(),
+  enforceRateLimit: vi.fn(),
   generateId: vi.fn(() => 'tx-1'),
   getSession: vi.fn(),
   logActivity: vi.fn(),
@@ -12,7 +13,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
-  createServiceClient: mocks.createServiceClient,
+  createUserServerClient: mocks.createUserServerClient,
 }));
 
 vi.mock('@/lib/session', () => ({
@@ -31,6 +32,13 @@ vi.mock('@/lib/transactionVerification', () => ({
 
 vi.mock('@/lib/csrf', () => ({
   validateOrigin: mocks.validateOrigin,
+}));
+
+vi.mock('@/lib/rateLimit', () => ({
+  RATE_LIMITS: {
+    hireAgent: {},
+  },
+  enforceRateLimit: mocks.enforceRateLimit,
 }));
 
 vi.mock('@/lib/contracts', () => ({
@@ -67,6 +75,7 @@ function makeSupabaseBuilder(
     return { error: options.insertError ?? null };
   });
   builder.eq = vi.fn(() => builder);
+  builder.is = vi.fn(() => builder);
   builder.single = vi.fn(async () => result);
 
   return builder;
@@ -89,6 +98,7 @@ describe('POST /api/agents/[id]/hire', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.validateOrigin.mockReturnValue(null);
+    mocks.enforceRateLimit.mockResolvedValue(null);
   });
 
   it('returns 401 without an authenticated session', async () => {
@@ -112,11 +122,23 @@ describe('POST /api/agents/[id]/hire', () => {
   it('rejects transactions sent to the wrong contract', async () => {
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
     mocks.verifyEscrowActionTransaction.mockRejectedValue(new Error('Transaction is not to the escrow contract'));
-    mocks.createServiceClient.mockReturnValue(
+    mocks.createUserServerClient.mockReturnValue(
       makeSupabaseClient({
         agents: [
           makeSupabaseBuilder({
             data: { id: 'agent-1', name: 'Audit Sentinel', status: 'online', price_per_task: '0.12 ETH' },
+            error: null,
+          }),
+        ],
+        tasks: [
+          makeSupabaseBuilder({
+            data: {
+              id: 'task-1',
+              status: 'active',
+              assigned_agent: null,
+              current_step: 'Submitted',
+              step_changed_at: '2026-03-24T12:00:00.000Z',
+            },
             error: null,
           }),
         ],
@@ -132,11 +154,23 @@ describe('POST /api/agents/[id]/hire', () => {
   it('rejects transactions signed by a different wallet', async () => {
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
     mocks.verifyEscrowActionTransaction.mockRejectedValue(new Error('Transaction sender does not match your wallet'));
-    mocks.createServiceClient.mockReturnValue(
+    mocks.createUserServerClient.mockReturnValue(
       makeSupabaseClient({
         agents: [
           makeSupabaseBuilder({
             data: { id: 'agent-1', name: 'Audit Sentinel', status: 'online', price_per_task: '0.12 ETH' },
+            error: null,
+          }),
+        ],
+        tasks: [
+          makeSupabaseBuilder({
+            data: {
+              id: 'task-1',
+              status: 'active',
+              assigned_agent: null,
+              current_step: 'Submitted',
+              step_changed_at: '2026-03-24T12:00:00.000Z',
+            },
             error: null,
           }),
         ],
@@ -155,7 +189,7 @@ describe('POST /api/agents/[id]/hire', () => {
 
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
     mocks.verifyEscrowActionTransaction.mockResolvedValue({ txStatus: 'pending', blockNumber: null });
-    mocks.createServiceClient.mockReturnValue(
+    mocks.createUserServerClient.mockReturnValue(
       makeSupabaseClient({
         agents: [
           makeSupabaseBuilder({
@@ -169,14 +203,24 @@ describe('POST /api/agents/[id]/hire', () => {
             onUpdate: () => undefined,
           }),
         ],
+        tasks: [
+          makeSupabaseBuilder({
+            data: {
+              id: 'task-1',
+              status: 'active',
+              assigned_agent: null,
+              current_step: 'Submitted',
+              step_changed_at: '2026-03-24T12:00:00.000Z',
+            },
+            error: null,
+          }),
+          makeSupabaseBuilder({ data: { id: 'task-1' }, error: null }, {
+            onUpdate: (payload) => { taskPayload = payload; },
+          }),
+        ],
         transactions: [
           makeSupabaseBuilder({ data: null, error: null }, {
             onInsert: (payload) => { transactionPayload = payload; },
-          }),
-        ],
-        tasks: [
-          makeSupabaseBuilder({ data: null, error: null }, {
-            onUpdate: (payload) => { taskPayload = payload; },
           }),
         ],
       }),
@@ -219,7 +263,7 @@ describe('POST /api/agents/[id]/hire', () => {
 
     mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
     mocks.verifyEscrowActionTransaction.mockResolvedValue({ txStatus: 'confirmed', blockNumber: 42 });
-    mocks.createServiceClient.mockReturnValue(
+    mocks.createUserServerClient.mockReturnValue(
       makeSupabaseClient({
         agents: [
           makeSupabaseBuilder({
@@ -234,6 +278,20 @@ describe('POST /api/agents/[id]/hire', () => {
             onUpdate: (payload) => { rollbackPayload = payload; },
           }),
         ],
+        tasks: [
+          makeSupabaseBuilder({
+            data: {
+              id: 'task-1',
+              status: 'active',
+              assigned_agent: null,
+              current_step: 'Submitted',
+              step_changed_at: '2026-03-24T12:00:00.000Z',
+            },
+            error: null,
+          }),
+          makeSupabaseBuilder({ data: { id: 'task-1' }, error: null }),
+          makeSupabaseBuilder({ data: null, error: null }),
+        ],
         transactions: [
           makeSupabaseBuilder({ data: null, error: null }, {
             insertError: { message: 'db down' },
@@ -247,5 +305,58 @@ describe('POST /api/agents/[id]/hire', () => {
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: 'Failed to record transaction' });
     expect(rollbackPayload).toEqual({ status: 'online' });
+  });
+
+  it('rejects hiring a task owned by another user', async () => {
+    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
+    mocks.createUserServerClient.mockReturnValue(
+      makeSupabaseClient({
+        agents: [
+          makeSupabaseBuilder({
+            data: { id: 'agent-1', name: 'Audit Sentinel', status: 'online', price_per_task: '0.12 ETH' },
+            error: null,
+          }),
+        ],
+        tasks: [
+          makeSupabaseBuilder({ data: null, error: { message: 'not found' } }),
+        ],
+      }),
+    );
+
+    const response = await POST(makeRequest({ txHash: '0x1234', taskId: 'task-1' }), { params: Promise.resolve({ id: 'agent-1' }) });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: 'Task not found' });
+  });
+
+  it('rejects hiring an already assigned task', async () => {
+    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
+    mocks.createUserServerClient.mockReturnValue(
+      makeSupabaseClient({
+        agents: [
+          makeSupabaseBuilder({
+            data: { id: 'agent-1', name: 'Audit Sentinel', status: 'online', price_per_task: '0.12 ETH' },
+            error: null,
+          }),
+        ],
+        tasks: [
+          makeSupabaseBuilder({
+            data: {
+              id: 'task-1',
+              status: 'active',
+              assigned_agent: 'agent-2',
+              current_step: 'Assigned',
+              step_changed_at: '2026-03-24T12:00:00.000Z',
+            },
+            error: null,
+          }),
+        ],
+      }),
+    );
+
+    const response = await POST(makeRequest({ txHash: '0x1234', taskId: 'task-1' }), { params: Promise.resolve({ id: 'agent-1' }) });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: 'Task is already assigned' });
   });
 });
