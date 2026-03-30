@@ -60,7 +60,7 @@ describe('agentWallet7579', () => {
       guardAddress: '0x00000000000000000000000000000000000000ff',
     });
 
-    expect(calls).toHaveLength(6);
+    expect(calls).toHaveLength(7);
     expect(calls.every((call) => typeof call.data === 'string' && call.data.startsWith('0x'))).toBe(true);
   });
 

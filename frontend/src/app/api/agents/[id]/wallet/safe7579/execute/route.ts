@@ -96,6 +96,7 @@ export async function POST(
       fallbackHandlerAddress: modules.adapter ? getAddress(modules.adapter) : undefined,
     });
     const missingChecks = [
+      !installation.ownerValidator ? 'ownerValidator' : null,
       !installation.smartSessionsValidator ? 'smartSessionsValidator' : null,
       !installation.compatibilityFallback ? 'compatibilityFallback' : null,
       !installation.hook ? 'hook' : null,

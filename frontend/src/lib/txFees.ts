@@ -1,4 +1,5 @@
 const MIN_PRIORITY_FEE_PER_GAS = 1_000_000n;
+const L2_DATA_FEE_RESERVE_WEI = 5_000_000_000n;
 
 type FeeClient = {
   estimateFeesPerGas(args: { type: 'eip1559' }): Promise<{
@@ -20,6 +21,9 @@ type GasEstimateClient = {
     to: `0x${string}`;
     value?: bigint;
     data?: `0x${string}`;
+  }): Promise<bigint>;
+  getBalance?(args: {
+    address: `0x${string}`;
   }): Promise<bigint>;
 };
 
@@ -64,6 +68,7 @@ export async function getPendingEip1559TxParams(
 
   return {
     nonce,
+    baseFeePerGas,
     maxFeePerGas,
     maxPriorityFeePerGas,
   };
@@ -92,10 +97,103 @@ export async function estimateGasLimitWithHeadroom(
   return ceilRatio(gas, numerator, denominator);
 }
 
+export async function estimateGasLimitWithinBalance(
+  client: GasEstimateClient,
+  request: {
+    account?: `0x${string}`;
+    to: `0x${string}`;
+    value?: bigint;
+    data?: `0x${string}`;
+  },
+  params: {
+    address: `0x${string}`;
+    maxFeePerGas: bigint;
+    numerator?: bigint;
+    denominator?: bigint;
+  },
+) {
+  const gas = await client.estimateGas(request);
+  const preferredGas = ceilRatio(gas, params.numerator ?? 15n, params.denominator ?? 10n);
+
+  if (!client.getBalance || params.maxFeePerGas <= 0n) {
+    return preferredGas;
+  }
+
+  const balance = await client.getBalance({ address: params.address });
+  const transferableBalance = balance - (request.value ?? 0n) - L2_DATA_FEE_RESERVE_WEI;
+  if (transferableBalance < 0n) {
+    throw new Error('Policy signer balance is lower than the transaction value');
+  }
+
+  const preferredCost = preferredGas * params.maxFeePerGas;
+  if (preferredCost <= transferableBalance) {
+    return preferredGas;
+  }
+
+  const affordableGas = transferableBalance / params.maxFeePerGas;
+  if (affordableGas < gas) {
+    throw new Error('Policy signer balance is too low to cover the estimated gas for this transaction');
+  }
+
+  return affordableGas;
+}
+
+export function fitEip1559FeesWithinBalance(params: {
+  balance: bigint;
+  value?: bigint;
+  gasEstimate: bigint;
+  baseFeePerGas: bigint;
+  maxFeePerGas: bigint;
+  maxPriorityFeePerGas: bigint;
+}) {
+  const transferableBalance = params.balance - (params.value ?? 0n) - L2_DATA_FEE_RESERVE_WEI;
+  if (transferableBalance < 0n) {
+    throw new Error('Policy signer balance is lower than the transaction value');
+  }
+
+  const affordableMaxFeePerGas = transferableBalance / params.gasEstimate;
+  if (affordableMaxFeePerGas <= 0n) {
+    throw new Error('Policy signer balance is too low to cover the estimated gas for this transaction');
+  }
+
+  let maxFeePerGas = min(params.maxFeePerGas, affordableMaxFeePerGas);
+  let maxPriorityFeePerGas = min(
+    params.maxPriorityFeePerGas,
+    maxFeePerGas > params.baseFeePerGas ? maxFeePerGas - params.baseFeePerGas : 0n,
+  );
+
+  if (maxPriorityFeePerGas < MIN_PRIORITY_FEE_PER_GAS) {
+    maxPriorityFeePerGas = MIN_PRIORITY_FEE_PER_GAS;
+  }
+
+  const minimumMaxFeePerGas = max(
+    params.baseFeePerGas + maxPriorityFeePerGas,
+    maxPriorityFeePerGas * 2n,
+  );
+
+  if (affordableMaxFeePerGas < minimumMaxFeePerGas) {
+    throw new Error('Policy signer balance is too low to cover the estimated gas for this transaction');
+  }
+
+  maxFeePerGas = min(maxFeePerGas, affordableMaxFeePerGas);
+  if (maxFeePerGas < minimumMaxFeePerGas) {
+    maxFeePerGas = minimumMaxFeePerGas;
+  }
+
+  return {
+    maxFeePerGas,
+    maxPriorityFeePerGas,
+  };
+}
+
 function ceilRatio(value: bigint, numerator: bigint, denominator: bigint) {
   return (value * numerator + denominator - 1n) / denominator;
 }
 
 function max(left: bigint, right: bigint) {
   return left > right ? left : right;
+}
+
+function min(left: bigint, right: bigint) {
+  return left < right ? left : right;
 }

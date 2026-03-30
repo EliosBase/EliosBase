@@ -65,7 +65,11 @@ export async function POST(
   }
 
   if (wallet.status !== 'active') {
-    return NextResponse.json({ error: 'Agent Safe is not deployed on Base yet' }, { status: 409 });
+    return NextResponse.json({
+      error: wallet.failureReason
+        ? `Agent Safe is not deployed on Base yet: ${wallet.failureReason}`
+        : 'Agent Safe is not deployed on Base yet',
+    }, { status: 409 });
   }
 
   const legacyPolicy = agent.wallet_policy ?? buildAgentWalletPolicy(ownerWallet);

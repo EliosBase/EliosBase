@@ -1,7 +1,9 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import path from 'node:path';
 import Safe from '@safe-global/protocol-kit';
 import {
+  getOwnableValidator,
   getSmartSessionsCompatibilityFallback,
   getSmartSessionsValidator,
 } from '@rhinestone/module-sdk';
@@ -53,6 +55,9 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
 const SAFE_FALLBACK_HANDLER_SLOT = '0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5';
 const SAFE_GUARD_SLOT = '0x4a204f620c8c5ccdca3fd54d003badd85ba500436a431f0cbda4f558c93c34c8';
+const L2_DATA_FEE_RESERVE_WEI = 5_000_000_000n;
+const PROOF_STATE_PATH = process.env.SAFE7579_PROOF_STATE_FILE
+  ?? path.join(process.cwd(), '.tmp', 'safe7579-live-proof-state.json');
 const ACCOUNT_7579_STATE_ABI = parseAbi([
   'function isModuleInstalled(uint256 moduleTypeId,address module,bytes additionalContext) external view returns (bool)',
   'function getValidatorsPaginated(address cursor,uint256 pageSize) external view returns (address[] memory,address)',
@@ -64,11 +69,23 @@ async function main() {
   logStep('authenticating owner');
   const ownerPrivateKey = `0x${crypto.randomBytes(32).toString('hex')}`;
   const owner = privateKeyToAccount(ownerPrivateKey);
-  const sessionDestination = privateKeyToAccount(`0x${crypto.randomBytes(32).toString('hex')}`).address;
+  const sessionDestination = policySigner.address;
   const reviewedDestination = privateKeyToAccount(`0x${crypto.randomBytes(32).toString('hex')}`).address;
   const ownerJar = new CookieJar();
+  const proofState = {
+    baseUrl,
+    stage: 'owner-created',
+    ownerPrivateKey,
+    ownerAddress: owner.address,
+    sessionDestination,
+    reviewedDestination,
+  };
+  saveProofState(proofState);
 
   const auth = await authenticateOwner(ownerJar, owner);
+  proofState.stage = 'owner-authenticated';
+  proofState.ownerUserId = auth.userId;
+  saveProofState(proofState);
   logStep('loading operator');
   const operator = await loadOperator();
   const operatorCookie = await sealSessionCookie({
@@ -82,7 +99,28 @@ async function main() {
   const agent = await registerAgent(ownerJar);
   const safeAddress = getAddress(agent.walletAddress);
   const policy = agent.walletPolicy;
-  const fundAmountEth = '0.000020';
+  const fundAmountEth = process.env.SAFE7579_PROOF_FUND_AMOUNT_ETH ?? '0.0000015';
+  Object.assign(proofState, {
+    stage: 'agent-registered',
+    agentId: agent.id,
+    safeAddress,
+    walletPolicy: policy,
+  });
+  saveProofState(proofState);
+
+  logStep('preparing migration');
+  const preparedMigration = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/safe7579/prepare`);
+  proofState.stage = 'migration-prepared';
+  saveProofState(proofState);
+  logStep('signing migration');
+  const migrationSignature = await signPreparedSafeExecution(ownerPrivateKey, safeAddress, preparedMigration);
+  logStep('executing migration');
+  const migration = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/safe7579/execute`, {
+    ownerSignature: migrationSignature,
+    txData: preparedMigration.txData,
+  });
+  proofState.stage = 'migration-executed';
+  saveProofState(proofState);
 
   logStep(`funding safe ${safeAddress}`);
   const fundHash = await sendPolicyTransaction(policyWalletClient, policySigner.address, {
@@ -94,26 +132,25 @@ async function main() {
   if (fundReceipt.status !== 'success') {
     throw new Error('Funding the agent Safe reverted');
   }
-
-  logStep('preparing migration');
-  const preparedMigration = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/safe7579/prepare`);
-  logStep('signing migration');
-  const migrationSignature = await signPreparedSafeExecution(ownerPrivateKey, safeAddress, preparedMigration);
-  logStep('executing migration');
-  const migration = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/safe7579/execute`, {
-    ownerSignature: migrationSignature,
-    txData: preparedMigration.txData,
-  });
+  proofState.stage = 'safe-funded';
+  saveProofState(proofState);
 
   logStep('preparing session rotation');
   const preparedSession = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/session/rotate`);
   logStep('signing session rotation');
   const sessionSignature = await signPreparedSafeExecution(ownerPrivateKey, safeAddress, preparedSession);
-  if (!preparedSession.enableSessionHash) {
-    throw new Error('Safe7579 session enable hash is missing from the rotation payload');
+  if (!preparedSession.enableSessionTypedData) {
+    throw new Error('Safe7579 session enable typed data is missing from the rotation payload');
   }
-  const enableSessionSignature = await owner.signMessage({
-    message: { raw: preparedSession.enableSessionHash },
+  const enableSessionSignature = await owner.signTypedData(
+    reviveEnableSessionTypedData(preparedSession.enableSessionTypedData),
+  );
+  debugLog('session-enable', {
+    agentId: agent.id,
+    safeAddress,
+    enableSessionTypedData: preparedSession.enableSessionTypedData,
+    enableSessionSignature,
+    pendingSession: preparedSession.pendingSession,
   });
   logStep('executing session rotation');
   const enabledSession = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/session/execute`, {
@@ -122,6 +159,8 @@ async function main() {
     txData: preparedSession.txData,
     pendingSession: preparedSession.pendingSession,
   });
+  proofState.stage = 'session-enabled';
+  saveProofState(proofState);
 
   logStep('verifying session status');
   const sessionStatus = await apiJson(ownerJar, 'GET', `/api/agents/${agent.id}/wallet/session`);
@@ -135,6 +174,16 @@ async function main() {
   const installedModules = await readInstalledModules(safeAddress, modules.hook);
   const guard = await getStorageAddress(safeAddress, SAFE_GUARD_SLOT);
   const fallbackHandler = await getFallbackHandlerAddress(safeAddress);
+  if (
+    !installedModules.ownerValidator
+    || !installedModules.smartSessionsValidator
+    || !installedModules.compatibilityFallback
+    || !installedModules.hook
+    || guard.toLowerCase() !== modules.guard.toLowerCase()
+    || fallbackHandler.toLowerCase() !== modules.adapter.toLowerCase()
+  ) {
+    throw new Error('Safe7579 module stack is not fully installed onchain after migration');
+  }
 
   const sessionTransferAmount = normalizeAmount(policy.autoApproveThresholdEth);
   logStep('creating session transfer');
@@ -213,6 +262,7 @@ async function main() {
       sessionPolicyTxHash: enabledSession.managerTxHash,
       sessionEnabled: sessionStatus.sessionEnabled,
       installedModules: {
+        ownerValidator: installedModules.ownerValidator,
         smartSessionsValidator: installedModules.smartSessionsValidator,
         compatibilityFallback: installedModules.compatibilityFallback,
         hook: installedModules.hook,
@@ -254,6 +304,35 @@ async function main() {
   };
 
   console.log(JSON.stringify(result, null, 2));
+}
+
+function saveProofState(state) {
+  fs.mkdirSync(path.dirname(PROOF_STATE_PATH), { recursive: true });
+  fs.writeFileSync(PROOF_STATE_PATH, JSON.stringify(state, null, 2));
+}
+
+function reviveEnableSessionTypedData(typedData) {
+  return {
+    domain: typedData.domain,
+    types: omitEip712Domain(typedData.types),
+    primaryType: typedData.primaryType,
+    message: {
+      sessionsAndChainIds: typedData.message.sessionsAndChainIds.map((entry) => ({
+        ...entry,
+        chainId: BigInt(entry.chainId),
+        session: {
+          ...entry.session,
+          nonce: BigInt(entry.session.nonce),
+        },
+      })),
+    },
+  };
+}
+
+function omitEip712Domain(types) {
+  const rest = { ...types };
+  delete rest.EIP712Domain;
+  return rest;
 }
 
 function requiredEnv(name, value = process.env[name]) {
@@ -452,6 +531,11 @@ async function fetchTransfer(agentId, transferId) {
 }
 
 async function readInstalledModules(safeAddress, hookAddress) {
+  const ownerValidator = getOwnableValidator({
+    threshold: 1,
+    owners: [getAddress(policySigner.address)],
+    hook: getAddress(hookAddress),
+  });
   const smartSessions = getSmartSessionsValidator({
     hook: getAddress(hookAddress),
     sessions: [],
@@ -485,11 +569,14 @@ async function readInstalledModules(safeAddress, hookAddress) {
     }).then((activeHook) => getAddress(activeHook) === getAddress(hookAddress)).catch(() => false),
   ]);
   const [installedValidators] = validators;
+  const normalizedValidators = installedValidators.map((validator) => getAddress(validator));
+  const ownerValidatorInstalled = normalizedValidators.includes(getAddress(ownerValidator.module));
   const smartSessionsInstalled = installedValidators
     .map((validator) => getAddress(validator))
     .includes(getAddress(smartSessions.module));
 
   return {
+    ownerValidator: ownerValidatorInstalled,
     smartSessionsValidator: smartSessionsInstalled,
     compatibilityFallback: fallbackInstalled,
     hook: hookInstalled,
@@ -529,17 +616,28 @@ function logStep(message) {
   console.error(`[prove-safe7579-live] ${new Date().toISOString()} ${message}`);
 }
 
+function debugLog(label, payload) {
+  if (!process.env.SAFE7579_DEBUG_ENABLE) {
+    return;
+  }
+
+  console.error(`[prove-safe7579-live][debug:${label}] ${JSON.stringify(payload)}`);
+}
+
 async function sendPolicyTransaction(walletClient, address, request) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const tx = await getPendingEip1559TxParams(address, attempt);
 
     try {
-      const gas = ceilRatio(await publicClient.estimateGas({
+      const gas = await estimateGasLimitWithinBalance({
         account: address,
         to: request.to,
         value: request.value,
         data: request.data,
-      }), 15n, 10n);
+      }, {
+        address,
+        maxFeePerGas: tx.maxFeePerGas,
+      });
 
       return await walletClient.sendTransaction({
         ...request,
@@ -631,6 +729,29 @@ function isUnderpricedTransactionError(error) {
 
 function ceilRatio(value, numerator, denominator) {
   return (value * numerator + denominator - 1n) / denominator;
+}
+
+async function estimateGasLimitWithinBalance(request, params) {
+  const gas = await publicClient.estimateGas(request);
+  const preferredGas = ceilRatio(gas, 15n, 10n);
+  const balance = await publicClient.getBalance({ address: params.address });
+  const transferableBalance = balance - (request.value ?? 0n) - L2_DATA_FEE_RESERVE_WEI;
+
+  if (transferableBalance < 0n) {
+    throw new Error('Policy signer balance is lower than the requested funding value');
+  }
+
+  const preferredCost = preferredGas * params.maxFeePerGas;
+  if (preferredCost <= transferableBalance) {
+    return preferredGas;
+  }
+
+  const affordableGas = transferableBalance / params.maxFeePerGas;
+  if (affordableGas < gas) {
+    throw new Error('Policy signer balance is too low to cover the proof funding transaction');
+  }
+
+  return affordableGas;
 }
 
 function max(left, right) {
