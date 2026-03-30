@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: dependency-review-${{ github.workflow }}-${{ github.ref }}
@@ -15,13 +16,33 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Check dependency graph support
+        id: support
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=$(gh api "repos/${GITHUB_REPOSITORY}" --jq '.security_and_analysis.dependency_graph.status // ""' 2>/dev/null || true)
+
+          if [ "$status" = "enabled" ]; then
+            echo "enabled=true" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "enabled=false" >>"$GITHUB_OUTPUT"
+
       - name: Checkout
+        if: steps.support.outputs.enabled == 'true'
         uses: actions/checkout@v5
         with:
           submodules: recursive
 
       - name: Review dependency changes
+        if: steps.support.outputs.enabled == 'true'
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
           fail-on-scopes: runtime
+
+      - name: Skip when dependency graph is unavailable
+        if: steps.support.outputs.enabled != 'true'
+        run: echo "Dependency graph is disabled for this repository; skipping dependency review."
