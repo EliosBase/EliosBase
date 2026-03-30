@@ -10,13 +10,10 @@ import {
   buildRotateSessionKeyCall,
   buildStoredSafe7579Session,
   getSafe7579SessionPermissionId,
-  readSafe7579EmissarySessionEnabled,
-  reviveSafe7579EnableSessionData,
   safe7579PublicClient,
   safeWalletChain,
 } from '@/lib/agentWallet7579';
 import {
-  bootstrapSafe7579SessionEnable,
   executePolicySignerCall,
 } from '@/lib/agentWallet7579Transfers';
 import {
@@ -67,12 +64,10 @@ export async function POST(
 
   const body = await req.json().catch(() => ({}));
   const ownerSignature = body.ownerSignature as Hex | undefined;
-  const enableSessionSignature = body.enableSessionSignature as Hex | undefined;
   const txData = body.txData as AgentWalletTransactionData | undefined;
   const pendingSession = body.pendingSession;
-  const enableSessionContext = reviveSafe7579EnableSessionData(body.enableSessionContext);
-  if (!ownerSignature || !enableSessionSignature || !txData || !isPendingSessionPayload(pendingSession) || !enableSessionContext) {
-    return NextResponse.json({ error: 'Owner signatures, prepared Safe transaction data, and pending session metadata are required' }, { status: 400 });
+  if (!ownerSignature || !txData || !isPendingSessionPayload(pendingSession)) {
+    return NextResponse.json({ error: 'Owner signature, prepared Safe transaction data, and pending session metadata are required' }, { status: 400 });
   }
 
   const validUntilMs = new Date(pendingSession.validUntil).getTime();
@@ -151,20 +146,6 @@ export async function POST(
         validUntil: Math.floor(validUntilMs / 1000),
       }),
     );
-    const emissaryReceipt = await bootstrapSafe7579SessionEnable({
-      safeAddress,
-      ownerEnableSignature: enableSessionSignature,
-      ownerWalletAddress: ownerWallet,
-      policy: agent.wallet_policy,
-      modules: nextModules,
-      enableSessionData: enableSessionContext,
-      sessionKeyAddress: getAddress(pendingSession.address),
-      sessionKeyValidAfter: Math.floor(rotatedAtMs / 1000),
-      sessionKeyValidUntil: Math.floor(validUntilMs / 1000),
-      sessionKeyCiphertext: pendingSession.ciphertext,
-      sessionKeyNonce: pendingSession.nonce,
-      sessionKeyTag: pendingSession.tag,
-    });
 
     const account = getAccount({
       address: safeAddress,
@@ -176,16 +157,9 @@ export async function POST(
       account,
       permissionId: getSafe7579SessionPermissionId(nextSession),
     });
-    const emissaryEnabled = await readSafe7579EmissarySessionEnabled({
-      safeAddress,
-      session: nextSession,
-    });
 
     if (!enabled) {
       return NextResponse.json({ error: 'Safe7579 session enable transaction mined, but the permission is not active onchain' }, { status: 409 });
-    }
-    if (!emissaryEnabled) {
-      return NextResponse.json({ error: 'Safe7579 session permission is active, but the emissary validator is not configured onchain' }, { status: 409 });
     }
 
     const nextPolicy = mergeSafe7579Compatibility(agent.wallet_policy, {
@@ -219,8 +193,8 @@ export async function POST(
       sessionEnabled: true,
       safeTxHash: safeExecution.hash,
       managerTxHash: managerReceipt.hash,
-      emissaryTxHash: emissaryReceipt.txHash,
-      emissaryUserOpHash: emissaryReceipt.userOpHash,
+      emissaryTxHash: null,
+      emissaryUserOpHash: null,
       sessionKeyAddress: pendingSession.address,
     });
   } catch (executionError) {
