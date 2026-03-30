@@ -1,15 +1,23 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import Safe from '@safe-global/protocol-kit';
+import {
+  getSmartSessionsCompatibilityFallback,
+  getSmartSessionsValidator,
+} from '@rhinestone/module-sdk';
 import { sealData } from 'iron-session';
 import { SiweMessage } from 'siwe';
 import { createClient } from '@supabase/supabase-js';
 import {
   createPublicClient,
   createWalletClient,
+  encodeAbiParameters,
+  fallback,
   formatEther,
   getAddress,
   http,
+  parseAbi,
+  parseAbiParameters,
   parseEther,
 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -20,7 +28,8 @@ hydrateEnvFile(process.env.ELIOS_ENV_FILE ?? '/tmp/elios-prod.env');
 const baseUrl = (process.env.ELIOS_BASE_URL ?? 'https://eliosbase.net').replace(/\/$/, '');
 const origin = new URL(baseUrl).origin;
 const domain = new URL(baseUrl).host;
-const rpcUrl = process.env.BASE_RPC_URL ?? 'https://mainnet.base.org';
+const rpcUrls = buildRpcUrls(process.env.BASE_RPC_URL);
+const rpcUrl = rpcUrls[0];
 const chainId = Number(process.env.NEXT_PUBLIC_BASE_CHAIN_ID ?? 8453);
 const sessionSecret = requiredEnv('SESSION_SECRET');
 const supabaseUrl = requiredEnv('NEXT_PUBLIC_SUPABASE_URL');
@@ -32,7 +41,7 @@ const policySignerPrivateKey = requiredEnv(
 
 const publicClient = createPublicClient({
   chain: base,
-  transport: http(rpcUrl),
+  transport: fallback(rpcUrls.map((url) => http(url, { timeout: 10_000 }))),
 });
 const policySigner = privateKeyToAccount(policySignerPrivateKey);
 const policyWalletClient = createWalletClient({
@@ -42,31 +51,17 @@ const policyWalletClient = createWalletClient({
 });
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-const accountAbi = [
-  {
-    type: 'function',
-    name: 'isModuleInstalled',
-    inputs: [
-      { name: 'moduleTypeId', type: 'uint256' },
-      { name: 'module', type: 'address' },
-      { name: 'additionalContext', type: 'bytes' },
-    ],
-    outputs: [{ name: 'isInstalled', type: 'bool' }],
-    stateMutability: 'view',
-  },
-] ;
-
-const safeAbi = [
-  {
-    type: 'function',
-    name: 'getGuard',
-    inputs: [],
-    outputs: [{ name: 'guard', type: 'address' }],
-    stateMutability: 'view',
-  },
-];
+const SAFE_FALLBACK_HANDLER_SLOT = '0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5';
+const SAFE_GUARD_SLOT = '0x4a204f620c8c5ccdca3fd54d003badd85ba500436a431f0cbda4f558c93c34c8';
+const ACCOUNT_7579_STATE_ABI = parseAbi([
+  'function isModuleInstalled(uint256 moduleTypeId,address module,bytes additionalContext) external view returns (bool)',
+  'function getValidatorsPaginated(address cursor,uint256 pageSize) external view returns (address[] memory,address)',
+  'function getActiveHook() external view returns (address)',
+]);
+const SENTINEL_ADDRESS = '0x0000000000000000000000000000000000000001';
 
 async function main() {
+  logStep('authenticating owner');
   const ownerPrivateKey = `0x${crypto.randomBytes(32).toString('hex')}`;
   const owner = privateKeyToAccount(ownerPrivateKey);
   const sessionDestination = privateKeyToAccount(`0x${crypto.randomBytes(32).toString('hex')}`).address;
@@ -74,6 +69,7 @@ async function main() {
   const ownerJar = new CookieJar();
 
   const auth = await authenticateOwner(ownerJar, owner);
+  logStep('loading operator');
   const operator = await loadOperator();
   const operatorCookie = await sealSessionCookie({
     userId: operator.id,
@@ -82,12 +78,15 @@ async function main() {
     role: operator.role,
   });
 
+  logStep('registering agent');
   const agent = await registerAgent(ownerJar);
   const safeAddress = getAddress(agent.walletAddress);
   const policy = agent.walletPolicy;
   const fundAmountEth = '0.000020';
 
-  const fundHash = await policyWalletClient.sendTransaction({
+  logStep(`funding safe ${safeAddress}`);
+  const fundHash = await sendPolicyTransaction(policyWalletClient, policySigner.address, {
+    account: policySigner,
     to: safeAddress,
     value: parseEther(fundAmountEth),
   });
@@ -96,44 +95,55 @@ async function main() {
     throw new Error('Funding the agent Safe reverted');
   }
 
+  logStep('preparing migration');
   const preparedMigration = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/safe7579/prepare`);
+  logStep('signing migration');
   const migrationSignature = await signPreparedSafeExecution(ownerPrivateKey, safeAddress, preparedMigration);
+  logStep('executing migration');
   const migration = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/safe7579/execute`, {
     ownerSignature: migrationSignature,
     txData: preparedMigration.txData,
   });
 
+  logStep('preparing session rotation');
+  const preparedSession = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/session/rotate`);
+  logStep('signing session rotation');
+  const sessionSignature = await signPreparedSafeExecution(ownerPrivateKey, safeAddress, preparedSession);
+  logStep('executing session rotation');
+  const enabledSession = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/session/execute`, {
+    ownerSignature: sessionSignature,
+    txData: preparedSession.txData,
+    pendingSession: preparedSession.pendingSession,
+  });
+
+  logStep('verifying session status');
   const sessionStatus = await apiJson(ownerJar, 'GET', `/api/agents/${agent.id}/wallet/session`);
-  if (!sessionStatus.enabled) {
+  if (!sessionStatus.sessionEnabled) {
     throw new Error('Safe7579 session key is not enabled after migration');
   }
 
+  logStep('reading migrated agent');
   const migratedAgent = await fetchAgent(agent.id);
   const modules = migratedAgent.wallet_policy.__safe7579.modules;
-
-  const installedModules = await Promise.all([
-    checkModule(safeAddress, 1n, modules.ownerValidator),
-    checkModule(safeAddress, 1n, modules.smartSessionsValidator),
-    checkModule(safeAddress, 3n, modules.compatibilityFallback),
-    checkModule(safeAddress, 4n, modules.hook),
-  ]);
-  const guard = await publicClient.readContract({
-    address: safeAddress,
-    abi: safeAbi,
-    functionName: 'getGuard',
-  });
+  const installedModules = await readInstalledModules(safeAddress, modules.hook);
+  const guard = await getStorageAddress(safeAddress, SAFE_GUARD_SLOT);
+  const fallbackHandler = await getFallbackHandlerAddress(safeAddress);
 
   const sessionTransferAmount = normalizeAmount(policy.autoApproveThresholdEth);
+  logStep('creating session transfer');
   const sessionTransfer = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/transfers`, {
     destination: sessionDestination,
     amountEth: sessionTransferAmount,
     note: 'safe7579 session proof',
   });
+  logStep('preparing session transfer');
   const preparedSessionTransfer = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/transfers/${sessionTransfer.id}/prepare`);
+  logStep('executing session transfer');
   const executedSessionTransfer = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/transfers/${sessionTransfer.id}/execute`, {});
   const sessionTransferRecord = await fetchTransfer(agent.id, sessionTransfer.id);
 
   const reviewedTransferAmount = bumpAmount(policy.timelockThresholdEth, 1n);
+  logStep('creating reviewed transfer');
   const reviewedTransfer = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/transfers`, {
     destination: reviewedDestination,
     amountEth: reviewedTransferAmount,
@@ -144,8 +154,10 @@ async function main() {
   }
 
   const waitMs = Math.max(0, new Date(reviewedTransfer.unlockAt).getTime() - Date.now()) + 2_000;
+  logStep(`waiting ${waitMs}ms for timelock`);
   await sleep(waitMs);
 
+  logStep('approving reviewed transfer');
   const approvedTransfer = await apiJson(
     null,
     'POST',
@@ -153,8 +165,11 @@ async function main() {
     undefined,
     operatorCookie,
   );
+  logStep('preparing reviewed transfer');
   const preparedReviewedTransfer = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/transfers/${reviewedTransfer.id}/prepare`);
+  logStep('signing reviewed transfer');
   const reviewedSignature = await signPreparedSafeExecution(ownerPrivateKey, safeAddress, preparedReviewedTransfer);
+  logStep('executing reviewed transfer');
   const executedReviewedTransfer = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/transfers/${reviewedTransfer.id}/execute`, {
     ownerSignature: reviewedSignature,
     txData: preparedReviewedTransfer.txData,
@@ -187,13 +202,15 @@ async function main() {
     migration: {
       safeTxHash: migration.safeTxHash,
       managerTxHashes: migration.managerTxHashes,
-      sessionEnabled: sessionStatus.enabled,
+      sessionEnableTxHash: enabledSession.safeTxHash,
+      sessionPolicyTxHash: enabledSession.managerTxHash,
+      sessionEnabled: sessionStatus.sessionEnabled,
       installedModules: {
-        ownerValidator: installedModules[0],
-        smartSessionsValidator: installedModules[1],
-        compatibilityFallback: installedModules[2],
-        hook: installedModules[3],
+        smartSessionsValidator: installedModules.smartSessionsValidator,
+        compatibilityFallback: installedModules.compatibilityFallback,
+        hook: installedModules.hook,
         guard: guard.toLowerCase() === modules.guard.toLowerCase(),
+        fallbackHandler: fallbackHandler.toLowerCase() === modules.adapter.toLowerCase(),
       },
     },
     sessionTransfer: {
@@ -394,7 +411,8 @@ async function apiJson(jar, method, path, body, manualCookie) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   jar?.setFromResponse(response);
-  const payload = await response.json().catch(async () => ({ error: await response.text() }));
+  const raw = await response.text();
+  const payload = raw ? safeJsonParse(raw) ?? { error: raw } : {};
   if (!response.ok) {
     throw new Error(`${method} ${path} failed: ${payload.error ?? JSON.stringify(payload)}`);
   }
@@ -426,13 +444,66 @@ async function fetchTransfer(agentId, transferId) {
   return data;
 }
 
-async function checkModule(safeAddress, moduleTypeId, moduleAddress) {
-  return publicClient.readContract({
-    address: safeAddress,
-    abi: accountAbi,
-    functionName: 'isModuleInstalled',
-    args: [moduleTypeId, getAddress(moduleAddress), '0x'],
+async function readInstalledModules(safeAddress, hookAddress) {
+  const smartSessions = getSmartSessionsValidator({
+    hook: getAddress(hookAddress),
+    sessions: [],
   });
+  const rawCompatibilityFallback = getSmartSessionsCompatibilityFallback();
+  const compatibilityFallback = {
+    ...rawCompatibilityFallback,
+    functionSig: rawCompatibilityFallback.selector,
+  };
+  const [validators, fallbackInstalled, hookInstalled] = await Promise.all([
+    publicClient.readContract({
+      address: getAddress(safeAddress),
+      abi: ACCOUNT_7579_STATE_ABI,
+      functionName: 'getValidatorsPaginated',
+      args: [SENTINEL_ADDRESS, 20n],
+    }).catch(() => [[], SENTINEL_ADDRESS]),
+    publicClient.readContract({
+      address: getAddress(safeAddress),
+      abi: ACCOUNT_7579_STATE_ABI,
+      functionName: 'isModuleInstalled',
+      args: [
+        3n,
+        getAddress(compatibilityFallback.module),
+        encodeAbiParameters(parseAbiParameters('bytes4 functionSig'), [compatibilityFallback.functionSig]),
+      ],
+    }).catch(() => false),
+    publicClient.readContract({
+      address: getAddress(safeAddress),
+      abi: ACCOUNT_7579_STATE_ABI,
+      functionName: 'getActiveHook',
+    }).then((activeHook) => getAddress(activeHook) === getAddress(hookAddress)).catch(() => false),
+  ]);
+  const [installedValidators] = validators;
+  const smartSessionsInstalled = installedValidators
+    .map((validator) => getAddress(validator))
+    .includes(getAddress(smartSessions.module));
+
+  return {
+    smartSessionsValidator: smartSessionsInstalled,
+    compatibilityFallback: fallbackInstalled,
+    hook: hookInstalled,
+  };
+}
+
+async function getFallbackHandlerAddress(safeAddress) {
+  return getStorageAddress(safeAddress, SAFE_FALLBACK_HANDLER_SLOT);
+}
+
+async function getStorageAddress(safeAddress, slot) {
+  const value = await publicClient.getStorageAt({
+    address: getAddress(safeAddress),
+    slot,
+  });
+
+  if (!value || value === '0x') {
+    return '0x0000000000000000000000000000000000000000';
+  }
+
+  return getAddress(`0x${value.slice(-40)}`);
 }
 
 function normalizeAmount(amountEth) {
@@ -445,6 +516,129 @@ function bumpAmount(amountEth, weiDelta) {
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function logStep(message) {
+  console.error(`[prove-safe7579-live] ${new Date().toISOString()} ${message}`);
+}
+
+async function sendPolicyTransaction(walletClient, address, request) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const tx = await getPendingEip1559TxParams(address, attempt);
+
+    try {
+      return await walletClient.sendTransaction({
+        ...request,
+        ...tx,
+      });
+    } catch (error) {
+      if (attempt === 2 || !isUnderpricedTransactionError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error('Policy funding fee retries exhausted');
+}
+
+async function getPendingEip1559TxParams(address, attempt = 0) {
+  const [estimate, block, nonce] = await Promise.all([
+    publicClient.estimateFeesPerGas({ type: 'eip1559' }).catch(() => undefined),
+    publicClient.getBlock().catch(() => undefined),
+    getMaxPendingNonce(address),
+  ]);
+
+  const multiplier = 2n ** BigInt(attempt);
+  const baseFeePerGas = block?.baseFeePerGas ?? 0n;
+  const estimatedPriorityFee = estimate?.maxPriorityFeePerGas ?? 0n;
+  const estimatedMaxFee = estimate?.maxFeePerGas ?? 0n;
+
+  let maxPriorityFeePerGas = max(
+    estimatedPriorityFee,
+    1_000_000_000n * multiplier,
+  );
+  let maxFeePerGas = max(
+    estimatedMaxFee,
+    baseFeePerGas * 2n + maxPriorityFeePerGas,
+  );
+
+  maxPriorityFeePerGas = ceilRatio(maxPriorityFeePerGas, 12n, 10n);
+  maxFeePerGas = max(
+    ceilRatio(maxFeePerGas, 12n, 10n),
+    maxPriorityFeePerGas * 2n,
+  );
+
+  return {
+    nonce,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
+  };
+}
+
+async function getMaxPendingNonce(address) {
+  const settled = await Promise.allSettled(
+    rpcUrls.map(async (url) => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_getTransactionCount',
+          params: [address, 'pending'],
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !payload?.result) {
+        throw new Error(`Failed to fetch pending nonce from ${url}`);
+      }
+      return Number.parseInt(payload.result, 16);
+    }),
+  );
+
+  const counts = settled
+    .filter((result) => result.status === 'fulfilled')
+    .map((result) => result.value);
+  if (counts.length === 0) {
+    throw new Error('Failed to fetch a pending nonce from any Base RPC');
+  }
+
+  return Math.max(...counts);
+}
+
+function isUnderpricedTransactionError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return normalized.includes('underpriced')
+    || normalized.includes('replacement transaction underpriced')
+    || normalized.includes('fee too low');
+}
+
+function ceilRatio(value, numerator, denominator) {
+  return (value * numerator + denominator - 1n) / denominator;
+}
+
+function max(left, right) {
+  return left > right ? left : right;
+}
+
+function buildRpcUrls(primary) {
+  return Array.from(new Set([
+    ...(primary && primary !== 'https://mainnet.base.org' ? [primary] : []),
+    'https://base-rpc.publicnode.com',
+    'https://mainnet.base.org',
+    'https://base.llamarpc.com',
+    'https://1rpc.io/base',
+    'https://base-mainnet.public.blastapi.io',
+  ]));
+}
+
+function safeJsonParse(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }
 
 main().catch((error) => {

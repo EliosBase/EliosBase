@@ -32,6 +32,7 @@ import {
 import type { Session as RhinestoneSession } from '@rhinestone/sdk';
 import { buildMockSignature } from '@rhinestone/sdk/smart-sessions';
 import { decryptSessionKey } from '@/lib/agentWalletSecrets';
+import { getMaxPendingNonce } from '@/lib/baseRpc';
 import { readEnv, readRequiredEnv } from '@/lib/env';
 import {
   buildStoredSafe7579Session,
@@ -41,7 +42,9 @@ import {
   SAFE_7579_SMART_SESSIONS_ADDRESS,
   safe7579PublicClient,
   safeWalletChain,
+  safeWalletRpcUrl,
 } from '@/lib/agentWallet7579';
+import { getPendingEip1559TxParams, isUnderpricedTransactionError } from '@/lib/txFees';
 import type { AgentWalletModules, AgentWalletPolicy } from '@/lib/types';
 
 const bundlerUrl = readEnv(process.env.SAFE7579_BUNDLER_URL)
@@ -66,9 +69,9 @@ export async function executePolicySignerCall(call: {
   const walletClient = createWalletClient({
     account,
     chain: safeWalletChain,
-    transport: http(readRequiredEnv('BASE_RPC_URL', process.env.BASE_RPC_URL)),
+    transport: http(safeWalletRpcUrl),
   });
-  const hash = await walletClient.sendTransaction({
+  const hash = await sendPolicySignerTransaction(walletClient, getAddress(account.address), {
     account,
     to: call.to,
     value: call.value,
@@ -266,7 +269,7 @@ export async function queueSafe7579ReviewedIntent(params: {
   const walletClient = createWalletClient({
     account,
     chain: safeWalletChain,
-    transport: http(readRequiredEnv('BASE_RPC_URL', process.env.BASE_RPC_URL)),
+    transport: http(safeWalletRpcUrl),
   });
   const value = parseEther(params.amountEth);
   const intentHash = keccak256(
@@ -279,7 +282,7 @@ export async function queueSafe7579ReviewedIntent(params: {
       [params.safeAddress, params.destination, value],
     ),
   );
-  const hash = await walletClient.sendTransaction({
+  const hash = await sendPolicySignerTransaction(walletClient, getAddress(account.address), {
     account,
     to: getAddress(SAFE_7579_POLICY_MANAGER_ADDRESS),
     value: 0n,
@@ -311,9 +314,9 @@ export async function approveSafe7579ReviewedIntent(intentHash: Hex) {
   const walletClient = createWalletClient({
     account,
     chain: safeWalletChain,
-    transport: http(readRequiredEnv('BASE_RPC_URL', process.env.BASE_RPC_URL)),
+    transport: http(safeWalletRpcUrl),
   });
-  const hash = await walletClient.sendTransaction({
+  const hash = await sendPolicySignerTransaction(walletClient, getAddress(account.address), {
     account,
     to: getAddress(SAFE_7579_POLICY_MANAGER_ADDRESS),
     value: 0n,
@@ -401,4 +404,38 @@ export async function executeSafe7579SessionTransfer(params: {
     txHash: receipt.receipt.transactionHash,
     blockNumber: Number(receipt.receipt.blockNumber),
   };
+}
+
+async function sendPolicySignerTransaction(
+  walletClient: ReturnType<typeof createWalletClient>,
+  address: Address,
+  request: {
+    account: ReturnType<typeof getPolicySignerAccount>;
+    to: Address;
+    value: bigint;
+    data: Hex;
+  },
+) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const tx = await getPendingEip1559TxParams(
+      safe7579PublicClient,
+      address as `0x${string}`,
+      attempt,
+      (target) => getMaxPendingNonce(safeWalletChain.id !== 8453, target),
+    );
+
+    try {
+      return await walletClient.sendTransaction({
+        ...request,
+        ...tx,
+        chain: safeWalletChain,
+      });
+    } catch (error) {
+      if (attempt === 2 || !isUnderpricedTransactionError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error('Policy signer transaction fee retries exhausted');
 }

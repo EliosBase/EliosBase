@@ -19,7 +19,6 @@ import {
   concatHex,
   encodeFunctionData,
   getAddress,
-  http,
   parseAbi,
   type Address,
   type Hex,
@@ -27,6 +26,7 @@ import {
 import { base, baseSepolia } from 'viem/chains';
 import { createPublicClient } from 'viem';
 import { readEnv } from '@/lib/env';
+import { getBaseRpcTransport, getBaseRpcUrl } from '@/lib/baseRpc';
 import { privateKeyToAccount } from 'viem/accounts';
 import type { AgentWalletModules, AgentWalletPolicy } from '@/lib/types';
 
@@ -53,12 +53,11 @@ export const SAFE_7579_POLICY_MANAGER_ADDRESS = readEnv(process.env.SAFE7579_POL
 export const SAFE_7579_GUARD_ADDRESS = readEnv(process.env.SAFE7579_GUARD_ADDRESS);
 export const SAFE_7579_HOOK_ADDRESS = readEnv(process.env.SAFE7579_HOOK_ADDRESS);
 
-const rpcUrl = readEnv(process.env.BASE_RPC_URL)
-  || (isTestnet ? 'https://sepolia.base.org' : 'https://mainnet.base.org');
+export const safeWalletRpcUrl = getBaseRpcUrl(isTestnet);
 
 export const safe7579PublicClient = createPublicClient({
   chain: safeWalletChain,
-  transport: http(rpcUrl),
+  transport: getBaseRpcTransport(isTestnet),
 });
 
 export const SAFE_ABI = parseAbi([
@@ -180,6 +179,7 @@ export function buildSafe7579Modules(params: {
     additionalContext: '0x',
     type: 'hook',
     hookType: SafeHookType.GLOBAL,
+    selector: '0x00000000',
   };
 
   return {
@@ -238,7 +238,7 @@ export function buildEnableSessionCall(session: Session) {
 
   return {
     to: getAddress(action.to),
-    value: action.value,
+    value: BigInt(action.value.toString()),
     data: hexOrEmpty(action.data),
   };
 }
@@ -248,7 +248,7 @@ export function buildRemoveSessionCall(permissionId: Hex) {
 
   return {
     to: getAddress(action.to),
-    value: action.value,
+    value: BigInt(action.value.toString()),
     data: hexOrEmpty(action.data),
   };
 }
@@ -263,7 +263,6 @@ export function buildSafe7579MigrationCalls(params: {
   const modules = buildSafe7579Modules({
     ownerWallet: params.ownerWallet,
     hookAddress: params.hookAddress,
-    session: params.session,
   });
   const account = getAccount({
     address: params.safeAddress,
@@ -272,7 +271,6 @@ export function buildSafe7579MigrationCalls(params: {
   });
 
   const moduleCalls = [
-    modules.ownerValidator,
     modules.smartSessions,
     modules.compatibilityFallback,
     modules.hookModule,

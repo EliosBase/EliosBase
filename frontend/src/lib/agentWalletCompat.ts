@@ -112,8 +112,8 @@ export function mergeSafe7579Compatibility(
   policy: AgentWalletPolicy,
   updates: {
     migrationState?: AgentWalletMigrationState;
-    modules?: AgentWalletModules;
-    session?: CompatSessionState;
+    modules?: AgentWalletModules | null;
+    session?: CompatSessionState | null;
     revision?: number;
   },
 ): AgentWalletPolicy {
@@ -121,8 +121,8 @@ export function mergeSafe7579Compatibility(
   const next = {
     ...current,
     ...updates,
-    modules: updates.modules ?? current.modules,
-    session: updates.session ?? current.session,
+    modules: 'modules' in updates ? updates.modules ?? undefined : current.modules,
+    session: 'session' in updates ? updates.session ?? undefined : current.session,
     revision: updates.revision ?? current.revision ?? 2,
   };
 

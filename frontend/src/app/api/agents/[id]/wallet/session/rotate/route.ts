@@ -4,8 +4,6 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { validateOrigin } from '@/lib/csrf';
 import {
-  SAFE_7579_POLICY_MANAGER_ADDRESS,
-  SAFE_7579_HOOK_ADDRESS,
   buildEnableSessionCall,
   buildRemoveSessionCall,
   buildRotateSessionKeyCall,
@@ -13,8 +11,12 @@ import {
   buildSessionDefinition,
   buildStoredSafe7579Session,
   getSafe7579SessionPermissionId,
+  SAFE_7579_POLICY_MANAGER_ADDRESS,
+  SAFE_7579_HOOK_ADDRESS,
 } from '@/lib/agentWallet7579';
 import { generateEncryptedSessionKey } from '@/lib/agentWalletSecrets';
+import { prepareAgentWalletExecution } from '@/lib/agentWallets';
+import { getAgentWalletMigrationState, getAgentWalletModules, getAgentWalletSession, getAgentWalletStandard } from '@/lib/agentWalletCompat';
 
 function serializeCall(call: { to: string; value: { toString(): string }; data: string }) {
   return {
@@ -44,7 +46,7 @@ export async function POST(
   const supabase = createServiceClient();
   const { data: agent, error } = await supabase
     .from('agents')
-    .select('id, owner_id, wallet_address, wallet_standard, wallet_migration_state, wallet_policy, wallet_modules, session_key_address, session_key_expires_at, session_key_rotated_at, users:owner_id(wallet_address)')
+    .select('id, owner_id, wallet_address, wallet_policy, users:owner_id(wallet_address)')
     .eq('id', id)
     .single();
 
@@ -56,7 +58,7 @@ export async function POST(
     return NextResponse.json({ error: 'Only the agent owner can rotate the session key' }, { status: 403 });
   }
 
-  if (agent.wallet_standard !== 'safe7579' || agent.wallet_migration_state !== 'migrated') {
+  if (getAgentWalletStandard(agent) !== 'safe7579' || getAgentWalletMigrationState(agent) !== 'migrated') {
     return NextResponse.json({ error: 'Rotate the session key after the Safe7579 migration is complete' }, { status: 409 });
   }
 
@@ -69,17 +71,21 @@ export async function POST(
   }
 
   const policy = agent.wallet_policy ?? buildSafe7579Policy(ownerWallet);
-  const hookAddress = agent.wallet_modules?.hook ?? SAFE_7579_HOOK_ADDRESS;
+  const modules = getAgentWalletModules(agent);
+  const currentSession = getAgentWalletSession(agent);
+  const hookAddress = modules?.hook ?? SAFE_7579_HOOK_ADDRESS;
   if (!hookAddress) {
     return NextResponse.json({ error: 'Safe7579 hook is not configured for this agent' }, { status: 409 });
   }
 
   const encryptedSession = generateEncryptedSessionKey();
+  const validAfter = Math.floor(Date.now() / 1000);
   const validUntil = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
   const sessionDefinition = buildSessionDefinition({
     sessionKeyAddress: encryptedSession.address,
     policy,
     hookAddress: getAddress(hookAddress),
+    validAfter,
     validUntil,
   });
   const rotateCall = buildRotateSessionKeyCall({
@@ -89,46 +95,43 @@ export async function POST(
   });
   const safeCalls = [];
 
-  if (agent.session_key_address && agent.session_key_expires_at && agent.wallet_modules?.sessionSalt) {
-    const currentSession = buildStoredSafe7579Session({
-      sessionKeyAddress: getAddress(agent.session_key_address),
-      sessionKeyValidAfter: agent.session_key_rotated_at
-        ? Math.floor(new Date(agent.session_key_rotated_at).getTime() / 1000)
+  if (currentSession?.address && currentSession.validUntil && modules?.sessionSalt) {
+    const storedSession = buildStoredSafe7579Session({
+      sessionKeyAddress: getAddress(currentSession.address),
+      sessionKeyValidAfter: currentSession.rotatedAt
+        ? Math.floor(new Date(currentSession.rotatedAt).getTime() / 1000)
         : undefined,
-      sessionKeyValidUntil: Math.floor(new Date(agent.session_key_expires_at).getTime() / 1000),
+      sessionKeyValidUntil: Math.floor(new Date(currentSession.validUntil).getTime() / 1000),
       policy,
-      modules: agent.wallet_modules,
+      modules,
     });
-    safeCalls.push(buildRemoveSessionCall(getSafe7579SessionPermissionId(currentSession)));
+    safeCalls.push(buildRemoveSessionCall(getSafe7579SessionPermissionId(storedSession)));
   }
 
   safeCalls.push(buildEnableSessionCall(sessionDefinition));
 
-  const { error: updateError } = await supabase
-    .from('agents')
-    .update({
-      wallet_modules: {
-        ...(agent.wallet_modules ?? {}),
-        sessionSalt: sessionDefinition.salt,
-      },
-      session_key_address: encryptedSession.address,
-      session_key_ciphertext: encryptedSession.ciphertext,
-      session_key_nonce: encryptedSession.nonce,
-      session_key_tag: encryptedSession.tag,
-      session_key_expires_at: new Date(validUntil * 1000).toISOString(),
-      session_key_rotated_at: new Date().toISOString(),
-    })
-    .eq('id', id);
-
-  if (updateError) {
-    return NextResponse.json({ error: 'Failed to persist the rotated session key' }, { status: 500 });
-  }
+  const prepared = await prepareAgentWalletExecution({
+    safeAddress: getAddress(agent.wallet_address),
+    calls: safeCalls,
+  });
 
   return NextResponse.json({
     agentId: id,
     sessionKeyAddress: encryptedSession.address,
     sessionKeyExpiresAt: new Date(validUntil * 1000).toISOString(),
-    safeCalls: safeCalls.map(serializeCall),
+    pendingSession: {
+      address: encryptedSession.address,
+      ciphertext: encryptedSession.ciphertext,
+      nonce: encryptedSession.nonce,
+      tag: encryptedSession.tag,
+      validUntil: new Date(validUntil * 1000).toISOString(),
+      rotatedAt: new Date(validAfter * 1000).toISOString(),
+      sessionSalt: sessionDefinition.salt,
+    },
+    safeTxHash: prepared.safeTxHash,
+    txData: prepared.txData,
+    chainId: prepared.chainId,
+    safeVersion: prepared.safeVersion,
     managerCall: serializeCall(rotateCall),
   });
 }

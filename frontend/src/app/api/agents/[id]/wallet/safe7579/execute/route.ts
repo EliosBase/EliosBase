@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAddress, type Hex } from 'viem';
-import { getAccount, isSessionEnabled } from '@rhinestone/module-sdk';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { validateOrigin } from '@/lib/csrf';
 import {
   buildPolicyManagerConfigureCall,
-  buildRotateSessionKeyCall,
   buildSafe7579MigrationCalls,
-  buildStoredSafe7579Session,
-  getSafe7579SessionPermissionId,
-  safe7579PublicClient,
-  safeWalletChain,
 } from '@/lib/agentWallet7579';
 import {
   executePolicySignerCall,
@@ -19,33 +13,9 @@ import {
 import { executeAgentWalletExecution, type AgentWalletTransactionData } from '@/lib/agentWallets';
 import {
   getAgentWalletModules,
-  getAgentWalletSession,
   mergeSafe7579Compatibility,
 } from '@/lib/agentWalletCompat';
-
-const accountAbi = [
-  {
-    type: 'function',
-    name: 'isModuleInstalled',
-    inputs: [
-      { name: 'moduleTypeId', type: 'uint256' },
-      { name: 'module', type: 'address' },
-      { name: 'additionalContext', type: 'bytes' },
-    ],
-    outputs: [{ name: 'isInstalled', type: 'bool' }],
-    stateMutability: 'view',
-  },
-] as const;
-
-const safeAbi = [
-  {
-    type: 'function',
-    name: 'getGuard',
-    inputs: [],
-    outputs: [{ name: 'guard', type: 'address' }],
-    stateMutability: 'view',
-  },
-] as const;
+import { readSafe7579InstallationState } from '@/lib/agentWallet7579State';
 
 export async function POST(
   req: NextRequest,
@@ -75,9 +45,8 @@ export async function POST(
     .single();
 
   const modules = agent ? getAgentWalletModules(agent) : undefined;
-  const sessionState = agent ? getAgentWalletSession(agent) : undefined;
 
-  if (error || !agent || !agent.wallet_address || !agent.wallet_policy || !modules || !sessionState?.address || !sessionState.validUntil) {
+  if (error || !agent || !agent.wallet_address || !agent.wallet_policy || !modules) {
     return NextResponse.json({ error: 'Safe7579 migration is not prepared for this agent' }, { status: 404 });
   }
 
@@ -85,25 +54,15 @@ export async function POST(
     return NextResponse.json({ error: 'Only the agent owner can execute Safe7579 migration' }, { status: 403 });
   }
 
-  if (!modules.hook || !modules.guard || !modules.policyManager || !modules.sessionSalt) {
+  if (!modules.hook || !modules.guard || !modules.policyManager) {
     return NextResponse.json({ error: 'Safe7579 migration metadata is incomplete' }, { status: 409 });
   }
 
   const safeAddress = getAddress(agent.wallet_address);
   const ownerWallet = getAddress(session.walletAddress);
-  const storedSession = buildStoredSafe7579Session({
-    sessionKeyAddress: getAddress(sessionState.address),
-    sessionKeyValidAfter: sessionState.rotatedAt
-      ? Math.floor(new Date(sessionState.rotatedAt).getTime() / 1000)
-      : undefined,
-    sessionKeyValidUntil: Math.floor(new Date(sessionState.validUntil).getTime() / 1000),
-    policy: agent.wallet_policy,
-    modules,
-  });
   const safeCalls = buildSafe7579MigrationCalls({
     safeAddress,
     ownerWallet,
-    session: storedSession,
     hookAddress: getAddress(modules.hook),
     guardAddress: getAddress(modules.guard),
   });
@@ -113,11 +72,6 @@ export async function POST(
       safeAddress,
       policy: agent.wallet_policy,
       modules,
-    }),
-    buildRotateSessionKeyCall({
-      safeAddress,
-      sessionKeyAddress: getAddress(sessionState.address),
-      validUntil: Math.floor(new Date(sessionState.validUntil).getTime() / 1000),
     }),
   ];
 
@@ -134,50 +88,31 @@ export async function POST(
       managerReceipts.push(await executePolicySignerCall(call));
     }
 
-    const installedModules = modules as Record<string, string | undefined>;
-    const checks = [
-      { type: 1n, address: installedModules.ownerValidator },
-      { type: 1n, address: installedModules.smartSessionsValidator },
-      { type: 3n, address: installedModules.compatibilityFallback },
-      { type: 4n, address: installedModules.hook },
-    ].filter((entry): entry is { type: bigint; address: `0x${string}` } => !!entry.address);
-    const installed = await Promise.all(checks.map((entry) => safe7579PublicClient.readContract({
-      address: safeAddress,
-      abi: accountAbi,
-      functionName: 'isModuleInstalled',
-      args: [entry.type, entry.address, '0x'],
-    })));
-    if (installed.some((value) => !value)) {
-      return NextResponse.json({ error: 'Safe7579 migration transactions mined, but modules are not fully installed onchain' }, { status: 409 });
-    }
+    const installation = await readSafe7579InstallationState({
+      safeAddress,
+      ownerWallet: getAddress(agent.wallet_policy.owner),
+      hookAddress: getAddress(modules.hook),
+      guardAddress: modules.guard ? getAddress(modules.guard) : undefined,
+      fallbackHandlerAddress: modules.adapter ? getAddress(modules.adapter) : undefined,
+    });
+    const missingChecks = [
+      !installation.smartSessionsValidator ? 'smartSessionsValidator' : null,
+      !installation.compatibilityFallback ? 'compatibilityFallback' : null,
+      !installation.hook ? 'hook' : null,
+      !installation.guard ? 'guard' : null,
+      !installation.fallbackHandler ? 'safeFallbackHandler' : null,
+    ].filter((value): value is string => Boolean(value));
 
-    const guard = await safe7579PublicClient.readContract({
-      address: safeAddress,
-      abi: safeAbi,
-      functionName: 'getGuard',
-    });
-    if (installedModules.guard && guard.toLowerCase() !== installedModules.guard.toLowerCase()) {
-      return NextResponse.json({ error: 'Safe7579 migration transactions mined, but the guard is not active onchain' }, { status: 409 });
-    }
-
-    const account = getAccount({
-      address: safeAddress,
-      type: 'safe',
-      deployedOnChains: [safeWalletChain.id],
-    });
-    const enabled = await isSessionEnabled({
-      client: safe7579PublicClient as never,
-      account,
-      permissionId: getSafe7579SessionPermissionId(storedSession),
-    });
-    if (!enabled) {
-      return NextResponse.json({ error: 'Safe7579 migration transactions mined, but the session key is not enabled onchain' }, { status: 409 });
+    if (missingChecks.length > 0) {
+      return NextResponse.json({
+        error: `Safe7579 migration transactions mined, but onchain verification is still missing: ${missingChecks.join(', ')}`,
+      }, { status: 409 });
     }
 
     const nextPolicy = mergeSafe7579Compatibility(agent.wallet_policy, {
       migrationState: 'migrated',
       modules,
-      session: sessionState,
+      session: null,
       revision: 2,
     });
     const { error: updateError } = await supabase
@@ -198,6 +133,7 @@ export async function POST(
       migrationState: 'migrated',
       safeTxHash: safeExecution.hash,
       managerTxHashes: managerReceipts.map((receipt) => receipt.hash),
+      sessionEnabled: false,
     });
   } catch (executionError) {
     const message = executionError instanceof Error ? executionError.message : 'Failed to execute Safe7579 migration';
