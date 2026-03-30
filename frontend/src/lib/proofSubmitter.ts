@@ -1,13 +1,14 @@
 import { createWalletClient, createPublicClient, http, stringToHex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { base, baseSepolia } from 'viem/chains';
+import { getBaseRpcTransport, getBaseRpcUrl } from '@/lib/baseRpc';
 import { readEnv, readRequiredEnv } from '@/lib/env';
 import { VERIFIER_ABI, VERIFIER_CONTRACT_ADDRESS } from './contracts';
 import { formatProofForContract, type ZkProofResult } from './zkProof';
 
 const isTestnet = readEnv(process.env.NEXT_PUBLIC_CHAIN) === 'testnet';
 const chain = isTestnet ? baseSepolia : base;
-const rpcUrl = readEnv(process.env.BASE_RPC_URL) || (isTestnet ? 'https://sepolia.base.org' : 'https://mainnet.base.org');
+const rpcUrl = getBaseRpcUrl(isTestnet);
 
 /**
  * Submit a ZK proof to the EliosProofVerifier contract on-chain.
@@ -32,7 +33,7 @@ export async function submitProofOnChain(
 
   const publicClient = createPublicClient({
     chain,
-    transport: http(rpcUrl),
+    transport: getBaseRpcTransport(isTestnet),
   });
 
   const taskIdBytes32 = stringToHex(taskId, { size: 32 });

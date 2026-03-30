@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http, formatEther } from 'viem';
+import { createPublicClient, formatEther } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { base, baseSepolia } from 'viem/chains';
 import { createSecurityAlert } from '@/lib/audit';
+import { getBaseRpcTransport } from '@/lib/baseRpc';
 import { readEnv, readFloatEnv } from '@/lib/env';
 import { createServiceClient } from '@/lib/supabase/server';
 import { dedupeSignerBalanceAlerts, isSignerBalanceAlert } from '@/lib/productionData';
 
 const isTestnet = readEnv(process.env.NEXT_PUBLIC_CHAIN) === 'testnet';
 const chain = isTestnet ? baseSepolia : base;
-const rpcUrl = readEnv(process.env.BASE_RPC_URL) || (isTestnet ? 'https://sepolia.base.org' : 'https://mainnet.base.org');
 
 // GET /api/cron/check-signer-balance — monitor proof submitter signer balance
 export async function GET(req: NextRequest) {
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   }
 
   const account = privateKeyToAccount(privateKey as `0x${string}`);
-  const client = createPublicClient({ chain, transport: http(rpcUrl) });
+  const client = createPublicClient({ chain, transport: getBaseRpcTransport(isTestnet) });
 
   const balance = await client.getBalance({ address: account.address });
   const balanceEth = parseFloat(formatEther(balance));

@@ -127,6 +127,9 @@ export async function POST(
         policy: wallet.policy,
         modules,
         sessionKeyAddress: getAddress(sessionState.address),
+        sessionKeyValidAfter: sessionState.rotatedAt
+          ? Math.floor(new Date(sessionState.rotatedAt).getTime() / 1000)
+          : undefined,
         sessionKeyValidUntil: Math.floor(new Date(sessionState.validUntil).getTime() / 1000),
         sessionKeyCiphertext: sessionState.ciphertext,
         sessionKeyNonce: sessionState.nonce,

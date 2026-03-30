@@ -10,6 +10,7 @@ import {
   buildStoredSafe7579Session,
   getSafe7579SessionPermissionId,
 } from '@/lib/agentWallet7579';
+import { getAgentWalletMigrationState, getAgentWalletModules, getAgentWalletSession, getAgentWalletStandard, mergeSafe7579Compatibility } from '@/lib/agentWalletCompat';
 
 export async function POST(
   req: NextRequest,
@@ -31,11 +32,14 @@ export async function POST(
   const supabase = createServiceClient();
   const { data: agent, error } = await supabase
     .from('agents')
-    .select('id, owner_id, wallet_address, wallet_standard, wallet_migration_state, wallet_policy, wallet_modules, session_key_address, session_key_expires_at')
+    .select('id, owner_id, wallet_address, wallet_policy')
     .eq('id', id)
     .single();
 
-  if (error || !agent || !agent.wallet_address || !agent.wallet_policy || !agent.wallet_modules?.sessionSalt || !agent.session_key_address || !agent.session_key_expires_at) {
+  const modules = agent ? getAgentWalletModules(agent) : undefined;
+  const currentSession = agent ? getAgentWalletSession(agent) : undefined;
+
+  if (error || !agent || !agent.wallet_address || !agent.wallet_policy || !modules?.sessionSalt || !currentSession?.address || !currentSession.validUntil) {
     return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   }
 
@@ -43,15 +47,18 @@ export async function POST(
     return NextResponse.json({ error: 'Only the agent owner can revoke the session key' }, { status: 403 });
   }
 
-  if (agent.wallet_standard !== 'safe7579' || agent.wallet_migration_state !== 'migrated') {
+  if (getAgentWalletStandard(agent) !== 'safe7579' || getAgentWalletMigrationState(agent) !== 'migrated') {
     return NextResponse.json({ error: 'Safe7579 must be fully migrated before revoking the session key' }, { status: 409 });
   }
 
   const storedSession = buildStoredSafe7579Session({
-    sessionKeyAddress: getAddress(agent.session_key_address),
-    sessionKeyValidUntil: Math.floor(new Date(agent.session_key_expires_at).getTime() / 1000),
+    sessionKeyAddress: getAddress(currentSession.address),
+    sessionKeyValidAfter: currentSession.rotatedAt
+      ? Math.floor(new Date(currentSession.rotatedAt).getTime() / 1000)
+      : undefined,
+    sessionKeyValidUntil: Math.floor(new Date(currentSession.validUntil).getTime() / 1000),
     policy: agent.wallet_policy,
-    modules: agent.wallet_modules,
+    modules,
   });
   const permissionId = getSafe7579SessionPermissionId(storedSession);
   const removeSessionCall = buildRemoveSessionCall(permissionId);
@@ -66,10 +73,20 @@ export async function POST(
     }),
   };
 
+  const revokedAt = new Date().toISOString();
+  const nextPolicy = mergeSafe7579Compatibility(agent.wallet_policy, {
+    migrationState: 'migrated',
+    modules,
+    session: {
+      ...currentSession,
+      validUntil: revokedAt,
+    },
+    revision: 2,
+  });
   const { error: updateError } = await supabase
     .from('agents')
     .update({
-      session_key_expires_at: new Date().toISOString(),
+      wallet_policy: nextPolicy,
     })
     .eq('id', id);
 

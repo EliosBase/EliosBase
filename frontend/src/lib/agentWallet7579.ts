@@ -4,6 +4,7 @@ import {
   SafeHookType,
   encodeModuleInstallationData,
   getAccount,
+  getEnableSessionDetails as getModuleEnableSessionDetails,
   getEnableSessionsAction,
   getOwnableValidator,
   getPermissionId,
@@ -15,11 +16,11 @@ import {
   moduleTypeIds,
   type Session,
 } from '@rhinestone/module-sdk';
+import { SMART_SESSION_EMISSARY_ADDRESS } from '@rhinestone/sdk/smart-sessions';
 import {
   concatHex,
   encodeFunctionData,
   getAddress,
-  http,
   parseAbi,
   type Address,
   type Hex,
@@ -27,6 +28,7 @@ import {
 import { base, baseSepolia } from 'viem/chains';
 import { createPublicClient } from 'viem';
 import { readEnv } from '@/lib/env';
+import { getBaseRpcTransport, getBaseRpcUrl } from '@/lib/baseRpc';
 import { privateKeyToAccount } from 'viem/accounts';
 import type { AgentWalletModules, AgentWalletPolicy } from '@/lib/types';
 
@@ -53,12 +55,11 @@ export const SAFE_7579_POLICY_MANAGER_ADDRESS = readEnv(process.env.SAFE7579_POL
 export const SAFE_7579_GUARD_ADDRESS = readEnv(process.env.SAFE7579_GUARD_ADDRESS);
 export const SAFE_7579_HOOK_ADDRESS = readEnv(process.env.SAFE7579_HOOK_ADDRESS);
 
-const rpcUrl = readEnv(process.env.BASE_RPC_URL)
-  || (isTestnet ? 'https://sepolia.base.org' : 'https://mainnet.base.org');
+export const safeWalletRpcUrl = getBaseRpcUrl(isTestnet);
 
 export const safe7579PublicClient = createPublicClient({
   chain: safeWalletChain,
-  transport: http(rpcUrl),
+  transport: getBaseRpcTransport(isTestnet),
 });
 
 export const SAFE_ABI = parseAbi([
@@ -121,6 +122,7 @@ export function buildSessionDefinition(params: {
   policy: AgentWalletPolicy;
   hookAddress: Address;
   validUntil: number;
+  validAfter?: number;
   salt?: Hex;
 }): Session {
   const sessionValidator = getOwnableValidator({
@@ -138,7 +140,7 @@ export function buildSessionDefinition(params: {
         limit: parseEthToPolicyUint(params.policy.autoApproveThresholdEth),
       }),
       getTimeFramePolicy({
-        validAfter: Math.floor(Date.now() / 1000),
+        validAfter: params.validAfter ?? Math.floor(Date.now() / 1000),
         validUntil: params.validUntil,
       }),
     ],
@@ -166,7 +168,11 @@ export function buildSafe7579Modules(params: {
     hook: params.hookAddress,
     sessions: params.session ? [params.session] : [],
   });
-  const compatibilityFallback = getSmartSessionsCompatibilityFallback();
+  const rawCompatibilityFallback = getSmartSessionsCompatibilityFallback();
+  const compatibilityFallback: SafeInstallModule = {
+    ...rawCompatibilityFallback,
+    functionSig: rawCompatibilityFallback.selector,
+  };
   const hookModule: SafeInstallModule = {
     address: params.hookAddress,
     module: params.hookAddress,
@@ -175,6 +181,7 @@ export function buildSafe7579Modules(params: {
     additionalContext: '0x',
     type: 'hook',
     hookType: SafeHookType.GLOBAL,
+    selector: '0x00000000',
   };
 
   return {
@@ -206,6 +213,7 @@ export function buildSafe7579ModuleMetadata(params: {
 export function buildStoredSafe7579Session(params: {
   sessionKeyAddress: Address;
   sessionKeyValidUntil: number;
+  sessionKeyValidAfter?: number;
   policy: AgentWalletPolicy;
   modules: AgentWalletModules;
 }): Session {
@@ -217,6 +225,7 @@ export function buildStoredSafe7579Session(params: {
     sessionKeyAddress: getAddress(params.sessionKeyAddress),
     policy: params.policy,
     hookAddress: getAddress(params.modules.hook),
+    validAfter: params.sessionKeyValidAfter,
     validUntil: params.sessionKeyValidUntil,
     salt: params.modules.sessionSalt as Hex,
   });
@@ -231,9 +240,58 @@ export function buildEnableSessionCall(session: Session) {
 
   return {
     to: getAddress(action.to),
-    value: action.value,
+    value: BigInt(action.value.toString()),
     data: hexOrEmpty(action.data),
   };
+}
+
+export async function getSafe7579EnableSessionDetails(params: {
+  safeAddress: Address;
+  session: Session;
+}) {
+  const account = getAccount({
+    address: getAddress(params.safeAddress),
+    type: 'safe',
+    deployedOnChains: [safeWalletChain.id],
+  });
+  const details = await getModuleEnableSessionDetails({
+    sessions: [params.session],
+    account,
+    clients: [safe7579PublicClient as never],
+    enableValidatorAddress: SAFE_7579_OWNER_VALIDATOR_ADDRESS,
+  });
+
+  return {
+    permissionEnableHash: details.permissionEnableHash,
+    permissionId: details.permissionId,
+    enableSessionData: details.enableSessionData,
+  };
+}
+
+export async function readSafe7579EmissarySessionEnabled(params: {
+  safeAddress: Address;
+  session: Session;
+}) {
+  return safe7579PublicClient.readContract({
+    address: getAddress(SMART_SESSION_EMISSARY_ADDRESS),
+    abi: [
+      {
+        type: 'function',
+        name: 'isPermissionEnabled',
+        inputs: [
+          { name: 'account', type: 'address' },
+          { name: 'permissionId', type: 'bytes32' },
+        ],
+        outputs: [{ name: 'isEnabled', type: 'bool' }],
+        stateMutability: 'view',
+      },
+    ],
+    functionName: 'isPermissionEnabled',
+    args: [
+      getAddress(params.safeAddress),
+      getSafe7579SessionPermissionId(params.session),
+    ],
+  });
 }
 
 export function buildRemoveSessionCall(permissionId: Hex) {
@@ -241,7 +299,7 @@ export function buildRemoveSessionCall(permissionId: Hex) {
 
   return {
     to: getAddress(action.to),
-    value: action.value,
+    value: BigInt(action.value.toString()),
     data: hexOrEmpty(action.data),
   };
 }
@@ -256,7 +314,6 @@ export function buildSafe7579MigrationCalls(params: {
   const modules = buildSafe7579Modules({
     ownerWallet: params.ownerWallet,
     hookAddress: params.hookAddress,
-    session: params.session,
   });
   const account = getAccount({
     address: params.safeAddress,
@@ -265,7 +322,6 @@ export function buildSafe7579MigrationCalls(params: {
   });
 
   const moduleCalls = [
-    modules.ownerValidator,
     modules.smartSessions,
     modules.compatibilityFallback,
     modules.hookModule,

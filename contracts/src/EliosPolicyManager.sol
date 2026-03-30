@@ -312,13 +312,27 @@ contract EliosPolicyManager {
         if (to == address(0) || to == safe) revert InvalidRecipient();
         if (blockedDestinations[safe][to]) revert DestinationBlocked();
 
-        if (to.code.length > 0 && !policy.allowContractRecipients && !allowlistedContracts[safe][to]) {
+        bool isInternalModuleTarget = _isInternalModuleTarget(safe, to);
+
+        if (to.code.length > 0 && !isInternalModuleTarget && !policy.allowContractRecipients && !allowlistedContracts[safe][to]) {
             revert ContractRecipientBlocked();
         }
 
-        if (data.length != 0 && !allowlistedContracts[safe][to]) {
+        if (data.length != 0 && !isInternalModuleTarget && !allowlistedContracts[safe][to]) {
             revert InvalidExecution();
         }
+    }
+
+    function _isInternalModuleTarget(address safe, address to) internal view returns (bool) {
+        ModuleConfig storage modules = safeWallets[safe].modules;
+
+        return to == modules.adapter
+            || to == modules.ownerValidator
+            || to == modules.smartSessionsValidator
+            || to == modules.compatibilityFallback
+            || to == modules.hook
+            || to == modules.guard
+            || to == modules.policyManager;
     }
 
     function _consumeSpend(address safe, uint256 value) internal {
