@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createUserServerClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { logAudit, logActivity, generateId } from '@/lib/audit';
 import { validateOrigin } from '@/lib/csrf';
 import { verifyEscrowActionTransaction } from '@/lib/transactionVerification';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 // POST /api/agents/[id]/hire — hire an agent with a verified on-chain escrow tx
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -16,8 +17,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.hireAgent, session.userId);
+  if (rateLimitError) return rateLimitError;
+
   const body = await req.json();
-  const supabase = createServiceClient();
+  const supabase = createUserServerClient();
   const actor = session.walletAddress ?? session.userId;
 
   // Require a real transaction hash
@@ -46,6 +50,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (agent.status === 'busy') {
     return NextResponse.json({ error: 'Agent is already busy' }, { status: 409 });
+  }
+
+  const { data: task, error: taskError } = await supabase
+    .from('tasks')
+    .select('id, title, status, assigned_agent, current_step, step_changed_at')
+    .eq('id', body.taskId)
+    .eq('submitter_id', session.userId)
+    .single();
+
+  if (taskError || !task) {
+    return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+  }
+
+  if (task.status !== 'active') {
+    return NextResponse.json({ error: 'Task is no longer active' }, { status: 409 });
+  }
+
+  if (task.assigned_agent) {
+    return NextResponse.json({ error: 'Task is already assigned' }, { status: 409 });
   }
 
   // Verify the transaction on-chain
@@ -79,7 +102,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Agent is no longer available' }, { status: 409 });
   }
 
-  // Store the real transaction
+  const { data: assignedTask, error: assignError } = await supabase
+    .from('tasks')
+    .update({
+      assigned_agent: agentId,
+      current_step: 'Assigned',
+      step_changed_at: new Date().toISOString(),
+    })
+    .eq('id', body.taskId)
+    .eq('submitter_id', session.userId)
+    .eq('status', 'active')
+    .is('assigned_agent', null)
+    .select('id')
+    .single();
+
+  if (assignError || !assignedTask) {
+    await supabase.from('agents').update({ status: 'online' }).eq('id', agentId);
+    return NextResponse.json({ error: 'Task is no longer available for assignment' }, { status: 409 });
+  }
+
   const txId = generateId('tx');
   const { error: txError } = await supabase.from('transactions').insert({
     id: txId,
@@ -94,20 +135,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   });
 
   if (txError) {
-    // Rollback agent status
-    await supabase.from('agents').update({ status: 'online' }).eq('id', agentId);
+    await Promise.all([
+      supabase.from('agents').update({ status: 'online' }).eq('id', agentId),
+      supabase
+        .from('tasks')
+        .update({
+          assigned_agent: null,
+          current_step: task.current_step,
+          step_changed_at: task.step_changed_at,
+        })
+        .eq('id', body.taskId)
+        .eq('submitter_id', session.userId),
+    ]);
     return NextResponse.json({ error: 'Failed to record transaction' }, { status: 500 });
   }
-
-  // If a taskId was provided, assign the agent to that task
-  await supabase
-    .from('tasks')
-    .update({
-      assigned_agent: agentId,
-      current_step: 'Assigned',
-      step_changed_at: new Date().toISOString(),
-    })
-    .eq('id', body.taskId);
 
   // Audit + activity logging
   await logAudit({ action: 'AGENT_HIRE', actor, target: agentId, result: 'ALLOW' });

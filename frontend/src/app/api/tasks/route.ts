@@ -1,26 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createPublicServerClient, createServiceClient, createUserServerClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { toTask } from '@/lib/transforms';
 import { logAudit, logActivity, checkSpendingLimit, parseRewardAmount, generateId } from '@/lib/audit';
 import { validateOrigin } from '@/lib/csrf';
 import { getTaskIdFromDisputeSource } from '@/lib/taskDisputes';
+import { parsePagination } from '@/lib/pagination';
+import { jsonWithCache, PUBLIC_COLLECTION_CACHE_CONTROL } from '@/lib/httpCache';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 export async function GET(req: NextRequest) {
-  const supabase = createServiceClient();
+  const publicSupabase = createPublicServerClient();
+  const serviceSupabase = createServiceClient();
   const { searchParams } = req.nextUrl;
+  const { limit, offset } = parsePagination(searchParams);
 
-  let query = supabase.from('tasks').select('*, agents(name, owner_id, wallet_address, wallet_policy, wallet_status, users:owner_id(wallet_address))');
+  let query = publicSupabase.from('tasks').select('*, agents(name, owner_id, wallet_address, wallet_policy, wallet_status, users:owner_id(wallet_address))');
 
   const status = searchParams.get('status');
   if (status) query = query.eq('status', status);
 
   const [{ data, error }, disputesRes] = await Promise.all([
-    query.order('submitted_at', { ascending: false }),
-    supabase
+    query.order('submitted_at', { ascending: false }).range(offset, offset + limit - 1),
+    serviceSupabase
       .from('security_alerts')
       .select('source')
-      .eq('resolved', false),
+      .eq('resolved', false)
+      .limit(200),
   ]);
 
   if (error) {
@@ -33,11 +39,12 @@ export async function GET(req: NextRequest) {
       .filter((taskId): taskId is string => !!taskId),
   );
 
-  return NextResponse.json(
+  return jsonWithCache(
     data.map((task) => toTask({
       ...task,
       has_open_dispute: openDisputes.has(task.id),
     })),
+    PUBLIC_COLLECTION_CACHE_CONTROL,
   );
 }
 
@@ -49,6 +56,9 @@ export async function POST(req: NextRequest) {
   if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.taskCreate, session.userId);
+  if (rateLimitError) return rateLimitError;
 
   const body = await req.json();
 
@@ -63,7 +73,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Reward is required' }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
+  const supabase = createUserServerClient();
 
   // Guardrail: check spending limit before allowing task creation
   const rewardNum = parseRewardAmount(body.reward);

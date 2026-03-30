@@ -43,6 +43,8 @@ jobs:
           fail-on-severity: high
           fail-on-scopes: runtime
 
-      - name: Skip when dependency graph is unavailable
+      - name: Require dependency graph support
         if: steps.support.outputs.enabled != 'true'
-        run: echo "Dependency graph is disabled for this repository; skipping dependency review."
+        run: |
+          echo "GitHub dependency graph must be enabled for dependency-review to run." >&2
+          exit 1

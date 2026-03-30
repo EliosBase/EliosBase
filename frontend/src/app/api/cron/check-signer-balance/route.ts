@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, formatEther } from 'viem';
+import { formatEther } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { base, baseSepolia } from 'viem/chains';
 import { createSecurityAlert } from '@/lib/audit';
-import { getBaseRpcTransport } from '@/lib/baseRpc';
 import { readEnv, readFloatEnv } from '@/lib/env';
 import { createServiceClient } from '@/lib/supabase/server';
 import { dedupeSignerBalanceAlerts, isSignerBalanceAlert } from '@/lib/productionData';
-
-const isTestnet = readEnv(process.env.NEXT_PUBLIC_CHAIN) === 'testnet';
-const chain = isTestnet ? baseSepolia : base;
+import { publicClient } from '@/lib/viemClient';
+import { getConfiguredCronSecret, isProductionRuntime } from '@/lib/runtimeConfig';
 
 // GET /api/cron/check-signer-balance — monitor proof submitter signer balance
 export async function GET(req: NextRequest) {
-  const cronSecret = readEnv(process.env.CRON_SECRET);
+  const cronSecret = getConfiguredCronSecret();
+  if (!cronSecret && isProductionRuntime()) {
+    return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 500 });
+  }
+
   if (cronSecret) {
     const authHeader = req.headers.get('authorization');
     if (authHeader !== `Bearer ${cronSecret}`) {
@@ -21,15 +22,14 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const privateKey = readEnv(process.env.PROOF_SUBMITTER_PRIVATE_KEY);
+  const privateKey = readEnv(process.env.SAFE_POLICY_SIGNER_PRIVATE_KEY)
+    ?? readEnv(process.env.PROOF_SUBMITTER_PRIVATE_KEY);
   if (!privateKey) {
-    return NextResponse.json({ error: 'PROOF_SUBMITTER_PRIVATE_KEY not configured' }, { status: 500 });
+    return NextResponse.json({ error: 'SAFE_POLICY_SIGNER_PRIVATE_KEY or PROOF_SUBMITTER_PRIVATE_KEY not configured' }, { status: 500 });
   }
 
   const account = privateKeyToAccount(privateKey as `0x${string}`);
-  const client = createPublicClient({ chain, transport: getBaseRpcTransport(isTestnet) });
-
-  const balance = await client.getBalance({ address: account.address });
+  const balance = await publicClient.getBalance({ address: account.address });
   const balanceEth = parseFloat(formatEther(balance));
   const threshold = readFloatEnv(process.env.SIGNER_MIN_BALANCE_ETH, 0.01);
   const belowThreshold = balanceEth < threshold;

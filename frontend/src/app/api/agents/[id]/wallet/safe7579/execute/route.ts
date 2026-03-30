@@ -16,6 +16,7 @@ import {
   mergeSafe7579Compatibility,
 } from '@/lib/agentWalletCompat';
 import { readSafe7579InstallationState } from '@/lib/agentWallet7579State';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 const INSTALLATION_VERIFICATION_ATTEMPTS = 6;
 const INSTALLATION_VERIFICATION_DELAY_MS = 1500;
@@ -31,6 +32,9 @@ export async function POST(
   if (!session.userId || !session.walletAddress) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.walletMutation, session.userId);
+  if (rateLimitError) return rateLimitError;
 
   const body = await req.json().catch(() => ({}));
   const ownerSignature = body.ownerSignature as Hex | undefined;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAddress, isAddress } from 'viem';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createUserServerClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { createSecurityAlert, generateId, logActivity, logAudit } from '@/lib/audit';
 import { evaluateAgentWalletTransfer, resolveAgentWallet } from '@/lib/agentWallets';
@@ -8,20 +8,26 @@ import { queueSafe7579ReviewedIntent } from '@/lib/agentWallet7579Transfers';
 import { toAgentWalletTransfer } from '@/lib/transforms';
 import { validateOrigin } from '@/lib/csrf';
 import { isMigratedSafe7579 } from '@/lib/agentWalletCompat';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
+import { parsePagination } from '@/lib/pagination';
 
 function parseAmount(value: string) {
   const parsed = Number.parseFloat(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.walletTransferRead, session.userId);
+  if (rateLimitError) return rateLimitError;
+
+  const { limit, offset } = parsePagination(req.nextUrl.searchParams);
   const { id } = await params;
-  const supabase = createServiceClient();
+  const supabase = createUserServerClient();
   const { data: agent, error: agentError } = await supabase
     .from('agents')
     .select('owner_id')
@@ -40,7 +46,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .from('agent_wallet_transfers')
     .select('*')
     .eq('agent_id', id)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error || !transfers) {
     return NextResponse.json({ error: 'Failed to load agent wallet transfers' }, { status: 500 });
@@ -58,6 +65,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.walletTransferMutation, session.userId);
+  if (rateLimitError) return rateLimitError;
+
   const { id } = await params;
   const body = await req.json();
   const destination = String(body.destination ?? '').trim();
@@ -74,7 +84,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Add a note between 8 and 240 characters' }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
+  const supabase = createUserServerClient();
   const { data: agent, error: agentError } = await supabase
     .from('agents')
     .select('id, name, owner_id, wallet_address, wallet_policy, wallet_status, users:owner_id(wallet_address)')

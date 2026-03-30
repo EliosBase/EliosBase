@@ -11,6 +11,7 @@ import {
   getSafe7579SessionPermissionId,
 } from '@/lib/agentWallet7579';
 import { getAgentWalletMigrationState, getAgentWalletModules, getAgentWalletSession, getAgentWalletStandard, mergeSafe7579Compatibility } from '@/lib/agentWalletCompat';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 export async function POST(
   req: NextRequest,
@@ -23,6 +24,9 @@ export async function POST(
   if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.walletMutation, session.userId);
+  if (rateLimitError) return rateLimitError;
 
   if (!SAFE_7579_POLICY_MANAGER_ADDRESS) {
     return NextResponse.json({ error: 'Safe7579 policy manager is not configured' }, { status: 500 });

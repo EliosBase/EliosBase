@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/server';
+import { createUserServerClient } from '@/lib/supabase/server';
 import { getSession } from '@/lib/session';
 import { toAgent } from '@/lib/transforms';
 import { logAudit, logActivity, generateId } from '@/lib/audit';
 import { validateOrigin } from '@/lib/csrf';
 import { provisionAgentWallet } from '@/lib/agentWallets';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 const VALID_TYPES = ['sentinel', 'analyst', 'executor', 'auditor', 'optimizer'];
 
@@ -19,6 +20,9 @@ export async function POST(req: NextRequest) {
   if (!session.walletAddress) {
     return NextResponse.json({ error: 'Wallet address is required to provision the agent Safe' }, { status: 400 });
   }
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.agentRegister, session.userId);
+  if (rateLimitError) return rateLimitError;
 
   const body = await req.json();
 
@@ -36,7 +40,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Capabilities must be an array (max 10)' }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
+  const supabase = createUserServerClient();
   const id = generateId('ag');
   let wallet;
 

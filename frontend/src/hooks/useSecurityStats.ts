@@ -10,8 +10,8 @@ export interface SecurityStats {
   guardrailsTrend: string;
   proofsVerified: number;
   proofsTrend: string;
-  uptime: string;
-  uptimeTrend: string;
+  auditEntries: number;
+  auditEntriesTrend: string;
 }
 
 async function fetchSecurityStats(): Promise<SecurityStats> {

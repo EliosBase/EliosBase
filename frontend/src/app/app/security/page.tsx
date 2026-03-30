@@ -33,6 +33,8 @@ export default function SecurityPage() {
   const queryClient = useQueryClient();
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [toggleError, setToggleError] = useState('');
+  const proofsVerified = typeof stats?.proofsVerified === 'number' ? stats.proofsVerified.toLocaleString() : '--';
+  const auditEntries = typeof stats?.auditEntries === 'number' ? stats.auditEntries.toLocaleString() : '--';
 
   const securityStats = [
     {
@@ -49,14 +51,14 @@ export default function SecurityPage() {
     },
     {
       label: 'Proofs Verified',
-      value: stats ? stats.proofsVerified.toLocaleString() : '--',
+      value: proofsVerified,
       trend: stats?.proofsTrend ?? '',
       trendUp: true,
     },
     {
-      label: 'Uptime',
-      value: stats?.uptime ?? '--',
-      trend: stats?.uptimeTrend ?? '',
+      label: 'Audit Events',
+      value: auditEntries,
+      trend: stats?.auditEntriesTrend ?? '',
       trendUp: true,
     },
   ];

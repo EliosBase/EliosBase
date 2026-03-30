@@ -1,10 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  createPublicServerClient: vi.fn(),
   createServiceClient: vi.fn(),
+  getBalance: vi.fn(),
 }));
 
-vi.mock('@/lib/supabase/server', () => ({ createServiceClient: mocks.createServiceClient }));
+vi.mock('@/lib/supabase/server', () => ({
+  createPublicServerClient: mocks.createPublicServerClient,
+  createServiceClient: mocks.createServiceClient,
+}));
+
+vi.mock('@/lib/viemClient', () => ({
+  publicClient: {
+    getBalance: mocks.getBalance,
+  },
+}));
 
 const { GET } = await import('@/app/api/stats/route');
 
@@ -48,17 +59,12 @@ class QueryBuilder<T extends Record<string, unknown>> {
     return this;
   }
 
-  lt(column: keyof T & string, value: unknown) {
-    this.filters.push((row) => String(row[column] ?? '') < String(value));
-    return this;
-  }
-
   then<TResult1 = unknown, TResult2 = never>(
-    onfulfilled?: ((value: { data?: T[]; count?: number }) => TResult1 | PromiseLike<TResult1>) | null,
+    onfulfilled?: ((value: { data?: T[]; count?: number; error: null }) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
   ) {
     const filtered = this.rows.filter((row) => this.filters.every((filter) => filter(row)));
-    const result = this.head ? { count: filtered.length } : { data: filtered };
+    const result = this.head ? { count: filtered.length, error: null } : { data: filtered, error: null };
     return Promise.resolve(result).then(onfulfilled ?? undefined, onrejected ?? undefined);
   }
 }
@@ -78,10 +84,12 @@ function makeSupabase(data: {
 describe('GET /api/stats', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_ESCROW_ADDRESS', '0x0000000000000000000000000000000000000001');
+    mocks.getBalance.mockResolvedValue(0n);
   });
 
   it('clamps tvl and sparkline points to zero when releases exceed locks', async () => {
-    mocks.createServiceClient.mockReturnValue(makeSupabase({
+    mocks.createPublicServerClient.mockReturnValue(makeSupabase({
       agents: [
         { status: 'online', created_at: isoDaysAgo(9) },
         { status: 'offline', created_at: isoDaysAgo(4) },
@@ -90,6 +98,11 @@ describe('GET /api/stats', () => {
         { status: 'active', submitted_at: isoDaysAgo(2), completed_at: null, zk_proof_id: null },
         { status: 'completed', submitted_at: isoDaysAgo(8), completed_at: isoDaysAgo(1), zk_proof_id: 'proof-1' },
       ],
+      transactions: [],
+    }));
+    mocks.createServiceClient.mockReturnValue(makeSupabase({
+      agents: [],
+      tasks: [],
       transactions: [
         { type: 'escrow_lock', status: 'confirmed', amount: '0.50 ETH', timestamp: isoDaysAgo(13) },
         { type: 'escrow_release', status: 'confirmed', amount: '1.10 ETH', timestamp: isoDaysAgo(13) },
@@ -107,7 +120,13 @@ describe('GET /api/stats', () => {
     expect(json.sparklines.tvl.every((point: number) => point >= 0)).toBe(true);
   });
 
-  it('carries forward pre-window locked value into the tvl sparkline', async () => {
+  it('anchors the sparkline to the current on-chain tvl balance', async () => {
+    mocks.getBalance.mockResolvedValue(850000000000000000n);
+    mocks.createPublicServerClient.mockReturnValue(makeSupabase({
+      agents: [],
+      tasks: [],
+      transactions: [],
+    }));
     mocks.createServiceClient.mockReturnValue(makeSupabase({
       agents: [],
       tasks: [],
@@ -126,24 +145,13 @@ describe('GET /api/stats', () => {
     expect(json.sparklines.tvl.every((point: number) => point >= 0)).toBe(true);
   });
 
-  it('subtracts refunded escrow from tvl and sparkline calculations', async () => {
-    mocks.createServiceClient.mockReturnValue(makeSupabase({
+  it('treats legacy self-directed escrow releases as refunds in tvl calculations', async () => {
+    mocks.getBalance.mockResolvedValue(600000000000000000n);
+    mocks.createPublicServerClient.mockReturnValue(makeSupabase({
       agents: [],
       tasks: [],
-      transactions: [
-        { type: 'escrow_lock', status: 'confirmed', amount: '1.00 ETH', timestamp: isoDaysAgo(13) },
-        { type: 'escrow_refund', status: 'confirmed', amount: '0.35 ETH', timestamp: isoDaysAgo(2) },
-      ],
+      transactions: [],
     }));
-
-    const res = await GET();
-    const json = await res.json();
-
-    expect(json.tvl).toBeCloseTo(0.65, 5);
-    expect(json.sparklines.tvl.at(-1)).toBeCloseTo(0.65, 5);
-  });
-
-  it('treats legacy self-directed escrow releases as refunds in tvl calculations', async () => {
     mocks.createServiceClient.mockReturnValue(makeSupabase({
       agents: [],
       tasks: [],
