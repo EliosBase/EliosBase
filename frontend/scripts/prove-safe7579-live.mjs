@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Safe from '@safe-global/protocol-kit';
 import {
   getOwnableValidator,
@@ -56,8 +57,19 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 const SAFE_FALLBACK_HANDLER_SLOT = '0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5';
 const SAFE_GUARD_SLOT = '0x4a204f620c8c5ccdca3fd54d003badd85ba500436a431f0cbda4f558c93c34c8';
 const L2_DATA_FEE_RESERVE_WEI = 5_000_000_000n;
+const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROOF_STATE_PATH = process.env.SAFE7579_PROOF_STATE_FILE
-  ?? path.join(process.cwd(), '.tmp', 'safe7579-live-proof-state.json');
+  ?? path.join(SCRIPT_DIR, '..', '.tmp', 'safe7579-live-proof-state.json');
+const PROOF_STAGES = [
+  'owner-created',
+  'owner-authenticated',
+  'agent-registered',
+  'migration-prepared',
+  'migration-executed',
+  'safe-funded',
+  'session-enabled',
+  'proof-complete',
+];
 const ACCOUNT_7579_STATE_ABI = parseAbi([
   'function isModuleInstalled(uint256 moduleTypeId,address module,bytes additionalContext) external view returns (bool)',
   'function getValidatorsPaginated(address cursor,uint256 pageSize) external view returns (address[] memory,address)',
@@ -68,26 +80,31 @@ const VALIDATOR_PAGE_SIZE = 20n;
 const MAX_VALIDATOR_PAGES = 8;
 
 async function main() {
-  logStep('authenticating owner');
-  const ownerPrivateKey = `0x${crypto.randomBytes(32).toString('hex')}`;
+  const resumedState = loadProofState();
+  const ownerPrivateKey = resumedState?.ownerPrivateKey ?? `0x${crypto.randomBytes(32).toString('hex')}`;
   const owner = privateKeyToAccount(ownerPrivateKey);
-  const sessionDestination = policySigner.address;
-  const reviewedDestination = privateKeyToAccount(`0x${crypto.randomBytes(32).toString('hex')}`).address;
+  const sessionDestination = resumedState?.sessionDestination ?? policySigner.address;
+  const reviewedDestination = resumedState?.reviewedDestination
+    ?? privateKeyToAccount(`0x${crypto.randomBytes(32).toString('hex')}`).address;
   const ownerJar = new CookieJar();
-  const proofState = {
-    baseUrl,
-    stage: 'owner-created',
-    ownerPrivateKey,
-    ownerAddress: owner.address,
-    sessionDestination,
-    reviewedDestination,
-  };
+  const proofState = resumedState?.baseUrl === baseUrl
+    ? resumedState
+    : {
+      baseUrl,
+      stage: 'owner-created',
+      ownerPrivateKey,
+      ownerAddress: owner.address,
+      sessionDestination,
+      reviewedDestination,
+    };
   saveProofState(proofState);
 
+  logStep('authenticating owner');
   const auth = await authenticateOwner(ownerJar, owner);
-  proofState.stage = 'owner-authenticated';
-  proofState.ownerUserId = auth.userId;
-  saveProofState(proofState);
+  updateProofState(proofState, 'owner-authenticated', {
+    ownerUserId: auth.userId,
+    ownerAddress: owner.address,
+  });
   logStep('loading operator');
   const operator = await loadOperator();
   const operatorCookie = await sealSessionCookie({
@@ -97,76 +114,91 @@ async function main() {
     role: operator.role,
   });
 
-  logStep('registering agent');
-  const agent = await registerAgent(ownerJar);
-  const safeAddress = getAddress(agent.walletAddress);
-  const policy = agent.walletPolicy;
+  let agent;
+  let safeAddress;
+  let policy;
   const fundAmountEth = process.env.SAFE7579_PROOF_FUND_AMOUNT_ETH ?? '0.0000015';
-  Object.assign(proofState, {
-    stage: 'agent-registered',
-    agentId: agent.id,
-    safeAddress,
-    walletPolicy: policy,
-  });
-  saveProofState(proofState);
+  let migration = null;
+  let fundHash = null;
+  let fundReceipt = null;
+  let enabledSession = null;
 
-  logStep('preparing migration');
-  const preparedMigration = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/safe7579/prepare`);
-  proofState.stage = 'migration-prepared';
-  saveProofState(proofState);
-  logStep('signing migration');
-  const migrationSignature = await signPreparedSafeExecution(ownerPrivateKey, safeAddress, preparedMigration);
-  logStep('executing migration');
-  const migration = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/safe7579/execute`, {
-    ownerSignature: migrationSignature,
-    txData: preparedMigration.txData,
-  });
-  proofState.stage = 'migration-executed';
-  saveProofState(proofState);
+  if (stageBefore(proofState.stage, 'safe-funded')) {
+    logStep('registering agent');
+    agent = await registerAgent(ownerJar);
+    safeAddress = getAddress(agent.walletAddress);
+    policy = agent.walletPolicy;
+    updateProofState(proofState, 'agent-registered', {
+      agentId: agent.id,
+      safeAddress,
+      walletPolicy: policy,
+    });
 
-  logStep(`funding safe ${safeAddress}`);
-  const fundHash = await sendPolicyTransaction(policyWalletClient, policySigner.address, {
-    account: policySigner,
-    to: safeAddress,
-    value: parseEther(fundAmountEth),
-  });
-  const fundReceipt = await publicClient.waitForTransactionReceipt({ hash: fundHash });
-  if (fundReceipt.status !== 'success') {
-    throw new Error('Funding the agent Safe reverted');
-  }
-  proofState.stage = 'safe-funded';
-  saveProofState(proofState);
+    logStep('preparing migration');
+    const preparedMigration = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/safe7579/prepare`);
+    updateProofState(proofState, 'migration-prepared');
+    logStep('signing migration');
+    const migrationSignature = await signPreparedSafeExecution(ownerPrivateKey, safeAddress, preparedMigration);
+    logStep('executing migration');
+    migration = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/safe7579/execute`, {
+      ownerSignature: migrationSignature,
+      txData: preparedMigration.txData,
+    });
+    updateProofState(proofState, 'migration-executed');
 
-  logStep('preparing session rotation');
-  const preparedSession = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/session/rotate`);
-  logStep('signing session rotation');
-  const sessionSignature = await signPreparedSafeExecution(ownerPrivateKey, safeAddress, preparedSession);
-  if (!preparedSession.enableSessionTypedData) {
-    throw new Error('Safe7579 session enable typed data is missing from the rotation payload');
+    logStep(`funding safe ${safeAddress}`);
+    fundHash = await sendPolicyTransaction(policyWalletClient, policySigner.address, {
+      account: policySigner,
+      to: safeAddress,
+      value: parseEther(fundAmountEth),
+    });
+    fundReceipt = await publicClient.waitForTransactionReceipt({ hash: fundHash });
+    if (fundReceipt.status !== 'success') {
+      throw new Error('Funding the agent Safe reverted');
+    }
+    updateProofState(proofState, 'safe-funded');
+  } else {
+    if (!proofState.agentId || !proofState.safeAddress) {
+      throw new Error('Saved proof state is missing the agent id or Safe address');
+    }
+    logStep(`resuming proof from ${proofState.stage}`);
+    agent = await fetchAgent(proofState.agentId);
+    safeAddress = getAddress(proofState.safeAddress);
+    policy = proofState.walletPolicy ?? agent.wallet_policy;
+    updateProofState(proofState, proofState.stage, { walletPolicy: policy });
   }
-  if (!preparedSession.enableSessionContext) {
-    throw new Error('Safe7579 session enable context is missing from the rotation payload');
+
+  if (stageBefore(proofState.stage, 'session-enabled')) {
+    logStep('preparing session rotation');
+    const preparedSession = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/session/rotate`);
+    logStep('signing session rotation');
+    const sessionSignature = await signPreparedSafeExecution(ownerPrivateKey, safeAddress, preparedSession);
+    if (!preparedSession.enableSessionTypedData) {
+      throw new Error('Safe7579 session enable typed data is missing from the rotation payload');
+    }
+    if (!preparedSession.enableSessionContext) {
+      throw new Error('Safe7579 session enable context is missing from the rotation payload');
+    }
+    const enableSessionSignature = await owner.signTypedData(
+      reviveEnableSessionTypedData(preparedSession.enableSessionTypedData),
+    );
+    debugLog('session-enable', {
+      agentId: agent.id,
+      safeAddress,
+      enableSessionTypedData: preparedSession.enableSessionTypedData,
+      enableSessionSignature,
+      pendingSession: preparedSession.pendingSession,
+    });
+    logStep('executing session rotation');
+    enabledSession = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/session/execute`, {
+      ownerSignature: sessionSignature,
+      enableSessionSignature,
+      txData: preparedSession.txData,
+      pendingSession: preparedSession.pendingSession,
+      enableSessionContext: preparedSession.enableSessionContext,
+    });
+    updateProofState(proofState, 'session-enabled');
   }
-  const enableSessionSignature = await owner.signTypedData(
-    reviveEnableSessionTypedData(preparedSession.enableSessionTypedData),
-  );
-  debugLog('session-enable', {
-    agentId: agent.id,
-    safeAddress,
-    enableSessionTypedData: preparedSession.enableSessionTypedData,
-    enableSessionSignature,
-    pendingSession: preparedSession.pendingSession,
-  });
-  logStep('executing session rotation');
-  const enabledSession = await apiJson(ownerJar, 'POST', `/api/agents/${agent.id}/wallet/session/execute`, {
-    ownerSignature: sessionSignature,
-    enableSessionSignature,
-    txData: preparedSession.txData,
-    pendingSession: preparedSession.pendingSession,
-    enableSessionContext: preparedSession.enableSessionContext,
-  });
-  proofState.stage = 'session-enabled';
-  saveProofState(proofState);
 
   logStep('verifying session status');
   const sessionStatus = await apiJson(ownerJar, 'GET', `/api/agents/${agent.id}/wallet/session`);
@@ -259,13 +291,14 @@ async function main() {
     funding: {
       amountEth: fundAmountEth,
       txHash: fundHash,
-      blockNumber: Number(fundReceipt.blockNumber),
+      blockNumber: fundReceipt ? Number(fundReceipt.blockNumber) : null,
+      resumed: fundHash === null,
     },
     migration: {
-      safeTxHash: migration.safeTxHash,
-      managerTxHashes: migration.managerTxHashes,
-      sessionEnableTxHash: enabledSession.safeTxHash,
-      sessionPolicyTxHash: enabledSession.managerTxHash,
+      safeTxHash: migration?.safeTxHash ?? null,
+      managerTxHashes: migration?.managerTxHashes ?? null,
+      sessionEnableTxHash: enabledSession?.safeTxHash ?? null,
+      sessionPolicyTxHash: enabledSession?.managerTxHash ?? null,
       sessionEnabled: sessionStatus.sessionEnabled,
       installedModules: {
         ownerValidator: installedModules.ownerValidator,
@@ -309,12 +342,38 @@ async function main() {
     },
   };
 
+  updateProofState(proofState, 'proof-complete');
+
   console.log(JSON.stringify(result, null, 2));
+}
+
+function loadProofState() {
+  if (!fs.existsSync(PROOF_STATE_PATH)) {
+    return null;
+  }
+  return safeJsonParse(fs.readFileSync(PROOF_STATE_PATH, 'utf8'));
 }
 
 function saveProofState(state) {
   fs.mkdirSync(path.dirname(PROOF_STATE_PATH), { recursive: true });
   fs.writeFileSync(PROOF_STATE_PATH, JSON.stringify(state, null, 2));
+}
+
+function updateProofState(state, stage, extra = {}) {
+  Object.assign(state, extra);
+  if (stage && stageIndex(stage) >= stageIndex(state.stage)) {
+    state.stage = stage;
+  }
+  saveProofState(state);
+}
+
+function stageBefore(currentStage, targetStage) {
+  return stageIndex(currentStage) < stageIndex(targetStage);
+}
+
+function stageIndex(stage) {
+  const idx = PROOF_STAGES.indexOf(stage);
+  return idx === -1 ? -1 : idx;
 }
 
 function reviveEnableSessionTypedData(typedData) {
