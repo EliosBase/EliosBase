@@ -17,6 +17,9 @@ import {
 } from '@/lib/agentWalletCompat';
 import { readSafe7579InstallationState } from '@/lib/agentWallet7579State';
 
+const INSTALLATION_VERIFICATION_ATTEMPTS = 6;
+const INSTALLATION_VERIFICATION_DELAY_MS = 1500;
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -88,21 +91,32 @@ export async function POST(
       managerReceipts.push(await executePolicySignerCall(call));
     }
 
-    const installation = await readSafe7579InstallationState({
-      safeAddress,
-      ownerWallet: getAddress(agent.wallet_policy.owner),
-      hookAddress: getAddress(modules.hook),
-      guardAddress: modules.guard ? getAddress(modules.guard) : undefined,
-      fallbackHandlerAddress: modules.adapter ? getAddress(modules.adapter) : undefined,
-    });
-    const missingChecks = [
-      !installation.ownerValidator ? 'ownerValidator' : null,
-      !installation.smartSessionsValidator ? 'smartSessionsValidator' : null,
-      !installation.compatibilityFallback ? 'compatibilityFallback' : null,
-      !installation.hook ? 'hook' : null,
-      !installation.guard ? 'guard' : null,
-      !installation.fallbackHandler ? 'safeFallbackHandler' : null,
-    ].filter((value): value is string => Boolean(value));
+    let missingChecks: string[] = [];
+    for (let attempt = 0; attempt < INSTALLATION_VERIFICATION_ATTEMPTS; attempt += 1) {
+      const installation = await readSafe7579InstallationState({
+        safeAddress,
+        ownerWallet: getAddress(agent.wallet_policy.owner),
+        hookAddress: getAddress(modules.hook),
+        guardAddress: modules.guard ? getAddress(modules.guard) : undefined,
+        fallbackHandlerAddress: modules.adapter ? getAddress(modules.adapter) : undefined,
+      });
+      missingChecks = [
+        !installation.ownerValidator ? 'ownerValidator' : null,
+        !installation.smartSessionsValidator ? 'smartSessionsValidator' : null,
+        !installation.compatibilityFallback ? 'compatibilityFallback' : null,
+        !installation.hook ? 'hook' : null,
+        !installation.guard ? 'guard' : null,
+        !installation.fallbackHandler ? 'safeFallbackHandler' : null,
+      ].filter((value): value is string => Boolean(value));
+
+      if (missingChecks.length === 0) {
+        break;
+      }
+
+      if (attempt < INSTALLATION_VERIFICATION_ATTEMPTS - 1) {
+        await sleep(INSTALLATION_VERIFICATION_DELAY_MS);
+      }
+    }
 
     if (missingChecks.length > 0) {
       return NextResponse.json({
@@ -140,4 +154,8 @@ export async function POST(
     const message = executionError instanceof Error ? executionError.message : 'Failed to execute Safe7579 migration';
     return NextResponse.json({ error: message }, { status: 500 });
   }
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
