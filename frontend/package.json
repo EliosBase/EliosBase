@@ -12,17 +12,17 @@
     "smoke:real": "node scripts/smoke-real-env.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.80.0",
+    "@anthropic-ai/sdk": "^0.81.0",
     "@base-org/account": "^2.5.3",
     "@rhinestone/module-sdk": "^0.4.0",
-    "@rhinestone/sdk": "^1.4.0",
+    "@rhinestone/sdk": "^1.4.1",
     "@safe-global/api-kit": "^4.1.0",
     "@safe-global/protocol-kit": "^7.0.0",
     "@safe-global/types-kit": "^3.1.0",
-    "@sentry/nextjs": "^10.46.0",
-    "@supabase/ssr": "^0.9.0",
-    "@supabase/supabase-js": "^2.100.1",
-    "@tanstack/react-query": "^5.95.2",
+    "@sentry/nextjs": "^10.47.0",
+    "@supabase/ssr": "^0.10.0",
+    "@supabase/supabase-js": "^2.101.1",
+    "@tanstack/react-query": "^5.96.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
     "bs58": "^6.0.0",
@@ -53,7 +53,7 @@
     "globals": "^17.4.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "typescript-eslint": "^8.57.2",
+    "typescript-eslint": "^8.58.0",
     "vitest": "^3.2.4"
   },
   "overrides": {
