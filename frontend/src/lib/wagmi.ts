@@ -1,5 +1,5 @@
 import { http, createConfig } from 'wagmi';
-import { injected } from 'wagmi/connectors';
+import { baseAccount, injected } from 'wagmi/connectors';
 import { base, baseSepolia } from 'wagmi/chains';
 import { readEnv } from '@/lib/env';
 
@@ -8,6 +8,7 @@ const isTestnet = readEnv(process.env.NEXT_PUBLIC_CHAIN) === 'testnet';
 export const activeChain = isTestnet ? baseSepolia : base;
 
 const connectors = [
+  baseAccount({ appName: 'EliosBase' }),
   injected({ target: 'metaMask' }),
   injected({ target: 'coinbaseWallet' }),
   injected({ target: 'rabby' }),
