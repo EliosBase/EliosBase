@@ -8,12 +8,12 @@ const isTestnet = readEnv(process.env.NEXT_PUBLIC_CHAIN) === 'testnet';
 export const activeChain = isTestnet ? baseSepolia : base;
 
 const connectors = [
-  baseAccount({ appName: 'EliosBase' }),
   injected({ target: 'metaMask' }),
   injected({ target: 'coinbaseWallet' }),
   injected({ target: 'rabby' }),
   injected({ target: 'phantom' }),
   injected(),
+  baseAccount({ appName: 'EliosBase' }),
 ];
 
 export const config = isTestnet
