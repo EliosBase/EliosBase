@@ -1,6 +1,6 @@
 /** @jsxImportSource frog/jsx */
 
-import { Frog, Button, loadGoogleFont } from 'frog';
+import { Frog, Button } from 'frog';
 import { type NextRequest } from 'next/server';
 import { registerAgentFrames } from '@/lib/frames/agent';
 import { registerTaskFrames } from '@/lib/frames/task';

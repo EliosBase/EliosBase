@@ -1,7 +1,7 @@
 import { http, createConfig } from 'wagmi';
 import { coinbaseWallet, injected } from 'wagmi/connectors';
 import { baseSepolia, base } from 'wagmi/chains';
-import { activeChain, isTestnet } from '@/lib/chainConfig';
+import { isTestnet } from '@/lib/chainConfig';
 
 export { activeChain } from '@/lib/chainConfig';
 
