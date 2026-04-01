@@ -17,6 +17,12 @@ const contentSecurityPolicy = [
   "frame-src 'self' https://warpcast.com https://relay.farcaster.xyz",
 ].join('; ');
 
+// Frames need to be embeddable by Farcaster clients — relax frame-ancestors
+const framesContentSecurityPolicy = contentSecurityPolicy.replace(
+  "frame-ancestors 'none'",
+  "frame-ancestors https://warpcast.com https://*.farcaster.xyz https://*.supercast.xyz *",
+);
+
 const nextConfig: NextConfig = {
   // snarkjs uses file:// URLs that Turbopack can't trace
   serverExternalPackages: ['snarkjs'],
@@ -34,6 +40,16 @@ const nextConfig: NextConfig = {
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
           { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
+        ],
+      },
+      {
+        source: '/api/frames/:path*',
+        headers: [
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type' },
+          { key: 'Content-Security-Policy', value: framesContentSecurityPolicy },
+          { key: 'X-Frame-Options', value: 'ALLOWALL' },
         ],
       },
       {
