@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createAppClient, viemConnector } from '@farcaster/auth-kit';
 import { getSession } from '@/lib/session';
 import { createUserServerClient } from '@/lib/supabase/server';
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 import { getConfiguredSiteUrl, isProductionRuntime } from '@/lib/runtimeConfig';
 
-const appClient = createAppClient({ ethereum: viemConnector() });
+async function getAppClient() {
+  const { createAppClient, viemConnector } = await import('@farcaster/auth-kit');
+  return createAppClient({ ethereum: viemConnector() });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,6 +28,7 @@ export async function POST(req: NextRequest) {
 
     const domain = siteUrl ? new URL(siteUrl).host : 'localhost:3000';
 
+    const appClient = await getAppClient();
     const result = await appClient.verifySignInMessage({
       message,
       signature,
