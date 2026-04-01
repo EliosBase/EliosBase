@@ -21,6 +21,8 @@ const RATE_LIMITS = {
   walletMutation: { namespace: 'wallet:mutation', limit: 20, window: '10 m' },
   walletTransferRead: { namespace: 'wallet:transfer:read', limit: 60, window: '10 m' },
   walletTransferMutation: { namespace: 'wallet:transfer:mutation', limit: 20, window: '10 m' },
+  framesInteract: { namespace: 'frames:interact', limit: 30, window: '10 m' },
+  framesTx: { namespace: 'frames:tx', limit: 10, window: '10 m' },
 } satisfies Record<string, RateLimitPolicy>;
 
 let redisClient: Redis | null | undefined;
