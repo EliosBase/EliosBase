@@ -5,6 +5,8 @@ import { ChevronDown, ExternalLink, LogOut, Menu } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { useSiweContext } from '@/components/dashboard/AuthGate';
 import { useMounted } from '@/hooks/useMounted';
+import { useAuthContext } from '@/providers/AuthProvider';
+import FarcasterSignInButton from './FarcasterSignInButton';
 import type { WalletId } from '@/lib/wallets';
 
 interface DashboardHeaderProps {
@@ -22,6 +24,7 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
     connect,
   } = useWallet();
   const { signOut } = useSiweContext();
+  const { session } = useAuthContext();
   const mounted = useMounted();
   const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false);
   const walletMenuRef = useRef<HTMLDivElement>(null);
@@ -85,6 +88,11 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
 
       {mounted && isConnected ? (
         <div className="flex items-center gap-2">
+          {session?.fcUsername && (
+            <span className="px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-sm text-purple-300 font-[family-name:var(--font-body)]">
+              @{session.fcUsername}
+            </span>
+          )}
           <span className="px-4 py-2 rounded-xl bg-white/10 border border-white/10 text-sm text-white/80 font-[family-name:var(--font-mono)]">
             {shortAddress}
           </span>
@@ -161,6 +169,10 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
                     </a>
                   ))}
                 </div>
+              ) : null}
+
+              {process.env.NEXT_PUBLIC_FC_AUTH_ENABLED === 'true' ? (
+                <FarcasterSignInButton onClose={() => setIsWalletMenuOpen(false)} />
               ) : null}
             </div>
           ) : null}
