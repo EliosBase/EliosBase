@@ -1,8 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import NeuralBackground from "@/components/ui/flow-field-background";
 
+const CONTRACT_ADDRESS = "XXXX";
+
 export default function Hero() {
+  const [copied, setCopied] = useState(false);
+
+  function handleCopy() {
+    navigator.clipboard.writeText(CONTRACT_ADDRESS);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 z-0">
@@ -15,10 +26,21 @@ export default function Hero() {
       </div>
 
       <div className="relative z-10 max-w-5xl mx-auto px-6 text-center pt-24">
-        <div className="inline-block px-4 py-1.5 rounded-full border border-white/20 bg-white/5 mb-8">
-          <span className="text-xs font-semibold tracking-widest uppercase text-white/80">
-            Base Mainnet
-          </span>
+        <div className="flex flex-col items-center gap-3 mb-8">
+          <button
+            onClick={handleCopy}
+            className="px-4 py-1.5 rounded-full border border-white/20 bg-white/5 cursor-pointer hover:bg-white/10 transition-colors"
+          >
+            <span className="text-xs font-semibold tracking-widest uppercase text-white/80">
+              {copied ? "Copied!" : `CA: ${CONTRACT_ADDRESS}`}
+            </span>
+          </button>
+
+          <div className="px-4 py-1.5 rounded-full border border-white/20 bg-white/5">
+            <span className="text-xs font-semibold tracking-widest uppercase text-white/80">
+              Base Mainnet
+            </span>
+          </div>
         </div>
 
         <h1 className="font-[family-name:var(--font-heading)] text-4xl sm:text-5xl md:text-7xl font-bold leading-tight tracking-tight mb-6 text-white">
