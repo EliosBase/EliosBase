@@ -1,22 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+
+type FarcasterSdk = typeof import('@farcaster/frame-sdk').default;
 
 export default function MiniAppPage() {
   const [ready, setReady] = useState(false);
+  const [sdkRef, setSdkRef] = useState<FarcasterSdk | null>(null);
 
   useEffect(() => {
     async function init() {
       try {
         const sdk = (await import('@farcaster/frame-sdk')).default;
+        setSdkRef(sdk);
         await sdk.actions.ready();
-        setReady(true);
       } catch {
-        setReady(true);
+        // Not in Farcaster context
       }
+      setReady(true);
     }
     init();
   }, []);
+
+  const openUrl = useCallback((url: string) => {
+    if (sdkRef) {
+      sdkRef.actions.openUrl(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  }, [sdkRef]);
 
   if (!ready) {
     return (
@@ -35,53 +47,47 @@ export default function MiniAppPage() {
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <a
-            href="https://eliosbase.net/app/marketplace"
-            target="_blank"
-            rel="noreferrer"
+          <button
+            onClick={() => openUrl('https://eliosbase.net/app/marketplace')}
             style={{
-              display: 'block', padding: '16px', borderRadius: '16px',
+              display: 'block', width: '100%', padding: '16px', borderRadius: '16px',
               background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-              color: 'white', textDecoration: 'none', fontSize: '14px', fontWeight: 600,
+              color: 'white', textAlign: 'left', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
             }}
           >
             Browse Agents
-            <span style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
+            <span style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px', fontWeight: 400 }}>
               Hire AI agents for tasks on Base
             </span>
-          </a>
+          </button>
 
-          <a
-            href="https://eliosbase.net/app/tasks"
-            target="_blank"
-            rel="noreferrer"
+          <button
+            onClick={() => openUrl('https://eliosbase.net/app/tasks')}
             style={{
-              display: 'block', padding: '16px', borderRadius: '16px',
+              display: 'block', width: '100%', padding: '16px', borderRadius: '16px',
               background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-              color: 'white', textDecoration: 'none', fontSize: '14px', fontWeight: 600,
+              color: 'white', textAlign: 'left', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
             }}
           >
             View Tasks
-            <span style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
+            <span style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px', fontWeight: 400 }}>
               Track task progress and ZK proofs
             </span>
-          </a>
+          </button>
 
-          <a
-            href="https://eliosbase.net/app/wallet"
-            target="_blank"
-            rel="noreferrer"
+          <button
+            onClick={() => openUrl('https://eliosbase.net/app/wallet')}
             style={{
-              display: 'block', padding: '16px', borderRadius: '16px',
+              display: 'block', width: '100%', padding: '16px', borderRadius: '16px',
               background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-              color: 'white', textDecoration: 'none', fontSize: '14px', fontWeight: 600,
+              color: 'white', textAlign: 'left', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
             }}
           >
             Wallet & Payments
-            <span style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
+            <span style={{ display: 'block', fontSize: '12px', color: 'rgba(255,255,255,0.4)', marginTop: '4px', fontWeight: 400 }}>
               ETH escrow and transaction history
             </span>
-          </a>
+          </button>
         </div>
 
         <div style={{ marginTop: '32px', padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
