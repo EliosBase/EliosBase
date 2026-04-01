@@ -13,7 +13,7 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://esm.sh",
   "connect-src 'self' https: wss: https://relay.farcaster.xyz",
   "worker-src 'self' blob:",
   "frame-src 'self' https://warpcast.com https://relay.farcaster.xyz",
