@@ -1,17 +1,15 @@
 import { http, createConfig } from 'wagmi';
-import { injected } from 'wagmi/connectors';
-import { base, baseSepolia } from 'wagmi/chains';
-import { readEnv } from '@/lib/env';
+import { coinbaseWallet, injected } from 'wagmi/connectors';
+import { baseSepolia, base } from 'wagmi/chains';
+import { isTestnet } from '@/lib/chainConfig';
 
-const isTestnet = readEnv(process.env.NEXT_PUBLIC_CHAIN) === 'testnet';
-
-export const activeChain = isTestnet ? baseSepolia : base;
+export { activeChain } from '@/lib/chainConfig';
 
 const connectors = [
   injected({ target: 'metaMask' }),
-  injected({ target: 'coinbaseWallet' }),
-  injected({ target: 'rabby' }),
+  coinbaseWallet({ appName: 'EliosBase', preference: { options: 'all' } }),
   injected({ target: 'phantom' }),
+  injected({ target: 'rabby' }),
   injected(),
 ];
 

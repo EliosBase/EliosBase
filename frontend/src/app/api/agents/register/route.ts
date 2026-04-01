@@ -6,8 +6,7 @@ import { logAudit, logActivity, generateId } from '@/lib/audit';
 import { validateOrigin } from '@/lib/csrf';
 import { provisionAgentWallet } from '@/lib/agentWallets';
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
-
-const VALID_TYPES = ['sentinel', 'analyst', 'executor', 'auditor', 'optimizer'];
+import { registerAgentSchema } from '@/lib/schemas/agent';
 
 export async function POST(req: NextRequest) {
   const csrfError = validateOrigin(req);
@@ -24,21 +23,13 @@ export async function POST(req: NextRequest) {
   const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.agentRegister, session.userId);
   if (rateLimitError) return rateLimitError;
 
-  const body = await req.json();
-
-  // Input validation
-  if (!body.name || typeof body.name !== 'string' || body.name.length > 100) {
-    return NextResponse.json({ error: 'Name is required (max 100 chars)' }, { status: 400 });
+  const raw = await req.json();
+  const parsed = registerAgentSchema.safeParse(raw);
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0]?.message ?? 'Invalid input';
+    return NextResponse.json({ error: firstError }, { status: 400 });
   }
-  if (!body.description || typeof body.description !== 'string' || body.description.length > 500) {
-    return NextResponse.json({ error: 'Description is required (max 500 chars)' }, { status: 400 });
-  }
-  if (body.type && !VALID_TYPES.includes(body.type)) {
-    return NextResponse.json({ error: `Type must be one of: ${VALID_TYPES.join(', ')}` }, { status: 400 });
-  }
-  if (body.capabilities && (!Array.isArray(body.capabilities) || body.capabilities.length > 10)) {
-    return NextResponse.json({ error: 'Capabilities must be an array (max 10)' }, { status: 400 });
-  }
+  const body = parsed.data;
 
   const supabase = createUserServerClient();
   const id = generateId('ag');

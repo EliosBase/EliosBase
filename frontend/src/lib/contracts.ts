@@ -50,8 +50,45 @@ export const ESCROW_ABI = [
       { name: 'depositor', type: 'address', internalType: 'address' },
       { name: 'agentId', type: 'bytes32', internalType: 'bytes32' },
       { name: 'amount', type: 'uint256', internalType: 'uint256' },
+      { name: 'lockedAt', type: 'uint256', internalType: 'uint256' },
       { name: 'state', type: 'uint8', internalType: 'enum EliosEscrow.State' },
     ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'disputeEscrow',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', internalType: 'bytes32' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'resolveDispute',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'recipient', type: 'address', internalType: 'address payable' },
+      { name: 'recipientShare', type: 'uint256', internalType: 'uint256' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'expiredRefund',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', internalType: 'bytes32' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'MAX_LOCK_DURATION',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256', internalType: 'uint256' }],
     stateMutability: 'view',
   },
   {
@@ -90,11 +127,32 @@ export const ESCROW_ABI = [
       { name: 'amount', type: 'uint256', indexed: false, internalType: 'uint256' },
     ],
   },
+  {
+    type: 'event',
+    name: 'EscrowDisputed',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', indexed: true, internalType: 'bytes32' },
+      { name: 'initiator', type: 'address', indexed: false, internalType: 'address' },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'DisputeResolved',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', indexed: true, internalType: 'bytes32' },
+      { name: 'recipient', type: 'address', indexed: false, internalType: 'address' },
+      { name: 'recipientAmount', type: 'uint256', indexed: false, internalType: 'uint256' },
+      { name: 'depositor', type: 'address', indexed: false, internalType: 'address' },
+      { name: 'depositorAmount', type: 'uint256', indexed: false, internalType: 'uint256' },
+    ],
+  },
   // ─── Errors ───────────────────────────────────────────────
   { type: 'error', name: 'NotAuthorized', inputs: [] },
   { type: 'error', name: 'InvalidAmount', inputs: [] },
   { type: 'error', name: 'InvalidState', inputs: [] },
   { type: 'error', name: 'TransferFailed', inputs: [] },
+  { type: 'error', name: 'LockNotExpired', inputs: [] },
+  { type: 'error', name: 'InvalidSplit', inputs: [] },
   // ─── Receive/Fallback ────────────────────────────────────
   { type: 'receive', stateMutability: 'payable' },
   { type: 'fallback', stateMutability: 'payable' },
