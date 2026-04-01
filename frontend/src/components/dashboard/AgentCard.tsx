@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { type Agent } from '@/lib/types';
-import { Bot, Star, CheckCircle, Loader2 } from 'lucide-react';
+import { Bot, Star, CheckCircle, Loader2, MessageCircle } from 'lucide-react';
 import ShareToWarpcast from './ShareToWarpcast';
+import CastComposer from './CastComposer';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEscrowLock } from '@/hooks/useEscrow';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -24,6 +25,7 @@ type HireStep = 'idle' | 'signing' | 'mining' | 'confirming' | 'hired' | 'error'
 export default function AgentCard({ agent }: AgentCardProps) {
   const [step, setStep] = useState<HireStep>('idle');
   const [error, setError] = useState('');
+  const [showCastComposer, setShowCastComposer] = useState(false);
   const [showTaskPicker, setShowTaskPicker] = useState(false);
   const selectedTaskId = useRef<string>('');
   const submittedHash = useRef<`0x${string}` | null>(null);
@@ -247,11 +249,28 @@ export default function AgentCard({ agent }: AgentCardProps) {
         <p className="text-[10px] text-white/30">
           {agent.tasksCompleted.toLocaleString()} tasks completed
         </p>
-        <ShareToWarpcast
-          text={`Check out ${agent.name} on EliosBase — ${agent.tasksCompleted} tasks completed with ${agent.reputation}% reputation`}
-          embedUrl={typeof window !== 'undefined' ? `${window.location.origin}/app/marketplace` : undefined}
-        />
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowCastComposer(true)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium text-purple-300 bg-purple-500/10 border border-purple-500/15 hover:bg-purple-500/20 transition-colors"
+            title="Cast to Farcaster"
+          >
+            <MessageCircle size={10} />
+          </button>
+          <ShareToWarpcast
+            text={`Check out ${agent.name} on EliosBase — ${agent.tasksCompleted} tasks completed with ${agent.reputation}% reputation`}
+            embedUrl={typeof window !== 'undefined' ? `${window.location.origin}/app/marketplace` : undefined}
+          />
+        </div>
       </div>
+
+      {showCastComposer && (
+        <CastComposer
+          defaultText={`Check out ${agent.name} on EliosBase — ${agent.tasksCompleted} tasks completed with ${agent.reputation}% reputation`}
+          embedUrl={typeof window !== 'undefined' ? `${window.location.origin}/app/marketplace` : undefined}
+          onClose={() => setShowCastComposer(false)}
+        />
+      )}
     </div>
   );
 }
