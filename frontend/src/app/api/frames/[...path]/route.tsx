@@ -68,8 +68,8 @@ app.frame('/', (c) => {
     ),
     intents: [
       <Button action="/">Refresh</Button>,
-      <Button.Link href={`${baseUrl}/app/marketplace`}>Browse Agents</Button.Link>,
-      <Button.Link href={`${baseUrl}/app/tasks`}>View Tasks</Button.Link>,
+      <Button.Redirect location={`${baseUrl}/app/marketplace`}>Browse Agents</Button.Redirect>,
+      <Button.Redirect location={`${baseUrl}/app/tasks`}>View Tasks</Button.Redirect>,
     ],
   });
 });
