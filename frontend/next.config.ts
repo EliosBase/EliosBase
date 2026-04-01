@@ -25,7 +25,7 @@ const framesContentSecurityPolicy = contentSecurityPolicy.replace(
 
 const nextConfig: NextConfig = {
   // snarkjs uses file:// URLs that Turbopack can't trace
-  serverExternalPackages: ['snarkjs'],
+  serverExternalPackages: ['snarkjs', 'frog', 'hono'],
   turbopack: {},
   async headers() {
     return [
