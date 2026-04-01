@@ -43,6 +43,13 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: '/app/:path*',
+        headers: [
+          { key: 'Content-Security-Policy', value: framesContentSecurityPolicy },
+          { key: 'X-Frame-Options', value: 'ALLOWALL' },
+        ],
+      },
+      {
         source: '/api/frames/:path*',
         headers: [
           { key: 'Access-Control-Allow-Origin', value: '*' },

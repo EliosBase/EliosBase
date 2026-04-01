@@ -11,6 +11,7 @@ import WalletProvider from '@/providers/WalletProvider';
 import AuthProvider from '@/providers/AuthProvider';
 import FarcasterAuthProvider from '@/providers/FarcasterAuthProvider';
 import AuthGate from '@/components/dashboard/AuthGate';
+import FarcasterReady from '@/components/FarcasterReady';
 
 const pageTitles: Record<string, string> = {
   '/app': 'Dashboard',
@@ -37,6 +38,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <WalletProvider>
         <FarcasterAuthProvider>
         <AuthGate>
+          <FarcasterReady />
           <TransactionSyncBridge />
           <div className="min-h-screen">
             <CyberBackground />

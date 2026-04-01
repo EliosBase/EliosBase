@@ -15,6 +15,8 @@
     "@anthropic-ai/sdk": "^0.81.0",
     "@base-org/account": "^2.5.3",
     "@farcaster/auth-kit": "^0.8.2",
+    "@farcaster/frame-node": "^0.2.0",
+    "@farcaster/frame-sdk": "^0.2.0",
     "@neynar/nodejs-sdk": "^3.137.2",
     "@rhinestone/module-sdk": "^0.4.0",
     "@rhinestone/sdk": "^1.4.1",
