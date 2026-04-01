@@ -12,9 +12,9 @@ const contentSecurityPolicy = [
   "font-src 'self' data: https://fonts.gstatic.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
-  "connect-src 'self' https: wss:",
+  "connect-src 'self' https: wss: https://relay.farcaster.xyz",
   "worker-src 'self' blob:",
-  "frame-src 'self'",
+  "frame-src 'self' https://warpcast.com https://relay.farcaster.xyz",
 ].join('; ');
 
 const nextConfig: NextConfig = {
