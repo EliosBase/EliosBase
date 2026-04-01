@@ -1,6 +1,6 @@
 /** @jsxImportSource frog/jsx */
 
-import { Frog, Button } from 'frog';
+import { Frog, Button, loadGoogleFont } from 'frog';
 import { type NextRequest } from 'next/server';
 import { registerAgentFrames } from '@/lib/frames/agent';
 import { registerTaskFrames } from '@/lib/frames/task';
@@ -13,6 +13,23 @@ const app = new Frog({
   imageOptions: {
     width: 1200,
     height: 630,
+    fonts: [
+      {
+        name: 'Inter',
+        source: 'google',
+        weight: 400,
+      },
+      {
+        name: 'Inter',
+        source: 'google',
+        weight: 600,
+      },
+      {
+        name: 'Inter',
+        source: 'google',
+        weight: 700,
+      },
+    ],
   },
 });
 
