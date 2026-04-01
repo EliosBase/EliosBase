@@ -85,9 +85,6 @@ function pickTask(agentIdx,taskIdx){
   if(!t||!a||!sdk)return;
   submitEscrowWithTask(agentIdx,t.id);
 }
-function submitEscrowWithTask(agentIdx,taskId){
-  var a=agents[agentIdx];if(!a||!sdk)return;
-function submitEscrow(i){submitEscrowWithTask(i,(document.getElementById('taskIdInput')||{}).value||'');}
 function submitEscrowWithTask(i,taskId){
   var a=agents[i];if(!a||!sdk||!taskId)return;
   var el=document.getElementById('ad');
