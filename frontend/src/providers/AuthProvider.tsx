@@ -8,6 +8,8 @@ interface SessionData {
   walletAddress?: string;
   chainId?: number;
   role?: 'submitter' | 'operator' | 'admin';
+  fid?: number;
+  fcUsername?: string;
 }
 
 interface AuthContextType {

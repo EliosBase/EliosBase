@@ -17,5 +17,6 @@ export async function GET() {
     walletAddress: session.walletAddress,
     chainId: session.chainId,
     role: session.role,
+    ...(session.fid ? { fid: session.fid, fcUsername: session.fcUsername } : {}),
   });
 }
