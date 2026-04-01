@@ -1,49 +1,48 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+
 /**
  * @title EliosEscrow
- * @notice Minimal escrow contract for EliosBase AI agent marketplace.
- *         Locks ETH per-task, releases to agent operator on completion, or refunds depositor.
+ * @notice Escrow contract for EliosBase AI agent marketplace.
+ *         Locks ETH per-task, supports release, refund, disputes, and time-based recovery.
  */
-contract EliosEscrow {
+contract EliosEscrow is ReentrancyGuard, Ownable {
     // ─── Types ──────────────────────────────────────────────────
-    enum State { None, Locked, Released, Refunded }
+    enum State { None, Locked, Released, Refunded, Disputed }
 
     struct Escrow {
         address depositor;
         bytes32 agentId;
         uint256 amount;
+        uint256 lockedAt;
         State state;
     }
 
+    // ─── Constants ──────────────────────────────────────────────
+    uint256 public constant MAX_LOCK_DURATION = 30 days;
+
     // ─── State ──────────────────────────────────────────────────
-    address public immutable owner;
     mapping(bytes32 => Escrow) public escrows;
 
     // ─── Events ─────────────────────────────────────────────────
     event FundsLocked(bytes32 indexed taskId, bytes32 indexed agentId, address depositor, uint256 amount);
     event FundsReleased(bytes32 indexed taskId, address recipient, uint256 amount);
     event FundsRefunded(bytes32 indexed taskId, address depositor, uint256 amount);
+    event EscrowDisputed(bytes32 indexed taskId, address initiator);
+    event DisputeResolved(bytes32 indexed taskId, address recipient, uint256 recipientAmount, address depositor, uint256 depositorAmount);
 
     // ─── Errors ─────────────────────────────────────────────────
     error NotAuthorized();
     error InvalidAmount();
     error InvalidState();
     error TransferFailed();
+    error LockNotExpired();
+    error InvalidSplit();
 
-    // ─── Reentrancy guard ───────────────────────────────────────
-    uint256 private _locked = 1;
-    modifier nonReentrant() {
-        require(_locked == 1, "ReentrancyGuard: reentrant call");
-        _locked = 2;
-        _;
-        _locked = 1;
-    }
-
-    constructor() {
-        owner = msg.sender;
-    }
+    constructor() Ownable(msg.sender) {}
 
     /**
      * @notice Lock ETH in escrow for a task.
@@ -58,6 +57,7 @@ contract EliosEscrow {
             depositor: msg.sender,
             agentId: agentId,
             amount: msg.value,
+            lockedAt: block.timestamp,
             state: State.Locked
         });
 
@@ -73,7 +73,7 @@ contract EliosEscrow {
     function releaseFunds(bytes32 taskId, address payable recipient) external nonReentrant {
         Escrow storage e = escrows[taskId];
         if (e.state != State.Locked) revert InvalidState();
-        if (msg.sender != e.depositor && msg.sender != owner) revert NotAuthorized();
+        if (msg.sender != e.depositor && msg.sender != owner()) revert NotAuthorized();
 
         uint256 amount = e.amount;
         e.state = State.Released;
@@ -93,7 +93,77 @@ contract EliosEscrow {
     function refund(bytes32 taskId) external nonReentrant {
         Escrow storage e = escrows[taskId];
         if (e.state != State.Locked) revert InvalidState();
-        if (msg.sender != e.depositor && msg.sender != owner) revert NotAuthorized();
+        if (msg.sender != e.depositor && msg.sender != owner()) revert NotAuthorized();
+
+        uint256 amount = e.amount;
+        address depositor = e.depositor;
+        e.state = State.Refunded;
+        e.amount = 0;
+
+        (bool ok, ) = payable(depositor).call{value: amount}("");
+        if (!ok) revert TransferFailed();
+
+        emit FundsRefunded(taskId, depositor, amount);
+    }
+
+    /**
+     * @notice Open a dispute on a locked escrow.
+     *         Only the depositor or contract owner can dispute.
+     * @param taskId The task to dispute
+     */
+    function disputeEscrow(bytes32 taskId) external {
+        Escrow storage e = escrows[taskId];
+        if (e.state != State.Locked) revert InvalidState();
+        if (msg.sender != e.depositor && msg.sender != owner()) revert NotAuthorized();
+
+        e.state = State.Disputed;
+        emit EscrowDisputed(taskId, msg.sender);
+    }
+
+    /**
+     * @notice Resolve a dispute by splitting funds between recipient and depositor.
+     *         Only the contract owner can resolve disputes.
+     * @param taskId          The disputed task
+     * @param recipient       Address to receive the agent's share
+     * @param recipientShare  Amount to send to the recipient (agent)
+     */
+    function resolveDispute(
+        bytes32 taskId,
+        address payable recipient,
+        uint256 recipientShare
+    ) external nonReentrant onlyOwner {
+        Escrow storage e = escrows[taskId];
+        if (e.state != State.Disputed) revert InvalidState();
+
+        uint256 total = e.amount;
+        if (recipientShare > total) revert InvalidSplit();
+
+        uint256 depositorShare = total - recipientShare;
+        e.state = State.Released;
+        e.amount = 0;
+
+        if (recipientShare > 0) {
+            (bool ok1, ) = recipient.call{value: recipientShare}("");
+            if (!ok1) revert TransferFailed();
+        }
+
+        if (depositorShare > 0) {
+            (bool ok2, ) = payable(e.depositor).call{value: depositorShare}("");
+            if (!ok2) revert TransferFailed();
+        }
+
+        emit DisputeResolved(taskId, recipient, recipientShare, e.depositor, depositorShare);
+    }
+
+    /**
+     * @notice Auto-refund if the escrow has been locked past MAX_LOCK_DURATION.
+     *         Anyone can call this to trigger the refund.
+     * @param taskId The expired task
+     */
+    function expiredRefund(bytes32 taskId) external nonReentrant {
+        Escrow storage e = escrows[taskId];
+        if (e.state != State.Locked) revert InvalidState();
+        if (block.timestamp < e.lockedAt + MAX_LOCK_DURATION) revert LockNotExpired();
 
         uint256 amount = e.amount;
         address depositor = e.depositor;
@@ -113,10 +183,11 @@ contract EliosEscrow {
         address depositor,
         bytes32 agentId,
         uint256 amount,
+        uint256 lockedAt,
         State state
     ) {
         Escrow memory e = escrows[taskId];
-        return (e.depositor, e.agentId, e.amount, e.state);
+        return (e.depositor, e.agentId, e.amount, e.lockedAt, e.state);
     }
 
     // Reject direct ETH sends

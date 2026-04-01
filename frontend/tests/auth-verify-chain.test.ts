@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
   createUserServerClient: vi.fn(),
   enforceRateLimit: vi.fn(),
   verify: vi.fn(),
+  activeChainId: 8453,
+  getConfiguredSiteUrl: vi.fn(),
+  isProductionRuntime: vi.fn(),
 }));
 
 vi.mock('@/lib/session', () => ({
@@ -30,6 +33,17 @@ vi.mock('siwe', () => ({
   },
 }));
 
+vi.mock('@/lib/chainConfig', () => ({
+  get activeChainId() {
+    return mocks.activeChainId;
+  },
+}));
+
+vi.mock('@/lib/runtimeConfig', () => ({
+  getConfiguredSiteUrl: () => mocks.getConfiguredSiteUrl(),
+  isProductionRuntime: () => mocks.isProductionRuntime(),
+}));
+
 const { POST } = await import('@/app/api/auth/verify/route');
 
 function makeRequest(body: Record<string, unknown>) {
@@ -43,8 +57,11 @@ function makeRequest(body: Record<string, unknown>) {
 describe('SIWE verify chain ID', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.activeChainId = 8453;
     mocks.getSession.mockResolvedValue({ nonce: 'test-nonce', save: vi.fn() });
     mocks.enforceRateLimit.mockResolvedValue(null);
+    mocks.getConfiguredSiteUrl.mockReturnValue(null);
+    mocks.isProductionRuntime.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -52,7 +69,6 @@ describe('SIWE verify chain ID', () => {
   });
 
   it('accepts the default chain ID 8453 when env is not set', async () => {
-    delete process.env.NEXT_PUBLIC_BASE_CHAIN_ID;
     mocks.verify.mockResolvedValue({
       data: {
         nonce: 'test-nonce',
@@ -72,14 +88,14 @@ describe('SIWE verify chain ID', () => {
       }),
     });
 
-    const res = await POST(makeRequest({ message: 'msg', signature: 'sig' }));
+    const res = await POST(makeRequest({ message: 'msg', signature: '0xabcdef01' }));
     const json = await res.json();
     expect(res.status).toBe(200);
     expect(json.authenticated).toBe(true);
   });
 
-  it('rejects wrong chain ID when env is set to 84532 (testnet)', async () => {
-    vi.stubEnv('NEXT_PUBLIC_BASE_CHAIN_ID', '84532');
+  it('rejects wrong chain ID when env is set to testnet', async () => {
+    mocks.activeChainId = 84532;
     mocks.verify.mockResolvedValue({
       data: {
         nonce: 'test-nonce',
@@ -90,14 +106,14 @@ describe('SIWE verify chain ID', () => {
       },
     });
 
-    const res = await POST(makeRequest({ message: 'msg', signature: 'sig' }));
+    const res = await POST(makeRequest({ message: 'msg', signature: '0xabcdef01' }));
     expect(res.status).toBe(422);
     const json = await res.json();
     expect(json.error).toContain('Wrong chain');
   });
 
-  it('accepts testnet chain ID when env is set to 84532', async () => {
-    vi.stubEnv('NEXT_PUBLIC_BASE_CHAIN_ID', '84532');
+  it('accepts testnet chain ID when env is set to testnet', async () => {
+    mocks.activeChainId = 84532;
     mocks.verify.mockResolvedValue({
       data: {
         nonce: 'test-nonce',
@@ -117,14 +133,14 @@ describe('SIWE verify chain ID', () => {
       }),
     });
 
-    const res = await POST(makeRequest({ message: 'msg', signature: 'sig' }));
+    const res = await POST(makeRequest({ message: 'msg', signature: '0xabcdef01' }));
     const json = await res.json();
     expect(res.status).toBe(200);
     expect(json.authenticated).toBe(true);
   });
 
   it('rejects a valid signature when the SIWE domain does not match the configured site', async () => {
-    vi.stubEnv('NEXT_PUBLIC_SITE_URL', 'https://eliosbase.net');
+    mocks.getConfiguredSiteUrl.mockReturnValue('https://eliosbase.net');
     mocks.verify.mockResolvedValue({
       data: {
         nonce: 'test-nonce',
@@ -135,7 +151,7 @@ describe('SIWE verify chain ID', () => {
       },
     });
 
-    const res = await POST(makeRequest({ message: 'msg', signature: 'sig' }));
+    const res = await POST(makeRequest({ message: 'msg', signature: '0xabcdef01' }));
 
     expect(res.status).toBe(422);
     await expect(res.json()).resolves.toEqual({
