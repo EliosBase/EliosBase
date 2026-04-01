@@ -14,7 +14,7 @@ function getClient(): NeynarAPIClient {
   return client;
 }
 
-export async function createManagedSigner(fid: number) {
+export async function createManagedSigner(_fid: number) {
   const neynar = getClient();
   const signer = await neynar.createSigner();
   return {

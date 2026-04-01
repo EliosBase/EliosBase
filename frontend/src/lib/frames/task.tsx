@@ -48,12 +48,6 @@ export function registerTaskFrames(app: Frog) {
 
     const proofColor = task.zk_proof_id ? '#22c55e' : task.current_step === 'ZK Verifying' ? '#eab308' : 'rgba(255,255,255,0.5)';
 
-    const statusColor = task.status === 'completed'
-      ? '#22c55e'
-      : task.status === 'failed'
-        ? '#ef4444'
-        : '#ffffff';
-
     return c.res({
       image: (
         <FrameContainer>

@@ -33,9 +33,8 @@ export function useFarcasterAuth() {
 
     (async () => {
       try {
-        // Get nonce from our Farcaster nonce endpoint
-        const nonceRes = await fetch('/api/auth/farcaster/nonce');
-        const { nonce } = await nonceRes.json();
+        // Fetch nonce — sets it in the server session for verification
+        await fetch('/api/auth/farcaster/nonce');
 
         // auth-kit already verified in the client — forward to our server
         const verifyRes = await fetch('/api/auth/farcaster/verify', {
