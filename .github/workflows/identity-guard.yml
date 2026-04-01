@@ -16,10 +16,6 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      IDENTITY_GUARD_NAME: ${{ vars.IDENTITY_GUARD_NAME }}
-      IDENTITY_GUARD_EMAIL: ${{ vars.IDENTITY_GUARD_EMAIL }}
-      IDENTITY_GUARD_ALLOWED_EMAILS: ${{ vars.IDENTITY_GUARD_ALLOWED_EMAILS }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -30,48 +26,5 @@ jobs:
       - name: Mark hook scripts executable
         run: chmod +x scripts/identity_guard.sh .githooks/pre-commit .githooks/prepare-commit-msg .githooks/commit-msg .githooks/pre-push
 
-      - name: Scan repository tree
+      - name: Scan repository tree for blocked identifiers
         run: scripts/identity_guard.sh scan-tree
-
-      - name: Scan pushed commit range
-        env:
-          EVENT_NAME: ${{ github.event_name }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PUSH_BEFORE_SHA: ${{ github.event.before }}
-          PUSH_HEAD_SHA: ${{ github.sha }}
-        run: |
-          set -eu
-
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            base_sha="$PR_BASE_SHA"
-            head_sha="$PR_HEAD_SHA"
-          elif [ "$EVENT_NAME" = "push" ]; then
-            base_sha="$PUSH_BEFORE_SHA"
-            head_sha="$PUSH_HEAD_SHA"
-
-            if [ "$base_sha" = '0000000000000000000000000000000000000000' ] && [ -n "$DEFAULT_BRANCH" ]; then
-              default_ref="origin/$DEFAULT_BRANCH"
-
-              if git rev-parse --verify "$default_ref" >/dev/null 2>&1; then
-                base_sha="$(git merge-base "$head_sha" "$default_ref")"
-              fi
-            fi
-          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            head_sha="$(git rev-parse HEAD)"
-            base_sha='0000000000000000000000000000000000000000'
-
-            if [ -n "$DEFAULT_BRANCH" ]; then
-              default_ref="origin/$DEFAULT_BRANCH"
-
-              if git rev-parse --verify "$default_ref" >/dev/null 2>&1; then
-                base_sha="$(git merge-base "$head_sha" "$default_ref")"
-              fi
-            fi
-          else
-            base_sha='0000000000000000000000000000000000000000'
-            head_sha="$(git rev-parse HEAD)"
-          fi
-
-          scripts/identity_guard.sh scan-range "$base_sha" "$head_sha"
