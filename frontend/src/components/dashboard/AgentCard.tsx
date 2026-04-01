@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { type Agent } from '@/lib/types';
 import { Bot, Star, CheckCircle, Loader2 } from 'lucide-react';
+import ShareToWarpcast from './ShareToWarpcast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEscrowLock } from '@/hooks/useEscrow';
 import { useAuthContext } from '@/providers/AuthProvider';
@@ -242,9 +243,15 @@ export default function AgentCard({ agent }: AgentCardProps) {
         <p className="text-[10px] text-red-400 mt-2">{error}</p>
       )}
 
-      <p className="text-[10px] text-white/30 mt-2">
-        {agent.tasksCompleted.toLocaleString()} tasks completed
-      </p>
+      <div className="flex items-center justify-between mt-2">
+        <p className="text-[10px] text-white/30">
+          {agent.tasksCompleted.toLocaleString()} tasks completed
+        </p>
+        <ShareToWarpcast
+          text={`Check out ${agent.name} on EliosBase — ${agent.tasksCompleted} tasks completed with ${agent.reputation}% reputation`}
+          embedUrl={typeof window !== 'undefined' ? `${window.location.origin}/app/marketplace` : undefined}
+        />
+      </div>
     </div>
   );
 }
