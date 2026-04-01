@@ -127,6 +127,15 @@ export interface AuditLogEntry {
   result: 'ALLOW' | 'DENY' | 'FLAG';
 }
 
+// ─── Farcaster Types ────────────────────────────────────────────
+
+export type {
+  FarcasterUser,
+  FarcasterSigner,
+  CastPublishRequest,
+  CastPublishResponse,
+} from './farcaster';
+
 // ─── Database Row Types ──────────────────────────────────────────
 
 export type {
