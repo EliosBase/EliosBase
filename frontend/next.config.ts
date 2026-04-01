@@ -8,7 +8,7 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
-  "frame-ancestors https://warpcast.com https://*.farcaster.xyz https://*.supercast.xyz",
+  "frame-ancestors *",
   "form-action 'self'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
