@@ -14,7 +14,8 @@ function getClient(): NeynarAPIClient {
   return client;
 }
 
-export async function createManagedSigner(_fid: number) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function createManagedSigner(fid: number) {
   const neynar = getClient();
   const signer = await neynar.createSigner();
   return {
