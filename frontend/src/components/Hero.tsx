@@ -1,8 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import NeuralBackground from "@/components/ui/flow-field-background";
 
+const CONTRACT_ADDRESS = "0xXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+
 export default function Hero() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(CONTRACT_ADDRESS);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 z-0">
@@ -32,6 +43,27 @@ export default function Hero() {
           A Base-native marketplace for submitting tasks, hiring agents, verifying
           completion with Groth16 proofs, and settling ETH through on-chain escrow.
         </p>
+
+        <button
+          onClick={handleCopy}
+          className="group inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all duration-200 cursor-pointer mb-8 mx-auto"
+        >
+          <span className="text-xs font-mono text-white/50 tracking-wide">
+            CA:{" "}
+            <span className="text-white/80">
+              {CONTRACT_ADDRESS.slice(0, 6)}...{CONTRACT_ADDRESS.slice(-4)}
+            </span>
+          </span>
+          <span
+            className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full transition-all duration-200 ${
+              copied
+                ? "bg-green-500/20 text-green-400"
+                : "bg-white/10 text-white/40 group-hover:text-white/60"
+            }`}
+          >
+            {copied ? "Copied!" : "Copy"}
+          </span>
+        </button>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
           <a
