@@ -1,17 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SiweMessage } from 'siwe';
-import { readIntEnv } from '@/lib/env';
 import { getSession } from '@/lib/session';
 import { createUserServerClient } from '@/lib/supabase/server';
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 import { getConfiguredSiteUrl, isProductionRuntime } from '@/lib/runtimeConfig';
+import { activeChainId } from '@/lib/chainConfig';
+import { siweVerifySchema } from '@/lib/schemas/auth';
 
 export async function POST(req: NextRequest) {
   try {
     const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.authVerify);
     if (rateLimitError) return rateLimitError;
 
-    const { message, signature } = await req.json();
+    const raw = await req.json();
+    const parsed = siweVerifySchema.safeParse(raw);
+    if (!parsed.success) {
+      const firstError = parsed.error.issues[0]?.message ?? 'Invalid input';
+      return NextResponse.json({ error: firstError }, { status: 400 });
+    }
+    const { message, signature } = parsed.data;
     const session = await getSession();
 
     const siweMessage = new SiweMessage(message);
@@ -21,8 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid nonce' }, { status: 422 });
     }
 
-    const expectedChainId = readIntEnv(process.env.NEXT_PUBLIC_BASE_CHAIN_ID, 8453);
-    if (fields.chainId !== expectedChainId) {
+    if (fields.chainId !== activeChainId) {
       return NextResponse.json({ error: 'Wrong chain. Please switch to Base network.' }, { status: 422 });
     }
 

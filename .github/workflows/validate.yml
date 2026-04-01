@@ -78,4 +78,14 @@ jobs:
           version: stable
 
       - name: Run contract tests
-        run: forge test
+        run: forge test -vvv
+
+      - name: Check contract sizes
+        run: |
+          forge build --sizes 2>&1 | tee /tmp/sizes.txt
+          if grep -E '\|\s+\d+\.\d+\s*\|' /tmp/sizes.txt | awk -F'|' '{gsub(/[[:space:]]/, "", $3); if ($3+0 > 24.0) exit 1}'; then
+            echo "All contracts under 24KB limit"
+          else
+            echo "::error::One or more contracts exceed the 24KB size limit"
+            exit 1
+          fi
