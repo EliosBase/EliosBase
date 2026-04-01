@@ -3,7 +3,9 @@
 export const dynamic = 'force-static';
 
 export default function MiniAppPage() {
+  const escrowAddr = process.env.NEXT_PUBLIC_ESCROW_ADDRESS || '0x3a78b6ec90cc79483f16258864a728ae35ce8a32';
   const html = `
+var ESCROW='${escrowAddr}';
 var sdk=null,agents=[],tasks=[],currentView='home',walletAddress=null;
 function init(){
   import('https://esm.sh/@farcaster/frame-sdk@0.2.0').then(function(m){
@@ -39,7 +41,48 @@ function showA(i){
   e.innerHTML='<div class="ah"><div class="ai">🤖</div><div><div class="an">'+esc(a.name)+'</div><div style="display:flex;align-items:center;gap:8px;margin-top:2px"><span class="'+bc(a.status)+'">'+esc(a.status)+'</span>'+(a.type?'<span style="font-size:11px;color:rgba(255,255,255,0.4);text-transform:capitalize">'+esc(a.type)+'</span>':'')+'</div></div></div><p class="dd">'+esc(a.description)+'</p><div class="sg"><div class="sb"><div class="sl">Reputation</div><div class="sv">'+a.reputation+'%</div></div><div class="sb"><div class="sl">Tasks Done</div><div class="sv">'+a.tasksCompleted+'</div></div><div class="sb"><div class="sl">Price</div><div class="sv">'+esc(a.pricePerTask)+'</div></div></div>'+caps+hire;
   show('ad');
 }
-function hireA(i){if(sdk)sdk.actions.openUrl('https://eliosbase.net/app/marketplace');else window.open('https://eliosbase.net/app/marketplace','_blank');}
+function hireA(i){
+  var a=agents[i];if(!a||!sdk)return;
+  var el=document.getElementById('ad');
+  el.innerHTML='<div style="text-align:center;padding:32px 0"><p style="font-size:14px;font-weight:600;margin-bottom:8px">Creating task & locking escrow...</p><p class="lo">Please confirm in your wallet</p></div>';
+  // For now, prompt user to create task first on the main app, then come back
+  // Full in-app escrow flow requires task creation first
+  setTimeout(function(){
+    el.innerHTML='<div style="text-align:center;padding:32px 0"><h2 style="font-size:18px;font-weight:700;margin-bottom:12px">Hire '+esc(a.name)+'</h2><div class="sb" style="margin-bottom:16px"><div class="sl">Escrow Amount</div><div class="sv" style="font-size:24px">'+esc(a.pricePerTask)+'</div><p style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px">Locked until task completion</p></div><p style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:16px">To hire this agent, you need an active task. Create one on EliosBase, then lock escrow here.</p><button class="pb" onclick="startEscrow('+i+')">Lock Escrow via Wallet</button><button style="display:block;width:100%;margin-top:8px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="showA('+i+')">Back to Agent</button></div>';
+  }, 500);
+}
+function startEscrow(i){
+  var a=agents[i];if(!a||!sdk)return;
+  var taskId=prompt('Enter your Task ID to lock escrow:');
+  if(!taskId)return;
+  var el=document.getElementById('ad');
+  el.innerHTML='<div style="text-align:center;padding:32px 0"><p style="font-size:14px;font-weight:600">Confirm in your wallet...</p><p class="lo">Locking '+esc(a.pricePerTask)+' in escrow</p></div>';
+  var sel='0x7e2a4de4';
+  function toB32(s){var h='';for(var j=0;j<s.length;j++)h+=s.charCodeAt(j).toString(16).padStart(2,'0');return h.padEnd(64,'0').slice(0,64);}
+  function parseEth(s){var n=s.replace(/[^0-9.]/g,'')||'0';var p=n.split('.');var w=p[0]||'0';var f=(p[1]||'').padEnd(18,'0').slice(0,18);return(BigInt(w)*BigInt('1000000000000000000')+BigInt(f)).toString(16);}
+  var data=sel+toB32(taskId)+toB32(a.id);
+  var val='0x'+parseEth(a.pricePerTask);
+  sdk.wallet.ethProvider.request({method:'eth_requestAccounts'}).then(function(accs){
+    return sdk.wallet.ethProvider.request({method:'eth_sendTransaction',params:[{from:accs[0],to:ESCROW,data:data,value:val}]});
+  }).then(function(txHash){
+    el.innerHTML='<div style="text-align:center;padding:32px 0"><p style="font-size:14px;font-weight:600">Mining transaction...</p><p class="lo">Waiting for confirmation on Base</p></div>';
+    function poll(n){
+      if(n>60){el.innerHTML='<div style="text-align:center;padding:32px 0"><p style="font-size:14px;font-weight:600;color:#f87171">Timeout</p><p class="lo">Transaction not confirmed. Check your wallet.</p><button class="pb" onclick="showA('+i+')">Back</button></div>';return;}
+      sdk.wallet.ethProvider.request({method:'eth_getTransactionReceipt',params:[txHash]}).then(function(r){
+        if(r){
+          fetch('/api/agents/'+a.id+'/hire',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({txHash:txHash,taskId:taskId})}).then(function(){
+            el.innerHTML='<div style="text-align:center;padding:32px 0"><div style="font-size:32px;margin-bottom:12px">✅</div><p style="font-size:16px;font-weight:700;color:#4ade80">Agent Hired!</p><p class="lo" style="margin-top:8px">Escrow locked. The agent will begin working.</p><button style="display:block;width:100%;margin-top:16px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="loadA()">Back to Marketplace</button></div>';
+          });
+        }else{setTimeout(function(){poll(n+1);},2000);}
+      });
+    }
+    poll(0);
+  }).catch(function(e){
+    var msg=e&&e.message||'Transaction failed';
+    if(msg.indexOf('rejected')>-1||msg.indexOf('denied')>-1)msg='Transaction cancelled';
+    el.innerHTML='<div style="text-align:center;padding:32px 0"><div style="font-size:32px;margin-bottom:12px">❌</div><p style="font-size:14px;font-weight:600;color:#f87171">'+esc(msg)+'</p><button class="pb" style="margin-top:16px" onclick="showA('+i+')">Try Again</button></div>';
+  });
+}
 function loadT(){
   show('tk');var l=document.getElementById('tl');l.innerHTML='<p class="lo">Loading tasks...</p>';
   fetch('/api/tasks?limit=20').then(function(r){return r.json()}).then(function(d){
