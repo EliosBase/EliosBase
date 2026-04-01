@@ -9,6 +9,7 @@ import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import TransactionSyncBridge from '@/components/dashboard/TransactionSyncBridge';
 import WalletProvider from '@/providers/WalletProvider';
 import AuthProvider from '@/providers/AuthProvider';
+import FarcasterAuthProvider from '@/providers/FarcasterAuthProvider';
 import AuthGate from '@/components/dashboard/AuthGate';
 
 const pageTitles: Record<string, string> = {
@@ -34,6 +35,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
       <WalletProvider>
+        <FarcasterAuthProvider>
         <AuthGate>
           <TransactionSyncBridge />
           <div className="min-h-screen">
@@ -60,6 +62,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </AuthGate>
+        </FarcasterAuthProvider>
       </WalletProvider>
     </AuthProvider>
   );
