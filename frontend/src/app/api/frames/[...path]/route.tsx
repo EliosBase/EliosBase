@@ -67,6 +67,7 @@ app.frame('/', (c) => {
       </div>
     ),
     intents: [
+      <Button action="/">Refresh</Button>,
       <Button.Link href={`${baseUrl}/app/marketplace`}>Browse Agents</Button.Link>,
       <Button.Link href={`${baseUrl}/app/tasks`}>View Tasks</Button.Link>,
     ],
