@@ -24,6 +24,12 @@ function getRatelimiter() {
 }
 
 export const framesRateLimitMiddleware: MiddlewareHandler = async (c, next) => {
+  // Only rate limit POST interactions, not GET requests (frame discovery/crawling)
+  if (c.req.method !== 'POST') {
+    await next();
+    return;
+  }
+
   const limiter = getRatelimiter();
   if (limiter) {
     const fid = c.req.header('x-farcaster-fid') || 'anonymous';
