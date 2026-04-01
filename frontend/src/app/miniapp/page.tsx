@@ -41,21 +41,55 @@ function showA(i){
   e.innerHTML='<div class="ah"><div class="ai">🤖</div><div><div class="an">'+esc(a.name)+'</div><div style="display:flex;align-items:center;gap:8px;margin-top:2px"><span class="'+bc(a.status)+'">'+esc(a.status)+'</span>'+(a.type?'<span style="font-size:11px;color:rgba(255,255,255,0.4);text-transform:capitalize">'+esc(a.type)+'</span>':'')+'</div></div></div><p class="dd">'+esc(a.description)+'</p><div class="sg"><div class="sb"><div class="sl">Reputation</div><div class="sv">'+a.reputation+'%</div></div><div class="sb"><div class="sl">Tasks Done</div><div class="sv">'+a.tasksCompleted+'</div></div><div class="sb"><div class="sl">Price</div><div class="sv">'+esc(a.pricePerTask)+'</div></div></div>'+caps+hire;
   show('ad');
 }
+var hireTasks=[];
 function hireA(i){
-  var a=agents[i];if(!a||!sdk)return;
+  var a=agents[i];if(!a)return;
   var el=document.getElementById('ad');
-  el.innerHTML='<div style="text-align:center;padding:32px 0"><p style="font-size:14px;font-weight:600;margin-bottom:8px">Creating task & locking escrow...</p><p class="lo">Please confirm in your wallet</p></div>';
-  // For now, prompt user to create task first on the main app, then come back
-  // Full in-app escrow flow requires task creation first
-  setTimeout(function(){
-    el.innerHTML='<div style="text-align:center;padding:32px 0"><h2 style="font-size:18px;font-weight:700;margin-bottom:12px">Hire '+esc(a.name)+'</h2><div class="sb" style="margin-bottom:16px"><div class="sl">Escrow Amount</div><div class="sv" style="font-size:24px">'+esc(a.pricePerTask)+'</div><p style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px">Locked until task completion</p></div><div style="text-align:left;margin-bottom:16px"><label style="font-size:12px;color:rgba(255,255,255,0.5);display:block;margin-bottom:6px">Task ID</label><input id="taskIdInput" type="text" placeholder="Enter your Task ID" style="width:100%;padding:12px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:white;font-size:14px;font-family:inherit;outline:none" /></div><button class="pb" onclick="submitEscrow('+i+')">Lock Escrow via Wallet</button><button style="display:block;width:100%;margin-top:8px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="showA('+i+')">Back to Agent</button></div>';
-  }, 500);
+  el.innerHTML='<div style="text-align:center;padding:32px 0"><p class="lo">Loading your tasks...</p></div>';
+  fetch('/api/tasks?limit=50').then(function(r){return r.json()}).then(function(d){
+    var all=Array.isArray(d)?d:d.tasks||[];
+    hireTasks=all.filter(function(t){return t.status==='active'&&(t.currentStep==='Submitted'||t.currentStep==='Decomposed');});
+    var h='<h2 style="font-size:18px;font-weight:700;margin-bottom:4px">Hire '+esc(a.name)+'</h2>';
+    h+='<div class="sb" style="margin-bottom:16px"><div class="sl">Escrow Amount</div><div class="sv" style="font-size:24px">'+esc(a.pricePerTask)+'</div></div>';
+    if(hireTasks.length===0){
+      h+='<p style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:16px">No available tasks. Create a task first.</p>';
+      h+='<button class="pb" onclick="createTask('+i+')">Create New Task</button>';
+    }else{
+      h+='<p style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:12px">Select a task to assign this agent:</p>';
+      for(var j=0;j<hireTasks.length;j++){
+        h+='<button class="c" onclick="pickTask('+i+','+j+')"><div class="ct"><span>'+esc(hireTasks[j].title)+'</span><span class="b b-active">'+esc(hireTasks[j].currentStep)+'</span></div><div class="cd">'+esc(hireTasks[j].reward)+'</div></button>';
+      }
+    }
+    h+='<button style="display:block;width:100%;margin-top:12px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="showA('+i+')">Back</button>';
+    el.innerHTML=h;
+  }).catch(function(){
+    el.innerHTML='<p class="lo">Failed to load tasks.</p><button style="margin-top:12px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;width:100%" onclick="showA('+i+')">Back</button>';
+  });
 }
-function submitEscrow(i){
-  var a=agents[i];if(!a||!sdk)return;
-  var inp=document.getElementById('taskIdInput');
-  var taskId=inp?inp.value.trim():'';
-  if(!taskId){if(inp)inp.style.borderColor='#f87171';return;}
+function createTask(agentIdx){
+  var el=document.getElementById('ad');
+  el.innerHTML='<h2 style="font-size:18px;font-weight:700;margin-bottom:12px">Create Task</h2><div style="text-align:left"><label style="font-size:12px;color:rgba(255,255,255,0.5);display:block;margin-bottom:6px">Title</label><input id="newTaskTitle" type="text" placeholder="Task title" style="width:100%;padding:12px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:white;font-size:14px;font-family:inherit;outline:none;margin-bottom:12px" /><label style="font-size:12px;color:rgba(255,255,255,0.5);display:block;margin-bottom:6px">Description</label><textarea id="newTaskDesc" placeholder="Describe the task" rows="3" style="width:100%;padding:12px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:white;font-size:14px;font-family:inherit;outline:none;resize:vertical;margin-bottom:12px"></textarea></div><div id="createTaskError" style="color:#f87171;font-size:12px;margin-bottom:8px"></div><button class="pb" onclick="submitNewTask('+agentIdx+')">Create Task</button><button style="display:block;width:100%;margin-top:8px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="hireA('+agentIdx+')">Back</button>';
+}
+function submitNewTask(agentIdx){
+  var title=(document.getElementById('newTaskTitle')||{}).value||'';
+  var desc=(document.getElementById('newTaskDesc')||{}).value||'';
+  var errEl=document.getElementById('createTaskError');
+  if(!title.trim()){if(errEl)errEl.textContent='Title is required';return;}
+  var a=agents[agentIdx];
+  fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:title.trim(),description:desc.trim(),reward:a?a.pricePerTask:'0.01 ETH'})}).then(function(r){
+    if(!r.ok)throw new Error('Failed');return r.json();
+  }).then(function(){hireA(agentIdx);}).catch(function(e){if(errEl)errEl.textContent=e.message||'Failed to create task';});
+}
+function pickTask(agentIdx,taskIdx){
+  var t=hireTasks[taskIdx];var a=agents[agentIdx];
+  if(!t||!a||!sdk)return;
+  submitEscrowWithTask(agentIdx,t.id);
+}
+function submitEscrowWithTask(agentIdx,taskId){
+  var a=agents[agentIdx];if(!a||!sdk)return;
+function submitEscrow(i){submitEscrowWithTask(i,(document.getElementById('taskIdInput')||{}).value||'');}
+function submitEscrowWithTask(i,taskId){
+  var a=agents[i];if(!a||!sdk||!taskId)return;
   var el=document.getElementById('ad');
   el.innerHTML='<div style="text-align:center;padding:32px 0"><p style="font-size:14px;font-weight:600">Confirm in your wallet...</p><p class="lo">Locking '+esc(a.pricePerTask)+' in escrow</p></div>';
   var sel='0x7e2a4de4';
