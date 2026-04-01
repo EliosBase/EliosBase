@@ -38,7 +38,7 @@ app.use(framesRateLimitMiddleware);
 
 // Landing frame
 app.frame('/', (c) => {
-  const baseUrl = process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net';
+  const baseUrl = (process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net').trim();
 
   return c.res({
     image: (

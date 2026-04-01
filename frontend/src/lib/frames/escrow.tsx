@@ -13,7 +13,7 @@ import {
 } from './components';
 
 export function registerEscrowFrames(app: Frog) {
-  const baseUrl = process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net';
+  const baseUrl = (process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net').trim();
   const escrowAddress = process.env.NEXT_PUBLIC_ESCROW_ADDRESS as `0x${string}` | undefined;
 
   // Escrow lock preview frame — shows task + agent info with "Lock Escrow" button

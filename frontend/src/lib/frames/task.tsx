@@ -14,7 +14,7 @@ import {
 const TASK_STEPS = ['Submitted', 'Decomposed', 'Assigned', 'Executing', 'ZK Verifying', 'Complete'];
 
 export function registerTaskFrames(app: Frog) {
-  const baseUrl = process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net';
+  const baseUrl = (process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net').trim();
 
   // Task status frame
   app.frame('/task/:taskId', async (c) => {
