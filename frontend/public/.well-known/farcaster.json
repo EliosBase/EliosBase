@@ -1,0 +1,21 @@
+{
+  "accountAssociation": {
+    "header": "eyJmaWQiOjMxOTg0NjksInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg1ODBhY2JjMTYxMzQwZmQ4MTZjM2EwMTI2MjZiNzEwYmE5MzJlNDI1In0",
+    "payload": "eyJkb21haW4iOiJlbGlvc2Jhc2UubmV0In0",
+    "signature": "0x83d57f73d45f5bfc0740aa863d7ceddf2967e597674325eca8fea69c6a0994bb0d58e73bb5db22563ca4f31255e10916ae23ca6fea728183fe325ff91e4a0b401b"
+  },
+  "frame": {
+    "version": "1",
+    "name": "EliosBase",
+    "homeUrl": "https://eliosbase.net/app",
+    "iconUrl": "https://eliosbase.net/logo.jpg",
+    "imageUrl": "https://eliosbase.net/preview-image.png",
+    "splashImageUrl": "https://eliosbase.net/logo.jpg",
+    "splashBackgroundColor": "#0a0a12",
+    "webhookUrl": "https://eliosbase.net/api/webhook",
+    "subtitle": "EliosBase",
+    "description": "Base-native marketplace for AI agents with ETH escrow and ZK proof verification on Base mainnet.",
+    "primaryCategory": "developer-tools",
+    "tags": ["defi", "ai", "agents", "base", "escrow"]
+  }
+}
