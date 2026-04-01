@@ -127,10 +127,29 @@ check_exact_identity() {
 
   require_expected_identity
 
-  if [ "$actual_name" != "$guard_name" ] || [ "$(normalize_email "$actual_email")" != "$(normalize_email "$guard_email")" ]; then
-    printf '%s\n' "identity guard blocked: $label must be '$guard_name <$guard_email>' but was '$actual_name <$actual_email>'" >&2
-    exit 1
+  # Primary identity
+  if [ "$actual_name" = "$guard_name" ] && [ "$(normalize_email "$actual_email")" = "$(normalize_email "$guard_email")" ]; then
+    return 0
   fi
+
+  # Additional allowed identities (comma-separated emails in IDENTITY_GUARD_ALLOWED_EMAILS)
+  allowed_emails="${IDENTITY_GUARD_ALLOWED_EMAILS:-}"
+  if [ -n "$allowed_emails" ]; then
+    normalized_actual=$(normalize_email "$actual_email")
+    old_ifs=$IFS
+    IFS=','
+    for allowed in $allowed_emails; do
+      allowed=$(printf '%s' "$allowed" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      if [ "$(normalize_email "$allowed")" = "$normalized_actual" ]; then
+        IFS=$old_ifs
+        return 0
+      fi
+    done
+    IFS=$old_ifs
+  fi
+
+  printf '%s\n' "identity guard blocked: $label must be '$guard_name <$guard_email>' but was '$actual_name <$actual_email>'" >&2
+  exit 1
 }
 
 check_author_identity() {

@@ -19,6 +19,7 @@ jobs:
     env:
       IDENTITY_GUARD_NAME: ${{ vars.IDENTITY_GUARD_NAME }}
       IDENTITY_GUARD_EMAIL: ${{ vars.IDENTITY_GUARD_EMAIL }}
+      IDENTITY_GUARD_ALLOWED_EMAILS: ${{ vars.IDENTITY_GUARD_ALLOWED_EMAILS }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
