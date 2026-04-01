@@ -4,6 +4,7 @@ import { getSession } from '@/lib/session';
 import { toTask } from '@/lib/transforms';
 import { logAudit, logActivity, checkSpendingLimit, parseRewardAmount, generateId } from '@/lib/audit';
 import { validateOrigin } from '@/lib/csrf';
+import { createTaskSchema } from '@/lib/schemas/task';
 import { getTaskIdFromDisputeSource } from '@/lib/taskDisputes';
 import { parsePagination } from '@/lib/pagination';
 import { jsonWithCache, PUBLIC_COLLECTION_CACHE_CONTROL } from '@/lib/httpCache';
@@ -60,18 +61,13 @@ export async function POST(req: NextRequest) {
   const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.taskCreate, session.userId);
   if (rateLimitError) return rateLimitError;
 
-  const body = await req.json();
-
-  // Input validation
-  if (!body.title || typeof body.title !== 'string' || body.title.length > 200) {
-    return NextResponse.json({ error: 'Title is required (max 200 chars)' }, { status: 400 });
+  const raw = await req.json();
+  const parsed = createTaskSchema.safeParse(raw);
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0]?.message ?? 'Invalid input';
+    return NextResponse.json({ error: firstError }, { status: 400 });
   }
-  if (!body.description || typeof body.description !== 'string' || body.description.length > 2000) {
-    return NextResponse.json({ error: 'Description is required (max 2000 chars)' }, { status: 400 });
-  }
-  if (!body.reward || typeof body.reward !== 'string') {
-    return NextResponse.json({ error: 'Reward is required' }, { status: 400 });
-  }
+  const body = parsed.data;
 
   const supabase = createUserServerClient();
 
