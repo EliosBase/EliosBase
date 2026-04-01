@@ -12,7 +12,7 @@ import {
 } from './components';
 
 export function registerAgentFrames(app: Frog) {
-  const baseUrl = process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net';
+  const baseUrl = (process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net').trim();
 
   // Agent preview frame
   app.frame('/agent/:agentId', async (c) => {
