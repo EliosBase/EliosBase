@@ -14,6 +14,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
     "@base-org/account": "^2.5.3",
+    "@farcaster/auth-kit": "^0.8.2",
     "@rhinestone/module-sdk": "^0.4.0",
     "@rhinestone/sdk": "^1.4.0",
     "@safe-global/api-kit": "^4.1.0",
