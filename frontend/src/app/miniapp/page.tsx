@@ -5,8 +5,8 @@ import { useEffect, useState } from 'react';
 export default function MiniAppPage() {
   const [ready, setReady] = useState(false);
   const [view, setView] = useState<'home' | 'marketplace' | 'tasks' | 'wallet'>('home');
-  const [agents, setAgents] = useState<Array<{ id: string; name: string; description: string; status: string; reputation: number; tasks_completed: number; price_per_task: string }>>([]);
-  const [tasks, setTasks] = useState<Array<{ id: string; title: string; description: string; status: string; current_step: string; reward: string }>>([]);
+  const [agents, setAgents] = useState<Array<{ id: string; name: string; description: string; status: string; reputation: number; tasksCompleted: number; pricePerTask: string }>>([]);
+  const [tasks, setTasks] = useState<Array<{ id: string; title: string; description: string; status: string; currentStep: string; reward: string }>>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function MiniAppPage() {
     try {
       const res = await fetch('/api/agents?limit=10');
       const data = await res.json();
-      setAgents(data.agents || []);
+      setAgents(Array.isArray(data) ? data : data.agents || []);
     } catch {
       setAgents([]);
     }
@@ -41,7 +41,7 @@ export default function MiniAppPage() {
     try {
       const res = await fetch('/api/tasks?limit=10');
       const data = await res.json();
-      setTasks(data.tasks || []);
+      setTasks(Array.isArray(data) ? data : data.tasks || []);
     } catch {
       setTasks([]);
     }
@@ -132,8 +132,8 @@ export default function MiniAppPage() {
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>
                       <span>Rep: {agent.reputation}%</span>
-                      <span>{agent.tasks_completed} tasks</span>
-                      <span>{agent.price_per_task}</span>
+                      <span>{agent.tasksCompleted} tasks</span>
+                      <span>{agent.pricePerTask}</span>
                     </div>
                   </div>
                 ))}
@@ -168,7 +168,7 @@ export default function MiniAppPage() {
                       {task.description?.slice(0, 80) || '—'}
                     </p>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '11px', color: 'rgba(255,255,255,0.35)' }}>
-                      <span>Step: {task.current_step}</span>
+                      <span>Step: {task.currentStep}</span>
                       <span>{task.reward}</span>
                     </div>
                   </div>
