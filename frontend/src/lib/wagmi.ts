@@ -1,5 +1,5 @@
 import { http, createConfig } from 'wagmi';
-import { baseAccount, injected } from 'wagmi/connectors';
+import { injected } from 'wagmi/connectors';
 import { base, baseSepolia } from 'wagmi/chains';
 import { readEnv } from '@/lib/env';
 
@@ -13,7 +13,6 @@ const connectors = [
   injected({ target: 'rabby' }),
   injected({ target: 'phantom' }),
   injected(),
-  baseAccount({ appName: 'EliosBase' }),
 ];
 
 export const config = isTestnet
