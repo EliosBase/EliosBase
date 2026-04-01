@@ -545,6 +545,35 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       await logActivity({ type: 'agent', message: `Agent available: ${updated.agents?.name ?? updated.assigned_agent}` });
     }
+
+    // Auto-cast to Farcaster if submitter has an approved signer
+    if (updated.submitter_id) {
+      try {
+        const { data: signer } = await supabase
+          .from('farcaster_signers')
+          .select('signer_uuid')
+          .eq('user_id', updated.submitter_id)
+          .eq('status', 'approved')
+          .limit(1)
+          .single();
+
+        if (signer) {
+          const { publishCast } = await import('@/lib/neynar');
+          const framesBaseUrl = process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net';
+          const castText = `Task completed on EliosBase: "${updated.title}" — verified with ZK proof on Base`;
+          const embedUrl = `${framesBaseUrl}/api/frames/task/${updated.id}`;
+
+          const result = await publishCast(signer.signer_uuid, castText, [embedUrl]);
+          await supabase
+            .from('tasks')
+            .update({ fc_cast_hash: result.castHash })
+            .eq('id', updated.id);
+        }
+      } catch (castErr) {
+        // Auto-cast is best-effort — don't fail the task advance
+        console.error('Auto-cast failed:', castErr);
+      }
+    }
   }
 
   return NextResponse.json({

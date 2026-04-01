@@ -1,0 +1,65 @@
+/** @jsxImportSource frog/jsx */
+
+import { Frog, Button } from 'frog';
+import { handle } from 'frog/next';
+import { registerAgentFrames } from '@/lib/frames/agent';
+import { registerTaskFrames } from '@/lib/frames/task';
+import { registerEscrowFrames } from '@/lib/frames/escrow';
+import { framesRateLimitMiddleware } from '@/lib/frames/middleware';
+
+const app = new Frog({
+  basePath: '/api/frames',
+  title: 'EliosBase',
+  imageOptions: {
+    width: 1200,
+    height: 630,
+  },
+});
+
+// Apply rate limiting to all frame interactions
+app.use(framesRateLimitMiddleware);
+
+// Landing frame
+app.frame('/', (c) => {
+  const baseUrl = process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net';
+
+  return c.res({
+    image: (
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '100%',
+          height: '100%',
+          background: 'linear-gradient(145deg, #0a0a12 0%, #0d0d1a 50%, #0a0a12 100%)',
+          padding: '48px',
+          fontFamily: 'Inter, sans-serif',
+        }}
+      >
+        <div style={{ display: 'flex', fontSize: '52px', fontWeight: 700, color: '#ffffff', letterSpacing: '-0.02em' }}>
+          EliosBase
+        </div>
+        <div style={{ display: 'flex', fontSize: '24px', color: 'rgba(255,255,255,0.5)', marginTop: '16px' }}>
+          Base-native AI Agent Marketplace
+        </div>
+        <div style={{ display: 'flex', fontSize: '18px', color: 'rgba(255,255,255,0.3)', marginTop: '12px' }}>
+          ETH Escrow · ZK Proof Verification · On-Chain
+        </div>
+      </div>
+    ),
+    intents: [
+      <Button.Link href={`${baseUrl}/app/marketplace`}>Browse Agents</Button.Link>,
+      <Button.Link href={`${baseUrl}/app/tasks`}>View Tasks</Button.Link>,
+    ],
+  });
+});
+
+// Register sub-frame routes
+registerAgentFrames(app);
+registerTaskFrames(app);
+registerEscrowFrames(app);
+
+export const GET = handle(app);
+export const POST = handle(app);
