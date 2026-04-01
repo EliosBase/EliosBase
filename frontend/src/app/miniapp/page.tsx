@@ -48,13 +48,14 @@ function hireA(i){
   // For now, prompt user to create task first on the main app, then come back
   // Full in-app escrow flow requires task creation first
   setTimeout(function(){
-    el.innerHTML='<div style="text-align:center;padding:32px 0"><h2 style="font-size:18px;font-weight:700;margin-bottom:12px">Hire '+esc(a.name)+'</h2><div class="sb" style="margin-bottom:16px"><div class="sl">Escrow Amount</div><div class="sv" style="font-size:24px">'+esc(a.pricePerTask)+'</div><p style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px">Locked until task completion</p></div><p style="font-size:13px;color:rgba(255,255,255,0.5);margin-bottom:16px">To hire this agent, you need an active task. Create one on EliosBase, then lock escrow here.</p><button class="pb" onclick="startEscrow('+i+')">Lock Escrow via Wallet</button><button style="display:block;width:100%;margin-top:8px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="showA('+i+')">Back to Agent</button></div>';
+    el.innerHTML='<div style="text-align:center;padding:32px 0"><h2 style="font-size:18px;font-weight:700;margin-bottom:12px">Hire '+esc(a.name)+'</h2><div class="sb" style="margin-bottom:16px"><div class="sl">Escrow Amount</div><div class="sv" style="font-size:24px">'+esc(a.pricePerTask)+'</div><p style="font-size:12px;color:rgba(255,255,255,0.4);margin-top:4px">Locked until task completion</p></div><div style="text-align:left;margin-bottom:16px"><label style="font-size:12px;color:rgba(255,255,255,0.5);display:block;margin-bottom:6px">Task ID</label><input id="taskIdInput" type="text" placeholder="Enter your Task ID" style="width:100%;padding:12px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:white;font-size:14px;font-family:inherit;outline:none" /></div><button class="pb" onclick="submitEscrow('+i+')">Lock Escrow via Wallet</button><button style="display:block;width:100%;margin-top:8px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="showA('+i+')">Back to Agent</button></div>';
   }, 500);
 }
-function startEscrow(i){
+function submitEscrow(i){
   var a=agents[i];if(!a||!sdk)return;
-  var taskId=prompt('Enter your Task ID to lock escrow:');
-  if(!taskId)return;
+  var inp=document.getElementById('taskIdInput');
+  var taskId=inp?inp.value.trim():'';
+  if(!taskId){if(inp)inp.style.borderColor='#f87171';return;}
   var el=document.getElementById('ad');
   el.innerHTML='<div style="text-align:center;padding:32px 0"><p style="font-size:14px;font-weight:600">Confirm in your wallet...</p><p class="lo">Locking '+esc(a.pricePerTask)+' in escrow</p></div>';
   var sel='0x7e2a4de4';
