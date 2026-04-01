@@ -88,11 +88,13 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
 
       {mounted && isConnected ? (
         <div className="flex items-center gap-2">
-          {session?.fcUsername && (
+          {session?.fcUsername ? (
             <span className="px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-sm text-purple-300 font-[family-name:var(--font-body)]">
               @{session.fcUsername}
             </span>
-          )}
+          ) : process.env.NEXT_PUBLIC_FC_AUTH_ENABLED === 'true' ? (
+            <LinkFarcasterButton />
+          ) : null}
           <span className="px-4 py-2 rounded-xl bg-white/10 border border-white/10 text-sm text-white/80 font-[family-name:var(--font-mono)]">
             {shortAddress}
           </span>
@@ -179,5 +181,33 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
         </div>
       )}
     </header>
+  );
+}
+
+function LinkFarcasterButton() {
+  const [showLink, setShowLink] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setShowLink(true)}
+        className="px-3 py-2 rounded-xl bg-purple-500/8 border border-purple-500/15 text-xs text-purple-400 hover:bg-purple-500/15 transition-colors"
+      >
+        Link Farcaster
+      </button>
+      {showLink && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm mx-4 rounded-2xl border border-white/10 bg-[#0b0b10] p-5 shadow-2xl">
+            <h3 className="text-sm font-semibold text-white mb-3">Link Farcaster Account</h3>
+            <FarcasterSignInButton onClose={() => setShowLink(false)} />
+            <button
+              onClick={() => setShowLink(false)}
+              className="mt-3 w-full px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/8 text-white/70 hover:bg-white/12 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
