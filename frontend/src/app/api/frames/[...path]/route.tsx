@@ -1,7 +1,7 @@
 /** @jsxImportSource frog/jsx */
 
 import { Frog, Button } from 'frog';
-import { handle } from 'frog/next';
+import { type NextRequest } from 'next/server';
 import { registerAgentFrames } from '@/lib/frames/agent';
 import { registerTaskFrames } from '@/lib/frames/task';
 import { registerEscrowFrames } from '@/lib/frames/escrow';
@@ -61,5 +61,16 @@ registerAgentFrames(app);
 registerTaskFrames(app);
 registerEscrowFrames(app);
 
-export const GET = handle(app);
-export const POST = handle(app);
+async function handler(req: NextRequest) {
+  // Hono registers the landing frame at /api/frames/ (trailing slash).
+  // Next.js strips the trailing slash, so re-add it for the root path.
+  const parsed = new URL(req.url);
+  if (parsed.pathname === '/api/frames') {
+    parsed.pathname = '/api/frames/';
+    return app.fetch(new Request(parsed.toString(), req));
+  }
+  return app.fetch(req);
+}
+
+export const GET = handler;
+export const POST = handler;
