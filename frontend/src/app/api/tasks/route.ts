@@ -50,10 +50,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const csrfError = validateOrigin(req);
-  if (csrfError) return csrfError;
-
   const session = await getSession();
+
+  // Skip CSRF for Farcaster Mini App sessions (origin differs in Warpcast iframe)
+  if (!session.fid) {
+    const csrfError = validateOrigin(req);
+    if (csrfError) return csrfError;
+  }
+
   if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

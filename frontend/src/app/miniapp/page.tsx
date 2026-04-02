@@ -36,24 +36,23 @@ var ESCROW='${escrowAddr}';
 var sdk=null,agents=[],tasks=[],currentView='home',walletAddress=null,authenticated=false;
 function init(){
   import('https://esm.sh/@farcaster/frame-sdk@0.2.0').then(function(m){
-    sdk=m.default;sdk.actions.ready();
-    try{
-      var ctx=sdk.context;
+    sdk=m.default;
+    // Get context first (may be a promise in newer SDK versions)
+    Promise.resolve(sdk.context).then(function(ctx){
       var fid=ctx&&ctx.user?ctx.user.fid:null;
       var username=ctx&&ctx.user?ctx.user.username:null;
-      sdk.wallet.ethProvider.request({method:'eth_requestAccounts'}).then(function(a){
+      sdk.actions.ready();
+      return sdk.wallet.ethProvider.request({method:'eth_requestAccounts'}).then(function(a){
         if(a&&a[0]){
           walletAddress=a[0];
           var e=document.getElementById('walletAddr');
           if(e){e.textContent=a[0].slice(0,6)+'...'+a[0].slice(-4);document.getElementById('walletInfo').style.display='block';}
-          if(fid){
-            fetch('/api/auth/farcaster/context',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fid:fid,username:username,walletAddress:a[0]})}).then(function(r){
-              if(r.ok)authenticated=true;
-            }).catch(function(){});
-          }
+          return fetch('/api/auth/farcaster/context',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fid:fid||0,username:username||'',walletAddress:a[0]})}).then(function(r){
+            if(r.ok){authenticated=true;var s=document.getElementById('authStatus');if(s)s.textContent='Connected';}
+          });
         }
       });
-    }catch(e){}
+    }).catch(function(e){console.log('init error',e);sdk.actions.ready();});
   }).catch(function(){});
 }
 init();
