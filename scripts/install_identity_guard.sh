@@ -27,5 +27,6 @@ git config --local user.email "$guard_email"
 git config --local identity.guard.name "$guard_name"
 git config --local identity.guard.email "$guard_email"
 
-printf '%s\n' "identity guard installed for $guard_name <$guard_email>"
+printf '%s\n' "local identity guard installed for $guard_name <$guard_email>"
+printf '%s\n' 'exact-identity mode is repo-local to this checkout'
 printf '%s\n' 'core.hooksPath=.githooks'
