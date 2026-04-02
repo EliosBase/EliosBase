@@ -18,7 +18,7 @@ function getSessionOptions(): SessionOptions {
     cookieName: 'eliosbase_session',
     cookieOptions: {
       httpOnly: true,
-      sameSite: 'lax' as const,
+      sameSite: 'none' as const,
       secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 24, // 24 hours
     },
