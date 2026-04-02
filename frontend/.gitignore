@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/.synpress/
+/.cache-synpress/
 
 # next.js
 /.next/

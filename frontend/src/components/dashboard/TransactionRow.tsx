@@ -25,30 +25,32 @@ export default function TransactionRow({ tx }: TransactionRowProps) {
   const amountLabel = tx.amount.endsWith(` ${tx.token}`) ? tx.amount : `${tx.amount} ${tx.token}`;
 
   return (
-    <div className="flex items-center gap-4 px-4 py-3 hover:bg-white/3 transition-colors rounded-lg">
-      <div className={`w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 ${color}`}>
+    <div className="rounded-lg px-4 py-3 transition-colors hover:bg-white/3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className={`flex h-9 w-9 items-center justify-center rounded-lg bg-white/5 ${color}`}>
         <Icon size={16} />
       </div>
 
       <div className="flex-1 min-w-0">
         <p className="text-sm text-white/80 font-[family-name:var(--font-body)]">{label}</p>
-        <p className="text-[11px] text-white/30 font-[family-name:var(--font-mono)] truncate">
+        <p className="break-all text-[11px] text-white/30 font-[family-name:var(--font-mono)]">
           {tx.from} → {tx.to}
         </p>
       </div>
 
-      <div className="text-right flex-shrink-0">
+      <div className="flex-shrink-0 text-left sm:text-right">
         <p className="text-sm font-medium text-white font-[family-name:var(--font-mono)]">
           {amountLabel}
         </p>
-        <div className="flex items-center gap-2 justify-end mt-0.5">
+        <div className="mt-1 flex flex-wrap items-center gap-2 sm:justify-end">
           <span className={`text-[10px] px-1.5 py-0.5 rounded ${statusStyles[tx.status]}`}>
             {tx.status}
           </span>
-          <span className="text-[10px] text-white/25 font-[family-name:var(--font-mono)]">
+          <span className="break-all text-[10px] text-white/25 font-[family-name:var(--font-mono)]">
             {tx.txHash}
           </span>
         </div>
+      </div>
       </div>
     </div>
   );

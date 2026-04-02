@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getConfiguredReownProjectId, getRuntimeConfigurationStatus } from '@/lib/runtimeConfig';
 
 const originalEnv = { ...process.env };
@@ -37,6 +37,7 @@ function configureRuntimeEnv(overrides: Record<string, string | undefined> = {})
 
 afterEach(() => {
   process.env = { ...originalEnv };
+  vi.resetModules();
 });
 
 describe('getRuntimeConfigurationStatus', () => {
@@ -100,5 +101,20 @@ describe('getRuntimeConfigurationStatus', () => {
     });
 
     expect(getConfiguredReownProjectId()).toBe('reown-project-id');
+  });
+
+  it('keeps the Reown alias available after client-style env inlining', async () => {
+    configureRuntimeEnv({
+      NEXT_PUBLIC_REOWN_PROJECT_ID: undefined,
+      NEXT_PUBLIC_PROJECT_ID: 'reown-project-id',
+    });
+
+    vi.resetModules();
+
+    const runtimeConfig = await import('@/lib/runtimeConfig');
+
+    delete process.env.NEXT_PUBLIC_PROJECT_ID;
+
+    expect(runtimeConfig.getConfiguredReownProjectId()).toBe('reown-project-id');
   });
 });

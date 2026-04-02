@@ -25,10 +25,10 @@ export default function ShareToWarpcast({ text, embedUrl, className }: ShareToWa
   return (
     <button
       onClick={handleShare}
-      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium text-purple-300 bg-purple-500/10 border border-purple-500/15 hover:bg-purple-500/20 transition-colors ${className ?? ''}`}
+      className={`inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-purple-500/15 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-300 transition-colors hover:bg-purple-500/20 ${className ?? ''}`}
       title="Share on Warpcast"
     >
-      <Share2 size={10} />
+      <Share2 size={12} />
       <span>Warpcast</span>
     </button>
   );

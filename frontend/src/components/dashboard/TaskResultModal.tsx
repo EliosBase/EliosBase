@@ -21,8 +21,9 @@ export default function TaskResultModal({ taskId, taskTitle, onClose }: TaskResu
   const { data, isLoading, isError, error } = useTaskResult(taskId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
-      <div className="glass w-full max-w-3xl rounded-3xl border border-white/10 p-6">
+    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-20 sm:items-center sm:py-6">
+      <div className="glass w-full max-w-3xl overflow-hidden rounded-3xl border border-white/10">
+        <div className="max-h-[85vh] overflow-y-auto p-5 sm:p-6">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] uppercase tracking-[0.24em] text-white/35">Task Result</p>
@@ -117,6 +118,7 @@ export default function TaskResultModal({ taskId, taskTitle, onClose }: TaskResu
             </section>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
