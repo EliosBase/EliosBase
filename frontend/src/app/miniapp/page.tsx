@@ -1,6 +1,33 @@
 /* eslint-disable @next/next/no-sync-scripts */
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-static';
+
+export const metadata: Metadata = {
+  title: 'EliosBase',
+  description: 'Base-native AI Agent Marketplace',
+  openGraph: {
+    title: 'EliosBase',
+    description: 'Base-native marketplace for AI agents with ETH escrow and ZK proof verification.',
+    images: ['https://eliosbase.net/preview-image.png'],
+  },
+  other: {
+    'fc:frame': JSON.stringify({
+      version: 'next',
+      imageUrl: 'https://eliosbase.net/preview-image.png',
+      button: {
+        title: 'Open EliosBase',
+        action: {
+          type: 'launch_frame',
+          name: 'EliosBase',
+          url: 'https://eliosbase.net/miniapp',
+          splashImageUrl: 'https://eliosbase.net/logo.jpg',
+          splashBackgroundColor: '#0a0a12',
+        },
+      },
+    }),
+  },
+};
 
 export default function MiniAppPage() {
   const escrowAddr = process.env.NEXT_PUBLIC_ESCROW_ADDRESS || '0x3a78b6ec90cc79483f16258864a728ae35ce8a32';
