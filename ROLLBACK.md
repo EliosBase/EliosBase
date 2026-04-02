@@ -7,6 +7,12 @@
 3. Click "..." > **Promote to Production**
 4. Verify the site is working at https://eliosbase.net
 
+### Staging
+
+1. Promote the last known good `staging` deployment inside the Vercel `staging` custom environment
+2. Verify `https://staging.eliosbase.net/api/ready`
+3. Re-run `staging-smoke` if the rollback changed behavior
+
 ## Database (Supabase)
 
 Supabase does not support automatic migration rollback.
