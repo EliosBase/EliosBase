@@ -145,11 +145,28 @@ function submitEscrowWithTask(i,taskId){
 function loadT(){
   show('tk');var l=document.getElementById('tl');l.innerHTML='<p class="lo">Loading tasks...</p>';
   fetch('/api/tasks?limit=20').then(function(r){return r.json()}).then(function(d){
-    tasks=Array.isArray(d)?d:d.tasks||[];if(!tasks.length){l.innerHTML='<p class="lo">No tasks found.</p>';return;}
-    var h='';for(var i=0;i<tasks.length;i++){var t=tasks[i];
+    tasks=Array.isArray(d)?d:d.tasks||[];
+    var h='<button class="pb" style="margin-bottom:16px" onclick="showCreateTask()">+ Create New Task</button>';
+    if(!tasks.length){h+='<p class="lo">No tasks yet.</p>';}
+    for(var i=0;i<tasks.length;i++){var t=tasks[i];
       h+='<button class="c" onclick="showT('+i+')"><div class="ct"><span>'+esc(t.title)+'</span><span class="'+bc(t.status)+'">'+esc(t.status)+'</span></div><div class="cd">'+esc((t.description||'').slice(0,80))+'</div><div class="cm"><span>'+esc(t.currentStep)+'</span><span>'+esc(t.reward)+'</span></div></button>';
     }l.innerHTML=h;
   }).catch(function(){l.innerHTML='<p class="lo">Failed to load.</p>';});
+}
+function showCreateTask(){
+  var el=document.getElementById('tl');
+  el.innerHTML='<h3 style="font-size:16px;font-weight:700;margin-bottom:12px">Create Task</h3><div style="text-align:left"><label style="font-size:12px;color:rgba(255,255,255,0.5);display:block;margin-bottom:6px">Title</label><input id="ctTitle" type="text" placeholder="Task title" style="width:100%;padding:12px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:white;font-size:14px;font-family:inherit;outline:none;margin-bottom:12px" /><label style="font-size:12px;color:rgba(255,255,255,0.5);display:block;margin-bottom:6px">Description</label><textarea id="ctDesc" placeholder="Describe the task" rows="3" style="width:100%;padding:12px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:white;font-size:14px;font-family:inherit;outline:none;resize:vertical;margin-bottom:12px"></textarea><label style="font-size:12px;color:rgba(255,255,255,0.5);display:block;margin-bottom:6px">Reward (e.g. 0.01 ETH)</label><input id="ctReward" type="text" placeholder="0.01 ETH" value="0.01 ETH" style="width:100%;padding:12px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);color:white;font-size:14px;font-family:inherit;outline:none;margin-bottom:12px" /></div><div id="ctError" style="color:#f87171;font-size:12px;margin-bottom:8px"></div><button class="pb" onclick="submitTask()">Create Task</button><button style="display:block;width:100%;margin-top:8px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="loadT()">Cancel</button>';
+}
+function submitTask(){
+  var title=(document.getElementById('ctTitle')||{}).value||'';
+  var desc=(document.getElementById('ctDesc')||{}).value||'';
+  var reward=(document.getElementById('ctReward')||{}).value||'0.01 ETH';
+  var errEl=document.getElementById('ctError');
+  if(!title.trim()){if(errEl)errEl.textContent='Title is required';return;}
+  if(errEl)errEl.textContent='Creating...';
+  fetch('/api/tasks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:title.trim(),description:desc.trim(),reward:reward.trim()})}).then(function(r){
+    if(!r.ok)throw new Error('Failed to create task');return r.json();
+  }).then(function(){loadT();}).catch(function(e){if(errEl)errEl.textContent=e.message||'Failed to create task';});
 }
 var ST=['Submitted','Decomposed','Assigned','Executing','ZK Verifying','Complete'];
 function showT(i){
