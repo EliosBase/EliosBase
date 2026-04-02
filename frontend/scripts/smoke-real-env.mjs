@@ -10,6 +10,7 @@ const taskCreateBody = parseJsonEnv('SMOKE_TASK_CREATE_BODY');
 const hireBody = parseJsonEnv('SMOKE_HIRE_BODY');
 const txSyncBody = parseJsonEnv('SMOKE_TX_SYNC_BODY');
 let sessionCookie = process.env.SMOKE_SESSION_COOKIE;
+const vercelProtectionBypass = process.env.SMOKE_VERCEL_PROTECTION_BYPASS;
 
 if (!baseUrl) {
   console.error('SMOKE_BASE_URL is required');
@@ -34,6 +35,10 @@ function parseJsonEnv(name) {
 
 function makeHeaders(extra = {}) {
   const headers = new Headers(extra);
+  if (vercelProtectionBypass) {
+    headers.set('x-vercel-protection-bypass', vercelProtectionBypass);
+    headers.set('x-vercel-set-bypass-cookie', 'true');
+  }
   if (sessionCookie) {
     headers.set('cookie', `eliosbase_session=${sessionCookie}`);
   }
