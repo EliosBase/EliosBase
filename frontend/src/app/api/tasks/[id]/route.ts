@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
+import { getSession } from '@/lib/session';
 import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { toTask } from '@/lib/transforms';
 import { logAudit, logActivity, checkRateLimit } from '@/lib/audit';
@@ -102,4 +103,49 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   return NextResponse.json(toTask(data));
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const session = await getSession();
+
+  if (!session.userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const supabase = createServiceClient();
+
+  // Verify the task belongs to this user and is deletable
+  const { data: task, error: fetchError } = await supabase
+    .from('tasks')
+    .select('id, submitter_id, status, current_step')
+    .eq('id', id)
+    .single();
+
+  if (fetchError || !task) {
+    return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+  }
+
+  if (task.submitter_id !== session.userId && session.role !== 'admin') {
+    return NextResponse.json({ error: 'Only the task creator can delete this task' }, { status: 403 });
+  }
+
+  // Only allow deleting tasks that haven't locked escrow
+  if (task.current_step !== 'Submitted' && task.current_step !== 'Decomposed') {
+    return NextResponse.json({ error: 'Cannot delete a task that has been assigned or has locked escrow' }, { status: 400 });
+  }
+
+  const { error: deleteError } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', id);
+
+  if (deleteError) {
+    return NextResponse.json({ error: 'Failed to delete task' }, { status: 500 });
+  }
+
+  await logAudit({ action: 'TASK_DELETE', actor: session.walletAddress ?? session.userId, target: id, result: 'ALLOW' });
+  await logActivity({ type: 'task', message: `Task deleted: ${id}` });
+
+  return NextResponse.json({ deleted: true });
 }
