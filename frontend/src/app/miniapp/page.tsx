@@ -181,6 +181,17 @@ function submitTask(){
     if(!r.ok)throw new Error('Failed to create task');return r.json();
   }).then(function(){loadT();}).catch(function(e){if(errEl)errEl.textContent=e.message||'Failed to create task';});
 }
+function deleteTask(i){
+  var t=tasks[i];if(!t)return;
+  var e=document.getElementById('td');
+  e.innerHTML='<div style="text-align:center;padding:32px 0"><p class="lo">Deleting task...</p></div>';
+  fetch('/api/tasks/'+t.id,{method:'DELETE'}).then(function(r){
+    if(!r.ok)throw new Error('Failed to delete');
+    e.innerHTML='<div style="text-align:center;padding:32px 0"><div style="font-size:32px;margin-bottom:12px">✅</div><p style="font-size:14px;font-weight:600">Task Deleted</p><button style="display:block;width:100%;margin-top:16px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="loadT()">Back to Tasks</button></div>';
+  }).catch(function(err){
+    e.innerHTML='<div style="text-align:center;padding:32px 0"><div style="font-size:32px;margin-bottom:12px">❌</div><p style="font-size:14px;font-weight:600;color:#f87171">'+(err.message||'Failed to delete')+'</p><button style="display:block;width:100%;margin-top:16px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="showT('+i+')">Back</button></div>';
+  });
+}
 var ST=['Submitted','Decomposed','Assigned','Executing','ZK Verifying','Complete'];
 function showT(i){
   var t=tasks[i];if(!t)return;var e=document.getElementById('td');
@@ -188,7 +199,9 @@ function showT(i){
   for(var j=0;j<ST.length;j++){var dn=j<=ci;pg+='<div class="ps"><div class="pb2" style="background:'+(dn?'rgba(255,255,255,0.6)':'rgba(255,255,255,0.08)')+'"></div><span style="font-size:8px;color:'+(dn?'rgba(255,255,255,0.5)':'rgba(255,255,255,0.2)')+'">'+ST[j]+'</span></div>';}
   pg+='</div></div>';
   var pf=t.zkProofId?'Verified':t.currentStep==='ZK Verifying'?'Verifying...':'Pending';
-  e.innerHTML='<h2 style="font-size:20px;font-weight:700;margin-bottom:4px">'+esc(t.title)+'</h2><div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span class="'+bc(t.status)+'">'+esc(t.status)+'</span>'+(t.assignedAgent?'<span style="font-size:11px;color:rgba(255,255,255,0.4)">🤖 '+esc(t.assignedAgent)+'</span>':'')+'</div><p class="dd">'+esc(t.description)+'</p>'+pg+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="sb"><div class="sl">Reward</div><div class="sv">'+esc(t.reward)+'</div></div><div class="sb"><div class="sl">ZK Proof</div><div class="sv">'+pf+'</div></div></div>';
+  var canDelete=(t.currentStep==='Submitted'||t.currentStep==='Decomposed');
+  var delBtn=canDelete?'<button style="display:block;width:100%;margin-top:16px;padding:12px;border-radius:14px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#f87171;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="deleteTask('+i+')">Delete Task</button>':'';
+  e.innerHTML='<h2 style="font-size:20px;font-weight:700;margin-bottom:4px">'+esc(t.title)+'</h2><div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span class="'+bc(t.status)+'">'+esc(t.status)+'</span>'+(t.assignedAgent?'<span style="font-size:11px;color:rgba(255,255,255,0.4)">🤖 '+esc(t.assignedAgent)+'</span>':'')+'</div><p class="dd">'+esc(t.description)+'</p>'+pg+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="sb"><div class="sl">Reward</div><div class="sv">'+esc(t.reward)+'</div></div><div class="sb"><div class="sl">ZK Proof</div><div class="sv">'+pf+'</div></div></div>'+delBtn;
   show('td');
 }
 `;
