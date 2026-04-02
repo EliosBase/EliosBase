@@ -88,7 +88,11 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               <span className="text-white/60">BASE</span>
             </span>
           </Link>
-          <button onClick={onClose} className="lg:hidden text-white/50 hover:text-white" aria-label="Close navigation">
+          <button
+            onClick={onClose}
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-white/50 transition-colors hover:bg-white/8 hover:text-white lg:hidden"
+            aria-label="Close navigation"
+          >
             <X size={20} />
           </button>
         </div>

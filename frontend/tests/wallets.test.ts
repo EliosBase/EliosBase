@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectInstalledWallets, getInjectedProvider } from '@/lib/wallets';
+import { detectInstalledWallets, getInjectedProvider, resolveWalletConnector } from '@/lib/wallets';
 
 describe('detectInstalledWallets', () => {
   it('detects MetaMask and Phantom when both are installed', () => {
@@ -43,5 +43,21 @@ describe('detectInstalledWallets', () => {
         phantom: { ethereum: phantom },
       }, 'metaMask'),
     ).toBe(metaMask);
+  });
+
+  it('matches wallet connectors by normalized id and name', () => {
+    const connectors = [
+      { id: 'io.metamask', name: 'MetaMask' },
+      { id: 'coinbaseWalletSDK', name: 'Coinbase Wallet' },
+      { id: 'phantom', name: 'Phantom' },
+      { id: 'rabby', name: 'Rabby Wallet' },
+      { id: 'injected', name: 'Injected' },
+    ];
+
+    expect(resolveWalletConnector('metaMask', connectors)).toBe(connectors[0]);
+    expect(resolveWalletConnector('coinbaseWallet', connectors)).toBe(connectors[1]);
+    expect(resolveWalletConnector('phantom', connectors)).toBe(connectors[2]);
+    expect(resolveWalletConnector('rabby', connectors)).toBe(connectors[3]);
+    expect(resolveWalletConnector('browserWallet', connectors)).toBe(connectors[4]);
   });
 });

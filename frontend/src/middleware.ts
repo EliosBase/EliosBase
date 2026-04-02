@@ -19,16 +19,6 @@ export function middleware(req: NextRequest) {
     }
   }
 
-  // Dashboard pages require a session cookie — redirect to landing if missing
-  if (pathname.startsWith('/app')) {
-    const session = req.cookies.get('eliosbase_session');
-    if (!session) {
-      const url = req.nextUrl.clone();
-      url.pathname = '/';
-      return NextResponse.redirect(url);
-    }
-  }
-
   // Apply security headers to all responses
   const res = NextResponse.next();
   for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
@@ -39,8 +29,7 @@ export function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match dashboard pages and admin API routes
-    '/app/:path*',
+    // Match admin API routes
     '/api/admin/:path*',
     // Match all other routes for security headers (excluding static assets)
     '/((?!_next/static|_next/image|favicon.ico|circuits/).*)',

@@ -4,9 +4,29 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useAccount, useSignMessage, useDisconnect, useSwitchChain } from 'wagmi';
 import { SiweMessage } from 'siwe';
 import { useQueryClient } from '@tanstack/react-query';
+import { getAddress } from 'viem';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { clearE2EWalletState, isE2EMode } from '@/lib/e2e';
 import { activeChain } from '@/lib/wagmi';
+import { getConnectedInjectedProvider, signWithInjectedProvider } from '@/lib/siweSignature';
+
+const skipWalletE2EChainSwitch = process.env.NEXT_PUBLIC_WALLET_E2E_SKIP_CHAIN_SWITCH === '1';
+
+async function signSiweMessage(
+  address: string,
+  message: string,
+  signMessageAsync: (args: { message: string }) => Promise<string>,
+) {
+  const injectedProvider = await getConnectedInjectedProvider(window, address);
+  if (injectedProvider) {
+    const signature = await signWithInjectedProvider(injectedProvider, address, message);
+    if (signature) {
+      return signature;
+    }
+  }
+
+  return signMessageAsync({ message });
+}
 
 export function useSiwe() {
   const { address, isConnected, isReconnecting } = useAccount();
@@ -32,14 +52,19 @@ export function useSiwe() {
     if (!address || isSigningIn) return;
     setIsSigningIn(true);
     try {
-      await switchChainAsync({ chainId: activeChain.id });
+      if (!skipWalletE2EChainSwitch) {
+        await switchChainAsync({ chainId: activeChain.id });
+      }
 
       const nonceRes = await fetch('/api/auth/nonce');
       const { nonce } = await nonceRes.json();
+      const checksumAddress = getAddress(address);
+      const scheme = window.location.protocol.replace(/:$/, '');
 
       const message = new SiweMessage({
+        scheme,
         domain: window.location.host,
-        address: address,
+        address: checksumAddress,
         statement: 'Sign in to EliosBase',
         uri: window.location.origin,
         version: '1',
@@ -48,7 +73,7 @@ export function useSiwe() {
       });
       const messageStr = message.prepareMessage();
 
-      const signature = await signMessageAsync({ message: messageStr });
+      const signature = await signSiweMessage(checksumAddress, messageStr, signMessageAsync);
 
       const verifyRes = await fetch('/api/auth/verify', {
         method: 'POST',
@@ -72,7 +97,15 @@ export function useSiwe() {
     } finally {
       setIsSigningIn(false);
     }
-  }, [address, isSigningIn, signMessageAsync, switchChainAsync, refreshSession, setIsSigningIn, queryClient]);
+  }, [
+    address,
+    isSigningIn,
+    queryClient,
+    refreshSession,
+    setIsSigningIn,
+    signMessageAsync,
+    switchChainAsync,
+  ]);
 
   const signOut = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -114,7 +147,15 @@ export function useSiwe() {
       hasAutoTriggered.current = true;
       signIn();
     }
-  }, [isConnected, address, isAuthenticated, isSessionLoading, isReconnecting, isSigningIn, signIn]);
+  }, [
+    address,
+    isAuthenticated,
+    isConnected,
+    isReconnecting,
+    isSessionLoading,
+    isSigningIn,
+    signIn,
+  ]);
 
   return { signIn, signOut };
 }

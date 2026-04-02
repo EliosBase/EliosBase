@@ -55,7 +55,7 @@ export default function SecurityAlertComponent({ alert }: SecurityAlertProps) {
           <Icon size={18} />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="mb-1 flex flex-wrap items-center gap-2">
             <h4 className="text-sm font-semibold text-white font-[family-name:var(--font-body)]">
               {alert.title}
             </h4>
@@ -71,7 +71,7 @@ export default function SecurityAlertComponent({ alert }: SecurityAlertProps) {
           <p className="text-xs text-white/50 leading-relaxed font-[family-name:var(--font-body)]">
             {alert.description}
           </p>
-          <div className="flex items-center gap-3 mt-2">
+          <div className="mt-3 flex flex-wrap items-center gap-3">
             <span className="text-[10px] text-white/30 font-[family-name:var(--font-mono)]">
               {alert.source}
             </span>
@@ -80,7 +80,7 @@ export default function SecurityAlertComponent({ alert }: SecurityAlertProps) {
               <button
                 onClick={handleResolve}
                 disabled={resolving}
-                className="ml-auto text-[10px] px-2 py-0.5 rounded-md bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-colors disabled:opacity-50 font-medium"
+                className="min-h-10 rounded-md bg-green-500/15 px-3 py-1.5 text-xs font-medium text-green-400 transition-colors hover:bg-green-500/25 disabled:opacity-50 sm:ml-auto"
               >
                 {resolving ? 'Resolving...' : 'Resolve'}
               </button>

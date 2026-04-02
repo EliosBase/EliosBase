@@ -23,8 +23,8 @@ export default function CastComposer({ defaultText, embedUrl, onClose }: CastCom
   const isOverLimit = remaining < 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md mx-4 rounded-2xl border border-white/10 bg-[#0b0b10] p-5 shadow-2xl">
+    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-20 backdrop-blur-sm sm:items-center sm:py-4">
+      <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#0b0b10] p-5 shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)]">
             Cast to Farcaster
@@ -84,17 +84,17 @@ export default function CastComposer({ defaultText, embedUrl, onClose }: CastCom
               <p className="mt-2 text-xs text-red-400">{error}</p>
             )}
 
-            <div className="mt-4 flex items-center justify-end gap-2">
+            <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
               <button
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/8 text-white/70 hover:bg-white/12 transition-colors"
+                className="min-h-10 rounded-lg bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/70 transition-colors hover:bg-white/12"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSubmit}
                 disabled={isPending || isOverLimit || !text.trim()}
-                className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-purple-500 text-white hover:bg-purple-400 transition-colors disabled:opacity-50"
+                className="min-h-10 rounded-lg bg-purple-500 px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-purple-400 disabled:opacity-50"
               >
                 {isPending ? (
                   <span className="inline-flex items-center gap-1">

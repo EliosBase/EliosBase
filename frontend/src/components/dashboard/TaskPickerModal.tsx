@@ -21,14 +21,14 @@ export default function TaskPickerModal({ onSelect, onClose }: TaskPickerModalPr
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/80 px-4 py-20 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
-        className="relative max-w-md w-full animate-fade-in-up"
+        className="relative w-full max-w-md animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="glass p-6 rounded-2xl relative">
+        <div className="relative max-h-[85vh] overflow-y-auto rounded-2xl p-5 glass sm:p-6">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
@@ -56,12 +56,12 @@ export default function TaskPickerModal({ onSelect, onClose }: TaskPickerModalPr
               <p className="text-white/30 text-xs mt-1">Create a task first from the Tasks page.</p>
             </div>
           ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
               {eligibleTasks.map((task) => (
                 <button
                   key={task.id}
                   onClick={() => onSelect(task.id)}
-                  className="w-full text-left p-3 rounded-xl bg-white/5 border border-white/6 hover:border-white/15 hover:bg-white/8 transition-all"
+                  className="w-full rounded-xl border border-white/6 bg-white/5 p-3 text-left transition-all hover:border-white/15 hover:bg-white/8"
                 >
                   <div className="flex items-start gap-3">
                     <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -69,7 +69,7 @@ export default function TaskPickerModal({ onSelect, onClose }: TaskPickerModalPr
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-white truncate">{task.title}</p>
-                      <div className="flex items-center gap-3 mt-1">
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
                         <span className="text-[10px] text-white/40 px-1.5 py-0.5 rounded bg-white/5">
                           {task.currentStep}
                         </span>

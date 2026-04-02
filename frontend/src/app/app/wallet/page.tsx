@@ -514,7 +514,7 @@ export default function WalletPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="w-full max-w-6xl space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {walletStats.map((stat) => (
           <StatCard key={stat.label} {...stat} />
@@ -584,19 +584,19 @@ export default function WalletPage() {
                           : 'border-white/8 bg-white/3 hover:bg-white/5'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
                           <p className="text-sm font-medium text-white">{agent.name}</p>
-                          <p className="mt-1 text-[11px] text-white/35 font-[family-name:var(--font-mono)]">
+                          <p className="mt-1 break-all text-[11px] text-white/35 font-[family-name:var(--font-mono)]">
                             {agent.walletAddress ?? 'Wallet pending'}
                           </p>
                         </div>
-                        <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/45">
+                        <span className="self-start rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/45">
                           {agent.walletStatus ?? 'predicted'}
                         </span>
                       </div>
                       {agent.walletPolicy ? (
-                        <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] text-white/45">
+                        <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] text-white/45 sm:grid-cols-2">
                           <p>Standard: {agent.walletStandard ?? 'safe'}</p>
                           <p>Migration: {agent.walletMigrationState ?? 'legacy'}</p>
                           <p>Threshold: {agent.walletPolicy.threshold}-of-{agent.walletPolicy.owners.length}</p>
@@ -619,7 +619,7 @@ export default function WalletPage() {
                 <p className="text-[11px] text-white/30 mb-4">
                   Install the Safe7579 adapter, Smart Sessions validator, guard, and Elios policy hook on this agent wallet.
                 </p>
-                <div className="grid grid-cols-2 gap-2 text-[11px] text-white/45">
+                <div className="grid grid-cols-1 gap-2 text-[11px] text-white/45 sm:grid-cols-2">
                   <p>Wallet standard: {selectedAgent.walletStandard ?? 'safe'}</p>
                   <p>Migration state: {selectedAgent.walletMigrationState ?? 'legacy'}</p>
                   <p>Wallet status: {selectedAgent.walletStatus ?? 'predicted'}</p>
@@ -632,13 +632,13 @@ export default function WalletPage() {
                     type="button"
                     onClick={handleMigrateAgentWallet}
                     disabled={migratingAgentId === selectedAgent.id || !selectedAgent.walletAddress}
-                    className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-60"
+                    className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-60 sm:w-auto"
                   >
                     {migratingAgentId === selectedAgent.id ? <Loader2 size={12} className="animate-spin" /> : null}
                     {migratingAgentId === selectedAgent.id ? 'Installing Safe7579…' : 'Install Safe7579'}
                   </button>
                 ) : (
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                     <div className="inline-flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1.5 text-[11px] text-green-300">
                       <CheckCircle2 size={12} />
                       Safe7579 live for this agent
@@ -647,7 +647,7 @@ export default function WalletPage() {
                       type="button"
                       onClick={handleRotateSessionKey}
                       disabled={rotatingSessionAgentId === selectedAgent.id}
-                      className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-white/10 disabled:opacity-60"
+                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/6 px-3 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-white/10 disabled:opacity-60 sm:w-auto"
                     >
                       {rotatingSessionAgentId === selectedAgent.id ? <Loader2 size={12} className="animate-spin" /> : null}
                       {rotatingSessionAgentId === selectedAgent.id ? 'Rotating session…' : 'Rotate session key'}
@@ -774,14 +774,14 @@ export default function WalletPage() {
 
                   return (
                     <div key={transfer.id} className="rounded-xl border border-white/8 bg-white/4 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
                           <p className="text-sm text-white">{transfer.amountEth} ETH</p>
-                          <p className="mt-1 text-[11px] text-white/35 font-[family-name:var(--font-mono)]">
+                          <p className="mt-1 break-all text-[11px] text-white/35 font-[family-name:var(--font-mono)]">
                             {transfer.destination}
                           </p>
                         </div>
-                        <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/45">
+                        <span className="self-start rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/45">
                           {transfer.status}
                         </span>
                       </div>
@@ -789,10 +789,10 @@ export default function WalletPage() {
                       {transfer.policyReason ? (
                         <p className="mt-2 text-[11px] text-white/35">{transfer.policyReason}</p>
                       ) : null}
-                      <div className="mt-3 flex flex-wrap gap-3 text-[11px] text-white/35">
+                      <div className="mt-3 flex flex-col gap-2 text-[11px] text-white/35 sm:flex-row sm:flex-wrap sm:gap-3">
                         <span>Approvals: {transfer.approvalsReceived}/{transfer.approvalsRequired}</span>
                         {transfer.unlockAt ? <span>Unlocks: {new Date(transfer.unlockAt).toLocaleString()}</span> : null}
-                        {transfer.txHash ? <span className="font-[family-name:var(--font-mono)]">Tx: {transfer.txHash}</span> : null}
+                        {transfer.txHash ? <span className="break-all font-[family-name:var(--font-mono)]">Tx: {transfer.txHash}</span> : null}
                       </div>
                       {transfer.executedAt ? (
                         <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-green-500/20 bg-green-500/10 px-3 py-1 text-[11px] text-green-300">
@@ -804,7 +804,7 @@ export default function WalletPage() {
                           type="button"
                           onClick={() => handleExecuteTransfer(transfer)}
                           disabled={isExecuting}
-                          className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-60"
+                          className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-60 sm:w-auto"
                         >
                           {isExecuting ? <Loader2 size={12} className="animate-spin" /> : null}
                           {isExecuting ? 'Signing Safe Tx…' : 'Execute with wallet'}
@@ -838,14 +838,14 @@ export default function WalletPage() {
 
                     return (
                       <div key={transfer.id} className="rounded-xl border border-white/8 bg-white/4 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
                             <p className="text-sm text-white">{transfer.agentName ?? transfer.agentId}</p>
-                            <p className="mt-1 text-[11px] text-white/35">
+                            <p className="mt-1 break-all text-[11px] text-white/35">
                               {transfer.amountEth} ETH to {transfer.destination}
                             </p>
                           </div>
-                          <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/45">
+                          <span className="self-start rounded-full border border-white/10 px-2 py-1 text-[10px] uppercase tracking-[0.16em] text-white/45">
                             {transfer.status}
                           </span>
                         </div>
@@ -863,7 +863,7 @@ export default function WalletPage() {
                             type="button"
                             onClick={() => handleApproveTransfer(transfer)}
                             disabled={isApproving}
-                            className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-60"
+                            className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-60 sm:w-auto"
                           >
                             {isApproving ? <Loader2 size={12} className="animate-spin" /> : null}
                             {isApproving ? 'Approving…' : 'Approve transfer'}

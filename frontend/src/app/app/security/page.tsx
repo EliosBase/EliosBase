@@ -112,7 +112,7 @@ export default function SecurityPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl">
+    <div className="w-full max-w-7xl space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {securityStats.map((stat) => (
@@ -148,7 +148,27 @@ export default function SecurityPage() {
             <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)] tracking-wide mb-4">
               Zero-Trust Audit Log
             </h2>
-            <div className="overflow-x-auto">
+            <div className="space-y-3 sm:hidden">
+              {auditLog.length === 0 && (
+                <div className="rounded-xl border border-white/8 bg-white/4 px-4 py-6 text-center">
+                  <p className="text-sm text-white/30 font-[family-name:var(--font-body)]">No audit entries yet.</p>
+                </div>
+              )}
+              {auditLog.map((entry, i) => (
+                <div key={i} className="rounded-xl border border-white/8 bg-white/4 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[11px] text-white/35 font-[family-name:var(--font-mono)]">{entry.timestamp}</span>
+                    <span className={`text-[11px] font-semibold ${resultColors[entry.result]}`}>{entry.result}</span>
+                  </div>
+                  <p className="mt-3 text-[11px] uppercase tracking-[0.18em] text-white/30">{entry.action}</p>
+                  <div className="mt-3 space-y-2 text-xs text-white/55 font-[family-name:var(--font-mono)]">
+                    <p>Actor: {entry.actor}</p>
+                    <p>Target: {entry.target}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto sm:block">
               <div className="min-w-[600px]">
                 <div className="grid grid-cols-[80px_1fr_1fr_1fr_60px] gap-2 px-3 py-2 text-[10px] text-white/30 uppercase tracking-wider font-[family-name:var(--font-mono)] border-b border-white/6">
                   <span>Time</span>
@@ -197,18 +217,18 @@ export default function SecurityPage() {
                 const isToggling = togglingId === gr.id;
                 return (
                   <div key={gr.id} className="p-3 rounded-lg bg-white/3 border border-white/5">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
+                    <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 items-center gap-2">
                         {gr.status === 'triggered' ? (
                           <ShieldOff size={14} className="text-red-400" />
                         ) : (
                           <Shield size={14} className="text-white/40" />
                         )}
-                        <h4 className="text-sm text-white/80 font-[family-name:var(--font-body)]">
+                        <h4 className="text-sm text-white/80 font-[family-name:var(--font-body)] break-words">
                           {gr.name}
                         </h4>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <div className="flex items-center gap-1.5">
                           <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
                           <span className={`text-[10px] ${style.textColor}`}>{style.label}</span>
@@ -216,7 +236,7 @@ export default function SecurityPage() {
                         <button
                           onClick={() => toggleGuardrail(gr.id, gr.status)}
                           disabled={isToggling || !!togglingId}
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium transition-colors disabled:opacity-50 ${
+                          className={`min-h-10 rounded px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 ${
                             gr.status === 'active'
                               ? 'bg-yellow-500/15 text-yellow-400 hover:bg-yellow-500/25'
                               : 'bg-green-500/15 text-green-400 hover:bg-green-500/25'

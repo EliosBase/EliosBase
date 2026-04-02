@@ -29,6 +29,7 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
   const { signOut } = useSiweContext();
   const { session } = useAuthContext();
   const mounted = useMounted();
+  const forceConnectorE2E = process.env.NEXT_PUBLIC_WALLET_E2E_FORCE_CONNECTORS === '1';
   const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false);
   const walletMenuRef = useRef<HTMLDivElement>(null);
 
@@ -75,35 +76,36 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
   const showWalletMenuChevron = mounted && needsWalletMenu && !showConnecting;
 
   return (
-    <header className="sticky top-0 z-30 glass border-b border-white/6 px-4 sm:px-6 py-4 flex items-center justify-between">
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 border-b border-white/6 px-4 py-4 glass sm:px-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-3">
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-2 -ml-2 text-white/50 hover:text-white rounded-lg hover:bg-white/5"
+          className="-ml-2 flex h-11 w-11 items-center justify-center rounded-lg text-white/50 transition-colors hover:bg-white/5 hover:text-white lg:hidden"
           aria-label="Open navigation"
         >
           <Menu size={20} />
         </button>
-        <h1 className="text-lg font-semibold font-[family-name:var(--font-heading)] tracking-wide text-white">
+        <h1 className="truncate text-lg font-semibold font-[family-name:var(--font-heading)] tracking-wide text-white">
           {title}
         </h1>
       </div>
 
       {mounted && isConnected ? (
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
           {session?.fcUsername ? (
-            <span className="px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-sm text-purple-300 font-[family-name:var(--font-body)]">
+            <span className="inline-flex min-h-11 items-center rounded-xl border border-purple-500/20 bg-purple-500/10 px-3 py-2 text-sm text-purple-300 font-[family-name:var(--font-body)]">
               @{session.fcUsername}
             </span>
           ) : process.env.NEXT_PUBLIC_FC_AUTH_ENABLED === 'true' ? (
             <LinkFarcasterButton />
           ) : null}
-          <span className="px-4 py-2 rounded-xl bg-white/10 border border-white/10 text-sm text-white/80 font-[family-name:var(--font-mono)]">
+          <span className="inline-flex min-h-11 max-w-full items-center rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/80 font-[family-name:var(--font-mono)]">
             {shortAddress}
           </span>
           <button
             onClick={() => signOut()}
-            className="p-2 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+            className="flex h-11 w-11 items-center justify-center rounded-xl text-white/40 transition-colors hover:bg-white/10 hover:text-white"
             title="Disconnect"
             aria-label="Disconnect wallet"
           >
@@ -111,24 +113,24 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
           </button>
         </div>
       ) : (
-        mounted && isAppKitEnabled ? (
+        mounted && isAppKitEnabled && !forceConnectorE2E ? (
           <AppKitConnectTrigger disabled={showConnecting} isConnecting={showConnecting} />
         ) : (
-          <div className="relative" ref={walletMenuRef}>
+          <div className="relative w-full sm:w-auto" ref={walletMenuRef}>
             <button
               type="button"
               onClick={handleConnectClick}
               disabled={!mounted || showConnecting}
               aria-expanded={isWalletMenuOpen}
               aria-haspopup="dialog"
-              className="px-4 py-2 rounded-xl bg-white text-black text-sm font-semibold hover:bg-white/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-50 sm:w-auto"
             >
               <span>{showConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
               {showWalletMenuChevron ? <ChevronDown size={16} /> : null}
             </button>
 
             {isWalletMenuOpen ? (
-              <div className="absolute right-0 top-[calc(100%+0.75rem)] z-20 w-80 rounded-2xl border border-white/10 bg-[#0b0b10] p-4 shadow-2xl shadow-black/40">
+              <div className="absolute left-0 top-[calc(100%+0.75rem)] z-20 w-[min(20rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-[#0b0b10] p-4 shadow-2xl shadow-black/40 sm:left-auto sm:right-0">
                 <div className="mb-3">
                   <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)]">
                     {installedWallets.length > 0 ? 'Connect Wallet' : 'Get a Wallet'}
@@ -187,6 +189,7 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
           </div>
         )
       )}
+      </div>
     </header>
   );
 }
@@ -214,7 +217,7 @@ function AppKitConnectTrigger({
       type="button"
       onClick={handleClick}
       disabled={disabled}
-      className="px-4 py-2 rounded-xl bg-white text-black text-sm font-semibold hover:bg-white/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-50 sm:w-auto"
     >
       <span>{isConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
     </button>
@@ -227,18 +230,18 @@ function LinkFarcasterButton() {
     <>
       <button
         onClick={() => setShowLink(true)}
-        className="px-3 py-2 rounded-xl bg-purple-500/8 border border-purple-500/15 text-xs text-purple-400 hover:bg-purple-500/15 transition-colors"
+        className="inline-flex min-h-11 items-center justify-center rounded-xl border border-purple-500/15 bg-purple-500/8 px-3 py-2 text-xs text-purple-400 transition-colors hover:bg-purple-500/15"
       >
         Link Farcaster
       </button>
       {showLink && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-sm mx-4 rounded-2xl border border-white/10 bg-[#0b0b10] p-5 shadow-2xl">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-20 backdrop-blur-sm sm:items-center sm:py-4">
+          <div className="max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-2xl border border-white/10 bg-[#0b0b10] p-5 shadow-2xl">
             <h3 className="text-sm font-semibold text-white mb-3">Link Farcaster Account</h3>
             <FarcasterSignInButton onClose={() => setShowLink(false)} />
             <button
               onClick={() => setShowLink(false)}
-              className="mt-3 w-full px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/8 text-white/70 hover:bg-white/12 transition-colors"
+              className="mt-3 min-h-11 w-full rounded-lg bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/70 transition-colors hover:bg-white/12"
             >
               Cancel
             </button>

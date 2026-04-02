@@ -25,6 +25,11 @@ export type WalletWindow = {
   };
 };
 
+type WalletConnectorCandidate = {
+  id?: string | null;
+  name?: string | null;
+};
+
 const metaMaskImpersonatorFlags = [
   'isApexWallet',
   'isAvalanche',
@@ -45,6 +50,19 @@ const metaMaskImpersonatorFlags = [
   'isUniswapWallet',
   'isZerion',
 ] as const;
+
+const walletConnectorAliases: Record<WalletId, string[]> = {
+  browserWallet: ['browserwallet', 'injected'],
+  coinbaseWallet: ['coinbasewallet', 'coinbase'],
+  injected: ['injected', 'browserwallet'],
+  metaMask: ['metamask', 'io.metamask'],
+  phantom: ['phantom'],
+  rabby: ['rabby'],
+};
+
+function normalizeWalletIdentifier(value: string | null | undefined) {
+  return value?.replace(/[^a-z0-9]/gi, '').toLowerCase() ?? '';
+}
 
 function isProvider(value: unknown): value is MaybeProvider {
   return typeof value === 'object' && value !== null;
@@ -120,4 +138,18 @@ export function detectInstalledWallets(source: WalletWindow): WalletId[] {
 export function getWalletName(id: string, fallback: string) {
   if (id === 'injected') return 'Browser Wallet';
   return knownWallets.find((wallet) => wallet.id === id)?.name ?? fallback;
+}
+
+export function resolveWalletConnector<T extends WalletConnectorCandidate>(
+  walletId: WalletId,
+  connectors: readonly T[],
+) {
+  const aliases = walletConnectorAliases[walletId].map(normalizeWalletIdentifier);
+
+  return connectors.find((connector) => {
+    const connectorId = normalizeWalletIdentifier(connector.id);
+    const connectorName = normalizeWalletIdentifier(connector.name);
+
+    return aliases.some((alias) => connectorId === alias || connectorName.includes(alias));
+  }) ?? null;
 }

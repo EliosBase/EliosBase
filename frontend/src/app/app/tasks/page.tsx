@@ -44,13 +44,13 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="w-full max-w-5xl space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1 bg-white/5 rounded-xl p-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap gap-1 rounded-xl bg-white/5 p-1">
           <button
             onClick={() => setTab('active')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`min-h-11 flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
               tab === 'active'
                 ? 'bg-white/10 text-white'
                 : 'text-white/40 hover:text-white/60'
@@ -60,7 +60,7 @@ export default function TasksPage() {
           </button>
           <button
             onClick={() => setTab('completed')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`min-h-11 flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
               tab === 'completed'
                 ? 'bg-white/10 text-white'
                 : 'text-white/40 hover:text-white/60'
@@ -70,7 +70,7 @@ export default function TasksPage() {
           </button>
           <button
             onClick={() => setTab('failed')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`min-h-11 flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
               tab === 'failed'
                 ? 'bg-red-500/15 text-red-200'
                 : 'text-white/40 hover:text-white/60'
@@ -82,7 +82,7 @@ export default function TasksPage() {
 
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black text-sm font-semibold hover:bg-white/90 transition-colors"
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-white/90 sm:w-auto"
         >
           <Plus size={16} />
           Submit New Task

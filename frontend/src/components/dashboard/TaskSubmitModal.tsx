@@ -24,14 +24,14 @@ export default function TaskSubmitModal({ onClose }: TaskSubmitModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/80 px-4 py-20 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
-        className="relative max-w-lg w-full animate-fade-in-up"
+        className="relative w-full max-w-lg animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="glass p-8 rounded-2xl relative">
+        <div className="relative max-h-[85vh] overflow-y-auto rounded-2xl p-5 glass sm:p-8">
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
@@ -40,7 +40,7 @@ export default function TaskSubmitModal({ onClose }: TaskSubmitModalProps) {
             <X size={20} />
           </button>
 
-          <h2 className="text-xl font-bold font-[family-name:var(--font-heading)] text-white mb-1">
+          <h2 className="mb-1 pr-10 text-xl font-bold font-[family-name:var(--font-heading)] text-white">
             Submit New Task
           </h2>
           <p className="text-sm text-white/40 mb-6 font-[family-name:var(--font-body)]">

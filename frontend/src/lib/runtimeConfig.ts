@@ -74,7 +74,10 @@ function readConfiguredEnv(name: string) {
     readEnv(PUBLIC_RUNTIME_ENV[name as keyof typeof PUBLIC_RUNTIME_ENV]) ??
     readEnv(process.env[name]) ??
     RUNTIME_ENV_ALIASES[name as keyof typeof RUNTIME_ENV_ALIASES]
-      ?.map((alias) => readEnv(process.env[alias]))
+      ?.map((alias) => (
+        readEnv(PUBLIC_RUNTIME_ENV[alias as keyof typeof PUBLIC_RUNTIME_ENV]) ??
+        readEnv(process.env[alias])
+      ))
       .find(Boolean);
 
   return configured ?? SAFE7579_DEFAULT_RUNTIME_ENV[name as keyof typeof SAFE7579_DEFAULT_RUNTIME_ENV];
