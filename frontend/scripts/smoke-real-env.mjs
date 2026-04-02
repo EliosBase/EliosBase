@@ -11,6 +11,7 @@ const hireBody = parseJsonEnv('SMOKE_HIRE_BODY');
 const txSyncBody = parseJsonEnv('SMOKE_TX_SYNC_BODY');
 let sessionCookie = process.env.SMOKE_SESSION_COOKIE;
 const vercelProtectionBypass = process.env.SMOKE_VERCEL_PROTECTION_BYPASS;
+let vercelProtectionCookie = null;
 
 if (!baseUrl) {
   console.error('SMOKE_BASE_URL is required');
@@ -35,12 +36,15 @@ function parseJsonEnv(name) {
 
 function makeHeaders(extra = {}) {
   const headers = new Headers(extra);
-  if (vercelProtectionBypass) {
-    headers.set('x-vercel-protection-bypass', vercelProtectionBypass);
-    headers.set('x-vercel-set-bypass-cookie', 'true');
+  const cookies = [];
+  if (vercelProtectionCookie) {
+    cookies.push(`_vercel_jwt=${vercelProtectionCookie}`);
   }
   if (sessionCookie) {
-    headers.set('cookie', `eliosbase_session=${sessionCookie}`);
+    cookies.push(`eliosbase_session=${sessionCookie}`);
+  }
+  if (cookies.length > 0) {
+    headers.set('cookie', cookies.join('; '));
   }
   return headers;
 }
@@ -54,22 +58,39 @@ function makeMutationHeaders(extra = {}) {
   return headers;
 }
 
-function extractSessionCookie(res) {
+function extractCookie(res, name) {
   const setCookie = res.headers.get('set-cookie');
   if (!setCookie) {
     return null;
   }
 
-  const match = setCookie.match(/eliosbase_session=([^;]+)/);
+  const match = setCookie.match(new RegExp(`${name}=([^;]+)`));
   return match?.[1] ?? null;
 }
 
 async function request(path, init = {}) {
+  if (vercelProtectionBypass && !vercelProtectionCookie) {
+    const bootstrapUrl = new URL(`${normalizedBaseUrl}${path}`);
+    bootstrapUrl.searchParams.set('x-vercel-set-bypass-cookie', 'true');
+    bootstrapUrl.searchParams.set('x-vercel-protection-bypass', vercelProtectionBypass);
+
+    const bootstrapRes = await fetch(bootstrapUrl, {
+      method: init.method ?? 'GET',
+      headers: makeHeaders(init.headers),
+      redirect: 'manual',
+    });
+
+    const bypassCookie = extractCookie(bootstrapRes, '_vercel_jwt');
+    if (bypassCookie) {
+      vercelProtectionCookie = bypassCookie;
+    }
+  }
+
   const res = await fetch(`${normalizedBaseUrl}${path}`, {
     ...init,
     headers: makeHeaders(init.headers),
   });
-  const nextSessionCookie = extractSessionCookie(res);
+  const nextSessionCookie = extractCookie(res, 'eliosbase_session');
   if (nextSessionCookie) {
     sessionCookie = nextSessionCookie;
   }
