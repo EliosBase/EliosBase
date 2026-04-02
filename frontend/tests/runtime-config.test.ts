@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { getRuntimeConfigurationStatus } from '@/lib/runtimeConfig';
+import { getConfiguredReownProjectId, getRuntimeConfigurationStatus } from '@/lib/runtimeConfig';
 
 const originalEnv = { ...process.env };
 
@@ -91,5 +91,14 @@ describe('getRuntimeConfigurationStatus', () => {
     expect(status.missing).not.toContain('SAFE7579_OWNER_VALIDATOR_ADDRESS');
     expect(status.missing).not.toContain('SAFE7579_SMART_SESSIONS_ADDRESS');
     expect(status.missing).not.toContain('SAFE7579_COMPATIBILITY_FALLBACK_ADDRESS');
+  });
+
+  it('accepts NEXT_PUBLIC_PROJECT_ID as an alias for Reown AppKit', () => {
+    configureRuntimeEnv({
+      NEXT_PUBLIC_REOWN_PROJECT_ID: undefined,
+      NEXT_PUBLIC_PROJECT_ID: 'reown-project-id',
+    });
+
+    expect(getConfiguredReownProjectId()).toBe('reown-project-id');
   });
 });

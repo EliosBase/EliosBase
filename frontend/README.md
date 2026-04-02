@@ -50,6 +50,7 @@ The minimum local env set is documented in [`.env.example`](.env.example). In pr
 - Supabase credentials
 - Base RPC access
 - deployed escrow and verifier addresses
+- a Reown AppKit project id for WalletConnect and broader wallet coverage
 - a session secret
 - a cron secret
 - an Anthropic API key for task execution

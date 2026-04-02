@@ -1,8 +1,9 @@
 'use client';
 
+import { AppKitProvider } from '@reown/appkit/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
-import { config } from '@/lib/wagmi';
+import { appKitConfig, config } from '@/lib/wagmi';
 import { useState } from 'react';
 
 export default function WalletProvider({ children }: { children: React.ReactNode }) {
@@ -25,7 +26,7 @@ export default function WalletProvider({ children }: { children: React.ReactNode
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        {children}
+        {appKitConfig ? <AppKitProvider {...appKitConfig}>{children}</AppKitProvider> : children}
       </QueryClientProvider>
     </WagmiProvider>
   );

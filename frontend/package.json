@@ -18,6 +18,8 @@
     "@farcaster/frame-node": "^0.2.0",
     "@farcaster/frame-sdk": "^0.2.0",
     "@neynar/nodejs-sdk": "^3.137.2",
+    "@reown/appkit": "^1.8.19",
+    "@reown/appkit-adapter-wagmi": "^1.8.19",
     "@rhinestone/module-sdk": "^0.4.0",
     "@rhinestone/sdk": "^1.4.1",
     "@safe-global/api-kit": "^4.1.0",

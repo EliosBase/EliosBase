@@ -29,6 +29,7 @@ export default defineConfig({
       NEXT_PUBLIC_E2E_MODE: '1',
       NEXT_PUBLIC_CHAIN: 'testnet',
       NEXT_PUBLIC_ESCROW_ADDRESS: '0x0000000000000000000000000000000000000001',
+      NEXT_PUBLIC_PROJECT_ID: 'playwright-reown-project-id',
       NEXT_PUBLIC_SITE_URL: baseURL,
       NEXT_PUBLIC_SUPABASE_ANON_KEY: 'playwright-supabase-anon-key',
       NEXT_PUBLIC_SUPABASE_URL: 'https://playwright.supabase.co',

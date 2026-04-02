@@ -37,6 +37,7 @@ const REQUIRED_SENTRY_ENV = [
 const RUNTIME_ENV_ALIASES = {
   UPSTASH_REDIS_REST_URL: ['KV_REST_API_URL'],
   UPSTASH_REDIS_REST_TOKEN: ['KV_REST_API_TOKEN'],
+  NEXT_PUBLIC_REOWN_PROJECT_ID: ['NEXT_PUBLIC_PROJECT_ID'],
 } as const;
 
 const SAFE7579_DEFAULT_RUNTIME_ENV = {
@@ -67,6 +68,10 @@ export function isProductionRuntime() {
 
 export function getConfiguredSiteUrl() {
   return readConfiguredEnv('NEXT_PUBLIC_SITE_URL');
+}
+
+export function getConfiguredReownProjectId() {
+  return readConfiguredEnv('NEXT_PUBLIC_REOWN_PROJECT_ID');
 }
 
 export function requireConfiguredSiteUrl() {

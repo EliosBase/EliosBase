@@ -4,13 +4,13 @@
 [![codeql](https://github.com/EliosBase/EliosBase/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/EliosBase/EliosBase/actions/workflows/codeql.yml)
 [![real-smoke](https://github.com/EliosBase/EliosBase/actions/workflows/real-smoke.yml/badge.svg?branch=main)](https://github.com/EliosBase/EliosBase/actions/workflows/real-smoke.yml)
 
-EliosBase is a Base-native AI agent marketplace with MetaMask-based wallet authentication, on-chain ETH escrow, Groth16 proof verification, realtime operational telemetry, and a production Next.js app deployed at [eliosbase.net](https://eliosbase.net).
+EliosBase is a Base-native AI agent marketplace with multi-wallet authentication on Base, on-chain ETH escrow, Groth16 proof verification, realtime operational telemetry, and a production Next.js app deployed at [eliosbase.net](https://eliosbase.net).
 
 The repo contains the web product, API routes, smart contracts, Circom circuits, Supabase schema, deployment scripts, and validation workflows. It is not just a frontend shell.
 
 ## What This Repo Ships
 
-- MetaMask sign-in on Base using SIWE and `iron-session`
+- Multi-wallet sign-in on Base using SIWE, wagmi, Reown AppKit, and `iron-session`
 - Agent marketplace, task submission, task progression, and result viewing
 - ETH escrow lock, release, refund, and dispute entry points
 - Groth16 proof verification with an on-chain verifier contract
@@ -22,7 +22,7 @@ The repo contains the web product, API routes, smart contracts, Circom circuits,
 | Surface | Stack | Notes |
 | --- | --- | --- |
 | Web app | Next.js 16, React 19, TypeScript | Public marketing site plus authenticated dashboard |
-| Auth | SIWE, wagmi, `iron-session` | MetaMask-verified wallet auth on Base |
+| Auth | SIWE, wagmi, Reown AppKit, `iron-session` | Multi-wallet auth on Base with WalletConnect support |
 | Data | Supabase | Agents, tasks, transactions, alerts, audit, activity |
 | Contracts | Solidity, Foundry | `EliosEscrow`, `EliosProofVerifier` |
 | Proofs | Circom, Groth16 | Task completion proof artifacts and verification |
@@ -117,6 +117,7 @@ Core runtime variables:
 | `PROOF_SUBMITTER_PRIVATE_KEY` | Yes | Signer used for proof submission |
 | `SAFE_POLICY_SIGNER_PRIVATE_KEY` | Recommended | Dedicated signer for Safe policy and migration execution |
 | `NEXT_PUBLIC_SITE_URL` | Yes | Canonical site URL used for origin validation |
+| `NEXT_PUBLIC_REOWN_PROJECT_ID` | Recommended | Reown AppKit project id for WalletConnect and broader wallet compatibility (`NEXT_PUBLIC_PROJECT_ID` is also accepted as an alias) |
 | `CRON_SECRET` | Yes | Authorization for cron routes |
 | `ANTHROPIC_API_KEY` | Yes | AI task execution backend |
 
@@ -213,10 +214,10 @@ Operational reference docs:
 
 What is live and implemented:
 
-- Base mainnet deployment target and MetaMask launch path
+- Base mainnet deployment target and multi-wallet launch path
 - Marketplace, tasks, security, and wallet surfaces
 - Dispute opening and escrow refund paths
-- Native ETH wallet payout UI from the connected MetaMask wallet
+- Native ETH wallet payout UI from the connected wallet
 
 What is still missing from a polished open-source program:
 

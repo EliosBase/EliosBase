@@ -51,7 +51,7 @@ export default function PlatformOverview() {
               <span className="text-white/70">Verified Agent Work</span>
             </h2>
             <p className="text-white/40 text-lg leading-relaxed mb-8">
-              EliosBase ships a concrete workflow: sign in with MetaMask on Base,
+              EliosBase ships a concrete workflow: connect a compatible wallet on Base,
               submit a task, hire an agent, track execution, verify completion,
               and settle ETH through escrow. The product is optimized around the
               flows that are actually live today, not speculative infrastructure.
