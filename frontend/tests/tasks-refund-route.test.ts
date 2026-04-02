@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   createServiceClient: vi.fn(),
+  enforceRateLimit: vi.fn(),
   generateId: vi.fn(() => 'tx-1'),
   getSession: vi.fn(),
   logActivity: vi.fn(),
@@ -31,6 +32,13 @@ vi.mock('@/lib/transactionVerification', () => ({
 
 vi.mock('@/lib/csrf', () => ({
   validateOrigin: mocks.validateOrigin,
+}));
+
+vi.mock('@/lib/rateLimit', () => ({
+  RATE_LIMITS: {
+    walletMutation: {},
+  },
+  enforceRateLimit: mocks.enforceRateLimit,
 }));
 
 vi.mock('@/lib/contracts', () => ({
@@ -99,12 +107,13 @@ describe('POST /api/tasks/[id]/refund', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.validateOrigin.mockReturnValue(null);
+    mocks.enforceRateLimit.mockResolvedValue(null);
   });
 
   it('returns 401 without an authenticated session', async () => {
     mocks.getSession.mockResolvedValue({});
 
-    const response = await POST(makeRequest({ txHash: '0x1234' }), { params: Promise.resolve({ id: 'task-1' }) });
+    const response = await POST(makeRequest({ txHash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789' }), { params: Promise.resolve({ id: 'task-1' }) });
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
@@ -120,7 +129,7 @@ describe('POST /api/tasks/[id]/refund', () => {
       }),
     );
 
-    const response = await POST(makeRequest({ txHash: '0x1234' }), { params: Promise.resolve({ id: 'task-1' }) });
+    const response = await POST(makeRequest({ txHash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789' }), { params: Promise.resolve({ id: 'task-1' }) });
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({ error: 'Only the task submitter can refund escrow' });
@@ -145,7 +154,7 @@ describe('POST /api/tasks/[id]/refund', () => {
       }),
     );
 
-    const response = await POST(makeRequest({ txHash: '0x1234' }), { params: Promise.resolve({ id: 'task-1' }) });
+    const response = await POST(makeRequest({ txHash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789' }), { params: Promise.resolve({ id: 'task-1' }) });
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
@@ -180,7 +189,7 @@ describe('POST /api/tasks/[id]/refund', () => {
       }),
     );
 
-    const response = await POST(makeRequest({ txHash: '0x1234' }), { params: Promise.resolve({ id: 'task-1' }) });
+    const response = await POST(makeRequest({ txHash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789' }), { params: Promise.resolve({ id: 'task-1' }) });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -197,7 +206,7 @@ describe('POST /api/tasks/[id]/refund', () => {
       amount: '0.25 ETH',
       token: 'ETH',
       status: 'confirmed',
-      tx_hash: '0x1234',
+      tx_hash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
       user_id: 'user-1',
     });
     expect(mocks.logAudit).toHaveBeenCalledWith({
@@ -253,7 +262,7 @@ describe('POST /api/tasks/[id]/refund', () => {
       }),
     );
 
-    const response = await POST(makeRequest({ txHash: '0x1234' }), { params: Promise.resolve({ id: 'task-1' }) });
+    const response = await POST(makeRequest({ txHash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789' }), { params: Promise.resolve({ id: 'task-1' }) });
 
     expect(response.status).toBe(200);
     expect(insertedTransactions).toEqual([
@@ -265,7 +274,7 @@ describe('POST /api/tasks/[id]/refund', () => {
         amount: '0.25 ETH',
         token: 'ETH',
         status: 'confirmed',
-        tx_hash: '0x1234',
+        tx_hash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
         user_id: 'user-1',
       },
       {
@@ -276,7 +285,7 @@ describe('POST /api/tasks/[id]/refund', () => {
         amount: '0.25 ETH',
         token: 'ETH',
         status: 'confirmed',
-        tx_hash: '0x1234',
+        tx_hash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
         user_id: 'user-1',
       },
     ]);

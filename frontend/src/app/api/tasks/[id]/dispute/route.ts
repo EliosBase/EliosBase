@@ -4,10 +4,15 @@ import { getSession } from '@/lib/session';
 import { createSecurityAlert, logActivity, logAudit } from '@/lib/audit';
 import { validateOrigin } from '@/lib/csrf';
 import { buildTaskDisputeSource } from '@/lib/taskDisputes';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
+import { taskDisputeSchema } from '@/lib/schemas/task';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const csrfError = validateOrigin(req);
   if (csrfError) return csrfError;
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.walletMutation);
+  if (rateLimitError) return rateLimitError;
 
   const { id: taskId } = await params;
   const session = await getSession();
@@ -15,14 +20,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await req.json();
-  const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
-  if (reason.length < 10 || reason.length > 1000) {
-    return NextResponse.json(
-      { error: 'Reason is required (10-1000 chars)' },
-      { status: 400 },
-    );
+  const raw = await req.json();
+  const parsed = taskDisputeSchema.safeParse(raw);
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0]?.message ?? 'Invalid input';
+    return NextResponse.json({ error: firstError }, { status: 400 });
   }
+  const { reason } = parsed.data;
 
   const supabase = createServiceClient();
   const { data: task, error: taskError } = await supabase

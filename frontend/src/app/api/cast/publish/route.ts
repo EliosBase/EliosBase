@@ -3,8 +3,13 @@ import { getSession } from '@/lib/session';
 import { createUserServerClient } from '@/lib/supabase/server';
 import { publishCast } from '@/lib/neynar';
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
+import { validateOrigin } from '@/lib/csrf';
+import { publishCastSchema } from '@/lib/schemas/cast';
 
 export async function POST(req: NextRequest) {
+  const csrfError = validateOrigin(req);
+  if (csrfError) return csrfError;
+
   const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.castPublish);
   if (rateLimitError) return rateLimitError;
 
@@ -13,15 +18,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not authenticated with Farcaster' }, { status: 401 });
   }
 
-  const { text, embeds } = await req.json();
-
-  if (!text || typeof text !== 'string') {
-    return NextResponse.json({ error: 'Text is required' }, { status: 400 });
+  const raw = await req.json();
+  const parsed = publishCastSchema.safeParse(raw);
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0]?.message ?? 'Invalid input';
+    return NextResponse.json({ error: firstError }, { status: 400 });
   }
-
-  if (text.length > 320) {
-    return NextResponse.json({ error: 'Cast text exceeds 320 character limit' }, { status: 400 });
-  }
+  const { text, embeds } = parsed.data;
 
   // Get approved signer for this user
   const supabase = createUserServerClient();

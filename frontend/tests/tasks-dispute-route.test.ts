@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   createSecurityAlert: vi.fn(),
   createServiceClient: vi.fn(),
+  enforceRateLimit: vi.fn(),
   getSession: vi.fn(),
   logActivity: vi.fn(),
   logAudit: vi.fn(),
@@ -26,6 +27,13 @@ vi.mock('@/lib/audit', () => ({
 
 vi.mock('@/lib/csrf', () => ({
   validateOrigin: mocks.validateOrigin,
+}));
+
+vi.mock('@/lib/rateLimit', () => ({
+  RATE_LIMITS: {
+    walletMutation: {},
+  },
+  enforceRateLimit: mocks.enforceRateLimit,
 }));
 
 const { POST } = await import('@/app/api/tasks/[id]/dispute/route');
@@ -51,6 +59,7 @@ describe('POST /api/tasks/[id]/dispute', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.validateOrigin.mockReturnValue(null);
+    mocks.enforceRateLimit.mockResolvedValue(null);
   });
 
   it('returns 401 without an authenticated session', async () => {
@@ -105,7 +114,7 @@ describe('POST /api/tasks/[id]/dispute', () => {
     });
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: 'Reason is required (10-1000 chars)' });
+    await expect(response.json()).resolves.toEqual({ error: 'Reason must be at least 10 characters' });
   });
 
   it('creates a dispute alert for the task submitter', async () => {

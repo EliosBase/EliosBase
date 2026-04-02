@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { deliverAlert, isAlertDeliveryConfigured } from '@/lib/alertDelivery';
 import { getConfiguredCronSecret, isProductionRuntime } from '@/lib/runtimeConfig';
+import { timingSafeCompare } from '@/lib/authUtils';
 
 /**
  * GET /api/cron/alert-check
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
 
   if (cronSecret) {
     const auth = req.headers.get('authorization');
-    if (auth !== `Bearer ${cronSecret}`) {
+    if (!auth || !timingSafeCompare(auth, `Bearer ${cronSecret}`)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }

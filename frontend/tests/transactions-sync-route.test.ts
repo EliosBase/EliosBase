@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   createUserServerClient: vi.fn(),
+  validateOrigin: vi.fn(() => null),
   enforceRateLimit: vi.fn(),
   generateId: vi.fn(() => 'tx-1'),
   getSession: vi.fn(),
@@ -46,6 +47,10 @@ vi.mock('@/lib/rateLimit', () => ({
   enforceRateLimit: mocks.enforceRateLimit,
 }));
 
+vi.mock('@/lib/csrf', () => ({
+  validateOrigin: mocks.validateOrigin,
+}));
+
 const route = await import('@/app/api/transactions/sync/route');
 
 function makePostRequest(body: Record<string, unknown>) {
@@ -64,6 +69,7 @@ describe('transactions sync routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.enforceRateLimit.mockResolvedValue(null);
+    mocks.validateOrigin.mockReturnValue(null);
   });
 
   it('returns 401 for unauthenticated POST requests', async () => {
@@ -82,14 +88,14 @@ describe('transactions sync routes', () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({
-      error: 'Missing required fields: type, from, to, amount, token, txHash',
+      error: 'Invalid input: expected string, received undefined',
     });
   });
 
   it('stores a confirmed transaction with the on-chain block number', async () => {
     let insertedPayload: Record<string, unknown> | undefined;
 
-    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
+    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0x1234567890abcdef1234567890abcdef12345678' });
     mocks.verifyOnchainTransaction.mockResolvedValue({ txStatus: 'confirmed', blockNumber: 42 });
     mocks.createUserServerClient.mockReturnValue({
       from: vi.fn(() => ({
@@ -112,11 +118,11 @@ describe('transactions sync routes', () => {
 
     const response = await route.POST(makePostRequest({
       type: 'escrow_lock',
-      from: '0xabc',
-      to: 'agent-1',
+      from: '0x1234567890abcdef1234567890abcdef12345678',
+      to: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
       amount: '0.15 ETH',
       token: 'ETH',
-      txHash: '0x1234',
+      txHash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
     }));
 
     expect(response.status).toBe(201);
@@ -124,23 +130,23 @@ describe('transactions sync routes', () => {
       id: 'tx-1',
       type: 'escrow_lock',
       status: 'confirmed',
-      txHash: '0x1234',
+      txHash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
     });
     expect(insertedPayload).toMatchObject({
       id: 'tx-1',
       type: 'escrow_lock',
-      from: '0xabc',
-      to: 'agent-1',
+      from: '0x1234567890abcdef1234567890abcdef12345678',
+      to: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
       amount: '0.15 ETH',
       token: 'ETH',
       status: 'confirmed',
-      tx_hash: '0x1234',
+      tx_hash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
       user_id: 'user-1',
       block_number: 42,
     });
     expect(mocks.logAudit).toHaveBeenCalledWith({
       action: 'ESCROW_LOCK',
-      actor: '0xabc',
+      actor: '0x1234567890abcdef1234567890abcdef12345678',
       target: 'tx-1',
       result: 'ALLOW',
     });
@@ -149,7 +155,7 @@ describe('transactions sync routes', () => {
   it('retries the insert without block_number when the live schema does not have that column', async () => {
     const insertPayloads: Array<Record<string, unknown>> = [];
 
-    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
+    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0x1234567890abcdef1234567890abcdef12345678' });
     mocks.verifyOnchainTransaction.mockResolvedValue({ txStatus: 'confirmed', blockNumber: 42 });
 
     mocks.createUserServerClient.mockReturnValue({
@@ -186,11 +192,11 @@ describe('transactions sync routes', () => {
 
     const response = await route.POST(makePostRequest({
       type: 'payment',
-      from: '0xabc',
-      to: '0xdef',
+      from: '0x1234567890abcdef1234567890abcdef12345678',
+      to: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
       amount: '0.000001 ETH',
       token: 'ETH',
-      txHash: '0x1234',
+      txHash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
     }));
 
     expect(response.status).toBe(201);
@@ -198,24 +204,24 @@ describe('transactions sync routes', () => {
       {
         id: 'tx-1',
         type: 'payment',
-        from: '0xabc',
-        to: '0xdef',
+        from: '0x1234567890abcdef1234567890abcdef12345678',
+        to: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
         amount: '0.000001 ETH',
         token: 'ETH',
         status: 'confirmed',
-        tx_hash: '0x1234',
+        tx_hash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
         user_id: 'user-1',
         block_number: 42,
       },
       {
         id: 'tx-1',
         type: 'payment',
-        from: '0xabc',
-        to: '0xdef',
+        from: '0x1234567890abcdef1234567890abcdef12345678',
+        to: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
         amount: '0.000001 ETH',
         token: 'ETH',
         status: 'confirmed',
-        tx_hash: '0x1234',
+        tx_hash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
         user_id: 'user-1',
       },
     ]);
@@ -224,7 +230,7 @@ describe('transactions sync routes', () => {
   it('ignores caller-supplied transaction status and persists the verified on-chain status', async () => {
     let insertedPayload: Record<string, unknown> | undefined;
 
-    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
+    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0x1234567890abcdef1234567890abcdef12345678' });
     mocks.verifyOnchainTransaction.mockResolvedValue({ txStatus: 'pending', blockNumber: null });
     mocks.createUserServerClient.mockReturnValue({
       from: vi.fn(() => ({
@@ -244,11 +250,11 @@ describe('transactions sync routes', () => {
 
     const response = await route.POST(makePostRequest({
       type: 'payment',
-      from: '0xabc',
-      to: '0xdef',
+      from: '0x1234567890abcdef1234567890abcdef12345678',
+      to: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
       amount: '0.1 ETH',
       token: 'ETH',
-      txHash: '0x1234',
+      txHash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
       status: 'confirmed',
     }));
 
@@ -257,15 +263,15 @@ describe('transactions sync routes', () => {
   });
 
   it('rejects a transaction sync when the sender does not match the session wallet', async () => {
-    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0xabc' });
+    mocks.getSession.mockResolvedValue({ userId: 'user-1', walletAddress: '0x1234567890abcdef1234567890abcdef12345678' });
 
     const response = await route.POST(makePostRequest({
       type: 'payment',
-      from: '0xdef',
-      to: '0x123',
+      from: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
+      to: '0x1111111111111111111111111111111111111111',
       amount: '0.15 ETH',
       token: 'ETH',
-      txHash: '0x1234',
+      txHash: '0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
     }));
 
     expect(response.status).toBe(400);

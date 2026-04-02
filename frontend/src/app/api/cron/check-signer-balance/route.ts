@@ -7,6 +7,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { dedupeSignerBalanceAlerts, isSignerBalanceAlert } from '@/lib/productionData';
 import { publicClient } from '@/lib/viemClient';
 import { getConfiguredCronSecret, isProductionRuntime } from '@/lib/runtimeConfig';
+import { timingSafeCompare } from '@/lib/authUtils';
 
 // GET /api/cron/check-signer-balance — monitor proof submitter signer balance
 export async function GET(req: NextRequest) {
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   if (cronSecret) {
     const authHeader = req.headers.get('authorization');
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    if (!authHeader || !timingSafeCompare(authHeader, `Bearer ${cronSecret}`)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }
