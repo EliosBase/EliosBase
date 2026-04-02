@@ -26,6 +26,7 @@ export type AuditAction =
   | 'TASK_RESULT_VIEW'
   | 'TASK_RETRY'
   | 'TASK_REASSIGN'
+  | 'TASK_DELETE'
   | 'TASK_CANCEL'
   | 'TASK_DISPUTE'
   | 'AGENT_WALLET_TRANSFER'
