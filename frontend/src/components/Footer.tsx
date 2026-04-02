@@ -39,9 +39,9 @@ const footerLinks = [
 
 export default function Footer() {
   return (
-    <footer className="relative border-t border-white/6 py-16 px-6 z-10">
+    <footer className="relative z-10 border-t border-white/6 px-5 py-14 sm:px-6 sm:py-16">
       <div className="max-w-7xl mx-auto">
-        <div className="grid md:grid-cols-5 gap-12 mb-12">
+        <div className="mb-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-5 lg:gap-12">
           <div className="md:col-span-1">
             <div className="flex items-center gap-2.5 mb-3">
               <Image
@@ -64,7 +64,7 @@ export default function Footer() {
                 href="https://x.com/EliosBase"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors duration-200 text-white/50 hover:text-white cursor-pointer"
+                className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/5 text-white/50 transition-colors duration-200 hover:bg-white/10 hover:text-white"
                 aria-label="Twitter"
               >
                 <svg width={18} height={18} viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
@@ -73,7 +73,7 @@ export default function Footer() {
                 href="https://github.com/EliosBase/EliosBase"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors duration-200 text-white/50 hover:text-white cursor-pointer"
+                className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/5 text-white/50 transition-colors duration-200 hover:bg-white/10 hover:text-white"
                 aria-label="GitHub"
               >
                 <Github size={18} />

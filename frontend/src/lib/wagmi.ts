@@ -8,12 +8,15 @@ import { getConfiguredReownProjectId, getConfiguredSiteUrl } from '@/lib/runtime
 
 export { activeChain } from '@/lib/chainConfig';
 
+const useWalletE2EConnectorMode = process.env.NEXT_PUBLIC_WALLET_E2E_FORCE_CONNECTORS === '1';
+const injectedConnectorOptions = { shimDisconnect: !useWalletE2EConnectorMode } as const;
+
 const fallbackConnectors = [
-  injected({ target: 'metaMask' }),
+  injected({ ...injectedConnectorOptions, target: 'metaMask' }),
   coinbaseWallet({ appName: 'EliosBase', preference: { options: 'all' } }),
-  injected({ target: 'phantom' }),
-  injected({ target: 'rabby' }),
-  injected(),
+  injected({ ...injectedConnectorOptions, target: 'phantom' }),
+  injected({ ...injectedConnectorOptions, target: 'rabby' }),
+  injected(injectedConnectorOptions),
 ];
 
 const siteUrl = getConfiguredSiteUrl() ?? 'https://eliosbase.net';

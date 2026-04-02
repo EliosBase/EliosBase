@@ -9,7 +9,13 @@ import {
   subscribeE2EWallet,
   writeE2EWalletState,
 } from '@/lib/e2e';
-import { detectInstalledWallets, getWalletName, knownWallets, type WalletId } from '@/lib/wallets';
+import {
+  detectInstalledWallets,
+  getWalletName,
+  knownWallets,
+  resolveWalletConnector,
+  type WalletId,
+} from '@/lib/wallets';
 
 const launchWalletIds = new Set<WalletId>(['metaMask', 'coinbaseWallet', 'phantom', 'rabby']);
 
@@ -104,8 +110,7 @@ export function useWallet() {
       return;
     }
 
-    const connectorId = walletId === 'browserWallet' ? 'injected' : walletId;
-    const connector = connectors.find((entry) => entry.id === connectorId);
+    const connector = resolveWalletConnector(walletId, connectors);
     if (!connector) return;
 
     connect({ connector });

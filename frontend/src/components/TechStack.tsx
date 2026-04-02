@@ -98,15 +98,15 @@ function TechModal({ tech, onClose }: { tech: Tech; onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/80 px-4 py-20 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="relative max-w-lg w-full animate-fade-in-up"
+        className="relative w-full max-w-lg animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
-        <AnimatedCard className="glass p-8" tilt={false} spotlight borderGlow hoverLift={false}>
+        <AnimatedCard className="glass max-h-[85vh] overflow-y-auto p-5 sm:p-8" tilt={false} spotlight borderGlow hoverLift={false}>
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors duration-200 cursor-pointer z-30"

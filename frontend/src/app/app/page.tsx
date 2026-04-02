@@ -65,7 +65,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-6 max-w-7xl">
+    <div className="w-full max-w-7xl space-y-6">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {dashboardStats.map((stat, i) => (
@@ -91,7 +91,8 @@ export default function DashboardPage() {
                     ? 'verifying' as const
                     : 'pending' as const;
                   return (
-                    <div key={task.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-white/3 transition-colors">
+                    <div key={task.id} className="rounded-lg px-3 py-2.5 transition-colors hover:bg-white/3">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-white/80 font-[family-name:var(--font-body)] truncate">
                           {task.title}
@@ -101,11 +102,12 @@ export default function DashboardPage() {
                           <span className="text-[11px] text-white/40">{task.assignedAgent}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                      <div className="flex items-center justify-between gap-3 sm:ml-3 sm:flex-shrink-0">
                         <ProofBadge status={proofStatus} />
                         <span className="text-xs text-white/50 font-[family-name:var(--font-mono)]">
                           {task.reward}
                         </span>
+                      </div>
                       </div>
                     </div>
                   );
@@ -128,7 +130,7 @@ export default function DashboardPage() {
                 </p>
               )}
               {topAgents.map((agent, i) => (
-                <div key={agent.id} className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-white/3 transition-colors">
+                <div key={agent.id} className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-white/3">
                   <span className="text-xs text-white/25 w-4 text-center font-[family-name:var(--font-mono)]">
                     {i + 1}
                   </span>

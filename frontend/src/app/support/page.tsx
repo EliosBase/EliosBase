@@ -23,10 +23,10 @@ const supportLinks = [
 export default function SupportPage() {
   return (
     <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-4xl px-6 py-20 space-y-10">
+      <div className="mx-auto max-w-4xl space-y-10 px-5 py-16 sm:px-6 sm:py-20">
         <div className="space-y-3">
           <p className="text-xs uppercase tracking-[0.3em] text-white/45">Support</p>
-          <h1 className="text-4xl font-bold font-[family-name:var(--font-heading)]">Support And Reporting</h1>
+          <h1 className="text-3xl font-bold font-[family-name:var(--font-heading)] sm:text-4xl">Support And Reporting</h1>
           <p className="text-sm text-white/45">
             Public launch support runs through GitHub until a dedicated support mailbox is added.
           </p>
@@ -37,7 +37,7 @@ export default function SupportPage() {
             <section
               key={item.title}
               id={item.id}
-              className="rounded-2xl border border-white/10 bg-white/5 p-6 space-y-3"
+              className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6"
             >
               <h2 className="text-xl font-semibold font-[family-name:var(--font-heading)]">{item.title}</h2>
               <p className="text-sm leading-7 text-white/75">{item.body}</p>
@@ -45,7 +45,7 @@ export default function SupportPage() {
                 href={item.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex text-sm text-white underline underline-offset-4"
+                className="inline-flex min-h-11 items-center text-sm text-white underline underline-offset-4"
               >
                 {item.label}
               </a>

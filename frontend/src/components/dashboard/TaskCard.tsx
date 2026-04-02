@@ -279,16 +279,16 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
 
   return (
     <div className="glass p-5 rounded-2xl">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h3 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)]">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)] break-words">
             {task.title}
           </h3>
           <p className="text-xs text-white/40 mt-0.5 font-[family-name:var(--font-body)]">
             {task.description}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {hasOpenDispute ? (
             <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-300">
               Dispute Open
@@ -309,7 +309,7 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
       </div>
 
       {/* Timeline */}
-      <div className="flex items-center gap-0 my-4">
+      <div className="my-4 hidden items-center gap-0 sm:flex">
         {TASK_STEPS.map((step, i) => {
           const done = i <= currentStepIndex;
           const isCurrent = i === currentStepIndex;
@@ -336,6 +336,41 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
                   i < currentStepIndex ? 'bg-white/30' : 'bg-white/8'
                 }`} />
               )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="my-4 grid grid-cols-2 gap-2 sm:hidden">
+        {TASK_STEPS.map((step, i) => {
+          const done = i <= currentStepIndex;
+          const isCurrent = i === currentStepIndex;
+
+          return (
+            <div
+              key={step}
+              className={`rounded-xl border px-3 py-2 ${
+                done
+                  ? isCurrent
+                    ? 'border-white/25 bg-white/8'
+                    : 'border-white/10 bg-white/4'
+                  : 'border-white/6 bg-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className={`h-2.5 w-2.5 rounded-full border ${
+                    done
+                      ? isCurrent
+                        ? 'border-white bg-white'
+                        : 'border-white/40 bg-white/40'
+                      : 'border-white/15 bg-transparent'
+                  }`}
+                />
+                <p className={`text-[10px] uppercase tracking-[0.16em] ${done ? 'text-white/60' : 'text-white/25'}`}>
+                  Step {i + 1}
+                </p>
+              </div>
+              <p className={`mt-2 text-xs leading-5 ${done ? 'text-white/75' : 'text-white/35'}`}>{step}</p>
             </div>
           );
         })}
@@ -387,20 +422,20 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
           {disputeError ? (
             <p className="mt-2 text-[11px] text-red-400">{disputeError}</p>
           ) : null}
-          <div className="mt-3 flex items-center justify-end gap-2">
+          <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
             <button
               onClick={() => {
                 setIsDisputeComposerOpen(false);
                 setDisputeError('');
               }}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/8 text-white/70 hover:bg-white/12 transition-colors"
+              className="min-h-10 rounded-lg bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/70 transition-colors hover:bg-white/12"
             >
               Cancel
             </button>
             <button
               onClick={handleDisputeSubmit}
               disabled={isSubmittingDispute}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-300 text-black hover:bg-amber-200 transition-colors disabled:opacity-70"
+              className="min-h-10 rounded-lg bg-amber-300 px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-amber-200 disabled:opacity-70"
             >
               {isSubmittingDispute ? 'Submitting...' : 'Submit Dispute'}
             </button>
@@ -409,18 +444,18 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
       ) : null}
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-3 border-t border-white/6">
+      <div className="flex flex-col gap-3 border-t border-white/6 pt-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <Bot size={14} className="text-white/40" />
           <span className="text-xs text-white/50 font-[family-name:var(--font-body)]">
             {task.assignedAgent}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {canOpenResult && (
             <button
               onClick={() => setShowResult(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 text-white hover:bg-white/15 transition-colors"
+              className="min-h-10 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-white/15"
             >
               View Result
             </button>
@@ -431,7 +466,7 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
                 setIsDisputeComposerOpen(true);
                 setDisputeError('');
               }}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 transition-colors"
+              className="min-h-10 rounded-lg bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-300 transition-colors hover:bg-amber-500/25"
             >
               Open Dispute
             </button>
@@ -440,7 +475,7 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
             <button
               onClick={handleRefund}
               disabled={['signing', 'mining', 'confirming'].includes(refundStep) || refundStep === 'refunded'}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`min-h-10 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                 refundStep === 'refunded'
                   ? 'bg-green-500/15 text-green-400 border border-green-500/20'
                   : refundStep === 'error'
@@ -461,7 +496,7 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
             <button
               onClick={handleRelease}
               disabled={['signing', 'mining', 'confirming'].includes(releaseStep) || releaseStep === 'released'}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+              className={`min-h-10 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                 releaseStep === 'released'
                   ? 'bg-green-500/15 text-green-400 border border-green-500/20'
                   : releaseStep === 'error'
@@ -485,10 +520,10 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
             <>
               <button
                 onClick={() => setShowCastComposer(true)}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium text-purple-300 bg-purple-500/10 border border-purple-500/15 hover:bg-purple-500/20 transition-colors"
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-purple-500/15 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-300 transition-colors hover:bg-purple-500/20"
                 title="Cast to Farcaster"
               >
-                <MessageCircle size={10} />
+                <MessageCircle size={12} />
                 <span>Cast</span>
               </button>
               <ShareToWarpcast

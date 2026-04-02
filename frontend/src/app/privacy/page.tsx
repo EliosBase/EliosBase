@@ -1,10 +1,10 @@
 export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-black text-white">
-      <div className="mx-auto max-w-4xl px-6 py-20 space-y-10">
+      <div className="mx-auto max-w-4xl space-y-10 px-5 py-16 sm:px-6 sm:py-20">
         <div className="space-y-3">
           <p className="text-xs uppercase tracking-[0.3em] text-white/45">Privacy</p>
-          <h1 className="text-4xl font-bold font-[family-name:var(--font-heading)]">Privacy Policy</h1>
+          <h1 className="text-3xl font-bold font-[family-name:var(--font-heading)] sm:text-4xl">Privacy Policy</h1>
           <p className="text-sm text-white/45">Last updated March 30, 2026.</p>
         </div>
 

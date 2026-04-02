@@ -92,6 +92,27 @@ function fulfillJson(route: Route, body: unknown, status = 200) {
   });
 }
 
+function extractSiweAddress(message: unknown) {
+  if (typeof message !== 'string') {
+    return undefined;
+  }
+
+  return message.match(/\n(0x[a-fA-F0-9]{40})\n/)?.[1];
+}
+
+function extractSiweChainId(message: unknown) {
+  if (typeof message !== 'string') {
+    return undefined;
+  }
+
+  const chainId = message.match(/Chain ID:\s+(\d+)/)?.[1];
+  if (!chainId) {
+    return undefined;
+  }
+
+  return Number(chainId);
+}
+
 async function seedAppSessionCookie(page: Page) {
   await page.context().addCookies([
     {
@@ -140,6 +161,19 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
   );
 
   await page.route('**/api/auth/session', (route) => fulfillJson(route, session));
+  await page.route('**/api/auth/nonce', (route) => fulfillJson(route, { nonce: 'playwrightnonce123' }));
+  await page.route('**/api/auth/verify', (route) => {
+    const body = parseBody(route);
+    session = {
+      authenticated: true,
+      userId: session.userId ?? 'user-1',
+      walletAddress: extractSiweAddress(body.message) ?? session.walletAddress,
+      chainId: extractSiweChainId(body.message) ?? session.chainId ?? 8453,
+      role: session.role ?? 'submitter',
+    };
+
+    return fulfillJson(route, session);
+  });
   await page.route('**/api/auth/logout', (route) => {
     session = { authenticated: false };
     return fulfillJson(route, { authenticated: false });

@@ -9,6 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "e2e": "playwright test",
+    "e2e:wallet": "HEADLESS=true playwright test -c playwright.wallet.config.ts",
     "smoke:real": "node scripts/smoke-real-env.mjs"
   },
   "dependencies": {
@@ -53,6 +54,8 @@
     "@eslint/js": "^9.39.4",
     "@next/eslint-plugin-next": "16.2.2",
     "@playwright/test": "^1.59.1",
+    "@synthetixio/synpress": "^4.1.2",
+    "@synthetixio/synpress-phantom": "^0.0.14",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

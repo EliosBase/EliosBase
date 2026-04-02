@@ -152,16 +152,16 @@ export default function AgentCard({ agent }: AgentCardProps) {
 
   return (
     <div className="glass p-5 rounded-2xl">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center">
             <Bot size={20} className="text-white/60" />
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)]">
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-semibold text-white font-[family-name:var(--font-heading)]">
               {agent.name}
             </h3>
-            <div className="flex items-center gap-2 mt-0.5">
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
               <span className={`w-1.5 h-1.5 rounded-full ${statusColors[agent.status]}`} />
               <span className="text-[11px] text-white/40 capitalize">{agent.status}</span>
               {isOwner && (
@@ -172,7 +172,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1 text-white/60">
+        <div className="flex items-center gap-1 self-start text-white/60 sm:self-auto">
           <Star size={12} className="fill-current" />
           <span className="text-xs font-medium">{agent.reputation}</span>
         </div>
@@ -202,7 +202,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
         ))}
       </div>
 
-      <div className="flex items-center justify-between pt-3 border-t border-white/6">
+      <div className="flex flex-col gap-3 border-t border-white/6 pt-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs text-white/40">Price</p>
           <p className="text-sm font-medium text-white font-[family-name:var(--font-mono)]">
@@ -212,10 +212,10 @@ export default function AgentCard({ agent }: AgentCardProps) {
         <button
           onClick={step === 'error' ? retryHire : handleHire}
           disabled={isDisabled || step === 'hired'}
-          className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+          className={`inline-flex min-h-10 w-full items-center justify-center rounded-lg px-4 py-1.5 text-xs font-semibold transition-all sm:w-auto ${
             step === 'hired'
               ? 'bg-green-500/15 text-green-400 border border-green-500/20'
-              : isBusy
+            : isBusy
                 ? 'bg-yellow-500/15 text-yellow-300 border border-yellow-500/20 cursor-not-allowed'
                 : isOffline
                 ? 'bg-white/10 text-white/30 cursor-not-allowed'
@@ -245,17 +245,18 @@ export default function AgentCard({ agent }: AgentCardProps) {
         <p className="text-[10px] text-red-400 mt-2">{error}</p>
       )}
 
-      <div className="flex items-center justify-between mt-2">
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-[10px] text-white/30">
           {agent.tasksCompleted.toLocaleString()} tasks completed
         </p>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setShowCastComposer(true)}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium text-purple-300 bg-purple-500/10 border border-purple-500/15 hover:bg-purple-500/20 transition-colors"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-purple-500/15 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-300 transition-colors hover:bg-purple-500/20"
             title="Cast to Farcaster"
           >
-            <MessageCircle size={10} />
+            <MessageCircle size={12} />
+            <span>Cast</span>
           </button>
           <ShareToWarpcast
             text={`Check out ${agent.name} on EliosBase — ${agent.tasksCompleted} tasks completed with ${agent.reputation}% reputation`}

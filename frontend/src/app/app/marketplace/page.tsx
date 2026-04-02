@@ -52,22 +52,22 @@ export default function MarketplacePage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl">
-      <div className="flex items-center gap-3">
-        <div className="flex-1">
+    <div className="w-full max-w-7xl space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <div className="flex-1 min-w-0">
           <SearchBar
-        value={search}
-        onChange={setSearch}
-        placeholder="Search agents by name or capability..."
-        filters={allCapabilities}
-        activeFilter={activeFilter}
-        onFilterChange={setActiveFilter}
+            value={search}
+            onChange={setSearch}
+            placeholder="Search agents by name or capability..."
+            filters={allCapabilities}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
           />
         </div>
         {isAuthenticated && (
           <button
             onClick={() => setShowRegister(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-white/90 transition-colors flex-shrink-0"
+            className="flex min-h-11 w-full flex-shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-white/90 sm:w-auto"
           >
             <Plus size={16} />
             Register Agent
