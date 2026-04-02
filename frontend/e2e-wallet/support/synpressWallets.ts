@@ -714,19 +714,21 @@ export async function recoverPhantomUnsupportedAccount(context: BrowserContext, 
   }
 
   await notification.waitForLoadState('domcontentloaded').catch(() => {});
+  await unlockPhantomPages(context, extensionId);
+  await notification.waitForLoadState('domcontentloaded').catch(() => {});
   const notificationBody = await notification.locator('body').innerText().catch(() => '');
   if (!notificationBody.includes('Unsupported account')) {
     return false;
   }
 
-  await unlockPhantomPages(context, extensionId);
-
-  const popup = findPhantomPopupPage(context, extensionId);
+  let popup = findPhantomPopupPage(context, extensionId);
   if (!popup) {
-    return false;
+    popup = await context.newPage();
+    await popup.goto(`chrome-extension://${extensionId}/popup.html`, { waitUntil: 'domcontentloaded' });
   }
 
   await popup.waitForLoadState('domcontentloaded').catch(() => {});
+  await waitForPhantomUnlocked(popup);
   await popup.getByTestId('settings-menu-open-button').click();
   await popup.waitForTimeout(1_000);
 
@@ -782,6 +784,10 @@ export async function chooseWalletExtension(context: BrowserContext, walletName:
   const deadline = Date.now() + 30_000;
 
   while (Date.now() < deadline) {
+    if (walletName === 'MetaMask' && findMetaMaskNotificationPage(context, metaMaskChromeExtensionId)) {
+      return;
+    }
+
     if (await clickWalletExtensionChoice(context, walletName)) {
       return;
     }

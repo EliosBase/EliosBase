@@ -8,65 +8,24 @@ import { getAddress } from 'viem';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { clearE2EWalletState, isE2EMode } from '@/lib/e2e';
 import { activeChain } from '@/lib/wagmi';
+import { getConnectedInjectedProvider, signWithInjectedProvider } from '@/lib/siweSignature';
 
 const skipWalletE2EChainSwitch = process.env.NEXT_PUBLIC_WALLET_E2E_SKIP_CHAIN_SWITCH === '1';
-
-type PhantomEthereumProvider = {
-  isPhantom?: boolean;
-  selectedAddress?: string;
-  request?: (args: {
-    method: 'eth_requestAccounts' | 'eth_sign';
-    params: [] | [string, string];
-  }) => Promise<string[] | string>;
-};
-
-function getPhantomEthereumProvider(address: string) {
-  const provider = (window as Window & {
-    phantom?: {
-      ethereum?: PhantomEthereumProvider;
-    };
-  }).phantom?.ethereum;
-
-  if (!provider?.isPhantom) {
-    return null;
-  }
-
-  if (!provider.selectedAddress) {
-    return provider;
-  }
-
-  try {
-    return getAddress(provider.selectedAddress) === address ? provider : null;
-  } catch {
-    return null;
-  }
-}
 
 async function signSiweMessage(
   address: string,
   message: string,
   signMessageAsync: (args: { message: string }) => Promise<string>,
 ) {
-  const phantomProvider = getPhantomEthereumProvider(address);
-  if (!phantomProvider) {
-    return signMessageAsync({ message });
+  const injectedProvider = await getConnectedInjectedProvider(window, address);
+  if (injectedProvider) {
+    const signature = await signWithInjectedProvider(injectedProvider, address, message);
+    if (signature) {
+      return signature;
+    }
   }
 
-  await phantomProvider.request?.({
-    method: 'eth_requestAccounts',
-    params: [],
-  });
-
-  const signature = await phantomProvider.request?.({
-    method: 'eth_sign',
-    params: [address, message],
-  });
-
-  if (!signature || Array.isArray(signature)) {
-    throw new Error('Phantom did not return a signature');
-  }
-
-  return signature;
+  return signMessageAsync({ message });
 }
 
 export function useSiwe() {

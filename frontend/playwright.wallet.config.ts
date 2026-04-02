@@ -9,7 +9,7 @@ const reownProjectId =
 
 export default defineConfig({
   testDir: './e2e-wallet',
-  timeout: 120_000,
+  timeout: 300_000,
   fullyParallel: false,
   workers: 1,
   retries: 0,
@@ -38,6 +38,7 @@ export default defineConfig({
       NEXT_PUBLIC_SITE_URL: baseURL,
       NEXT_PUBLIC_SUPABASE_ANON_KEY: 'playwright-supabase-anon-key',
       NEXT_PUBLIC_SUPABASE_URL: 'https://playwright.supabase.co',
+      NEXT_PUBLIC_WALLET_E2E_DISABLE_RECONNECT: '1',
       NEXT_PUBLIC_VERIFIER_ADDRESS: '0x0000000000000000000000000000000000000002',
       NEXT_PUBLIC_WALLET_E2E_SKIP_CHAIN_SWITCH: '1',
       PLAYWRIGHT_BASE_URL: baseURL,

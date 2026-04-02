@@ -10,6 +10,7 @@ const files = ["**/*.{js,mjs,cjs,ts,tsx}"];
 export default defineConfig([
   globalIgnores([
     ".next/**",
+    ".cache-synpress/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

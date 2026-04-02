@@ -9,6 +9,7 @@ import { getConfiguredReownProjectId, getConfiguredSiteUrl } from '@/lib/runtime
 export { activeChain } from '@/lib/chainConfig';
 
 const useWalletE2EConnectorMode = process.env.NEXT_PUBLIC_WALLET_E2E_FORCE_CONNECTORS === '1';
+const disableWalletReconnect = process.env.NEXT_PUBLIC_WALLET_E2E_DISABLE_RECONNECT === '1';
 const injectedConnectorOptions = { shimDisconnect: !useWalletE2EConnectorMode } as const;
 
 const fallbackConnectors = [
@@ -47,6 +48,7 @@ export const wagmiAdapter = reownProjectId
 export const appKitConfig = wagmiAdapter
   ? {
       adapters: [wagmiAdapter],
+      enableReconnect: !disableWalletReconnect,
       projectId: reownProjectId,
       metadata: appKitMetadata,
       networks: appKitNetworks,

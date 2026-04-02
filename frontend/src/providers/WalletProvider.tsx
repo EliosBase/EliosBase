@@ -6,6 +6,8 @@ import { WagmiProvider } from 'wagmi';
 import { appKitConfig, config } from '@/lib/wagmi';
 import { useState } from 'react';
 
+const disableWalletReconnect = process.env.NEXT_PUBLIC_WALLET_E2E_DISABLE_RECONNECT === '1';
+
 export default function WalletProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
@@ -24,7 +26,7 @@ export default function WalletProvider({ children }: { children: React.ReactNode
   );
 
   return (
-    <WagmiProvider config={config}>
+    <WagmiProvider config={config} reconnectOnMount={!disableWalletReconnect}>
       <QueryClientProvider client={queryClient}>
         {appKitConfig ? <AppKitProvider {...appKitConfig}>{children}</AppKitProvider> : children}
       </QueryClientProvider>
