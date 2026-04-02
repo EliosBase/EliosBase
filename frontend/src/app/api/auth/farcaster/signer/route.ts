@@ -3,6 +3,7 @@ import { getSession } from '@/lib/session';
 import { createUserServerClient } from '@/lib/supabase/server';
 import { createManagedSigner, checkSignerStatus } from '@/lib/neynar';
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
+import { validateOrigin } from '@/lib/csrf';
 
 // GET — check signer status for current user
 export async function GET() {
@@ -53,6 +54,9 @@ export async function GET() {
 
 // POST — create a new managed signer
 export async function POST(req: NextRequest) {
+  const csrfError = validateOrigin(req);
+  if (csrfError) return csrfError;
+
   const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.signerCreate);
   if (rateLimitError) return rateLimitError;
 

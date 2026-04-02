@@ -7,9 +7,14 @@ import { publicClient } from '@/lib/viemClient';
 import { insertTransactionRecord, updateTransactionRecord } from '@/lib/transactions';
 import { verifyOnchainTransaction } from '@/lib/transactionVerification';
 import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
+import { validateOrigin } from '@/lib/csrf';
+import { syncTransactionSchema } from '@/lib/schemas/transaction';
 
 // POST /api/transactions/sync — store a new transaction with on-chain verification
 export async function POST(req: NextRequest) {
+  const csrfError = validateOrigin(req);
+  if (csrfError) return csrfError;
+
   const session = await getSession();
   if (!session.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -18,16 +23,15 @@ export async function POST(req: NextRequest) {
   const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.transactionSyncWrite, session.userId);
   if (rateLimitError) return rateLimitError;
 
-  const body = await req.json();
-
-  if (!body.type || !body.from || !body.to || !body.amount || !body.token || !body.txHash) {
-    return NextResponse.json(
-      { error: 'Missing required fields: type, from, to, amount, token, txHash' },
-      { status: 400 }
-    );
+  const raw = await req.json();
+  const parsed = syncTransactionSchema.safeParse(raw);
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0]?.message ?? 'Invalid input';
+    return NextResponse.json({ error: firstError }, { status: 400 });
   }
+  const body = parsed.data;
 
-  if (session.walletAddress && String(body.from).toLowerCase() !== session.walletAddress.toLowerCase()) {
+  if (session.walletAddress && body.from.toLowerCase() !== session.walletAddress.toLowerCase()) {
     return NextResponse.json({ error: 'Transaction sender does not match your wallet' }, { status: 400 });
   }
 
