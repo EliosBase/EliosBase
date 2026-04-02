@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readEnv } from '@/lib/env';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getConfiguredCronSecret, getConfiguredSiteUrl, isProductionRuntime } from '@/lib/runtimeConfig';
+import { timingSafeCompare } from '@/lib/authUtils';
 
 // GET /api/cron/advance-tasks — batch-advance all eligible active tasks
 // Can be called by Vercel cron, external scheduler, or manual trigger
@@ -13,7 +14,7 @@ export async function GET(req: NextRequest) {
 
   if (cronSecret) {
     const authHeader = req.headers.get('authorization');
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    if (!authHeader || !timingSafeCompare(authHeader, `Bearer ${cronSecret}`)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   }

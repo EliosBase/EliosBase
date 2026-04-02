@@ -6,10 +6,15 @@ import { validateOrigin } from '@/lib/csrf';
 import { buildTaskDisputeSource } from '@/lib/taskDisputes';
 import { insertTransactionRecord } from '@/lib/transactions';
 import { verifyEscrowActionTransaction } from '@/lib/transactionVerification';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
+import { txHashSchema } from '@/lib/schemas/auth';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const csrfError = validateOrigin(req);
   if (csrfError) return csrfError;
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.walletMutation);
+  if (rateLimitError) return rateLimitError;
 
   const { id: taskId } = await params;
   const session = await getSession();
@@ -17,11 +22,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { txHash } = body;
-  if (!txHash || typeof txHash !== 'string' || !txHash.startsWith('0x')) {
-    return NextResponse.json({ error: 'Valid txHash is required' }, { status: 400 });
+  const raw = await req.json();
+  const parsed = txHashSchema.safeParse(raw);
+  if (!parsed.success) {
+    const firstError = parsed.error.issues[0]?.message ?? 'Invalid input';
+    return NextResponse.json({ error: firstError }, { status: 400 });
   }
+  const { txHash } = parsed.data;
 
   const supabase = createServiceClient();
   const { data: task, error: taskError } = await supabase
