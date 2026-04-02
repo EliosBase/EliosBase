@@ -21,6 +21,15 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status');
   if (status) query = query.eq('status', status);
 
+  // Filter to current user's tasks only
+  const mine = searchParams.get('mine');
+  if (mine === 'true') {
+    const session = await getSession();
+    if (session.userId) {
+      query = query.eq('submitter_id', session.userId);
+    }
+  }
+
   const [{ data, error }, disputesRes] = await Promise.all([
     query.order('submitted_at', { ascending: false }).range(offset, offset + limit - 1),
     serviceSupabase
