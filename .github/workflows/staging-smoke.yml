@@ -53,15 +53,18 @@ jobs:
       - name: Wait for staging deployment
         run: |
           set -eu
+          cookie_jar=/tmp/staging-vercel-cookies.txt
+          rm -f "$cookie_jar"
 
           for attempt in $(seq 1 30); do
             if [ -n "${VERCEL_PROTECTION_BYPASS:-}" ]; then
               status=$(curl -sS \
-                -H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}" \
-                -H "x-vercel-set-bypass-cookie: true" \
+                -L \
+                -c "$cookie_jar" \
+                -b "$cookie_jar" \
                 -o /tmp/staging-ready.json \
                 -w '%{http_code}' \
-                "$BASE_URL/api/ready" || true)
+                "${BASE_URL}/api/ready?x-vercel-set-bypass-cookie=true&x-vercel-protection-bypass=${VERCEL_PROTECTION_BYPASS}" || true)
             else
               status=$(curl -sS -o /tmp/staging-ready.json -w '%{http_code}' "$BASE_URL/api/ready" || true)
             fi
