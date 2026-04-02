@@ -1,0 +1,46 @@
+name: branch-policy
+
+on:
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: branch-policy-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Enforce branch flow
+        env:
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -eu
+
+          case "$BASE_BRANCH" in
+            main)
+              if [ "$HEAD_BRANCH" != "staging" ]; then
+                echo "::error::Pull requests into main must come from staging."
+                exit 1
+              fi
+              ;;
+            staging)
+              case "$HEAD_BRANCH" in
+                feature/*|fix/*|hotfix/*|chore/*|codex/*|deps/*|dependabot/*)
+                  ;;
+                *)
+                  echo "::error::Pull requests into staging must come from feature-style branches (feature/*, fix/*, hotfix/*, chore/*, codex/*, deps/*, dependabot/*)."
+                  exit 1
+                  ;;
+              esac
+              ;;
+            *)
+              echo "No enforced branch policy for base branch $BASE_BRANCH."
+              ;;
+          esac

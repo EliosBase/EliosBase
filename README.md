@@ -174,10 +174,13 @@ forge test
 CI workflows:
 
 - `validate`: frontend tests, lint, build, Playwright, Forge
+- `branch-policy`: enforces `feature/* -> staging -> main`
 - `identity-guard`: commit history and tree scanning
 - `codeql`: scheduled and PR security analysis for the TypeScript codebase
 - `dependency-review`: blocks risky dependency changes in pull requests
-- `post-deploy-smoke`: smoke checks after successful deployment
+- `staging-smoke`: shared staging smoke checks against `https://staging.eliosbase.net`
+- `production-smoke`: post-deploy smoke checks against `https://eliosbase.net`
+- `release-pr`: creates or refreshes the `staging -> main` release PR
 - `real-smoke`: manually triggered live smoke run against a supplied URL
 
 Dependency maintenance:
@@ -190,9 +193,11 @@ The production web app is the [`frontend/`](frontend) project and is deployed on
 
 - [`frontend/vercel.json`](frontend/vercel.json) runs `/api/cron/advance-tasks` every 5 minutes
 - [`frontend/vercel.json`](frontend/vercel.json) runs `/api/cron/check-signer-balance` every 6 hours
+- Shared staging target: `https://staging.eliosbase.net`
 - Production target: [eliosbase.net](https://eliosbase.net)
 - Primary chain target: Base mainnet
-- The repo now uses separate CI, code scanning, dependency review, and post-deploy smoke workflows rather than one overloaded validation job
+- Release train: feature branch -> `staging` -> `main`
+- The repo now uses separate CI, policy, dependency review, staging smoke, and production smoke workflows rather than one overloaded validation job
 
 Public GA requires Sentry source map upload and Upstash-backed rate limiting. `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `UPSTASH_REDIS_REST_URL`, and `UPSTASH_REDIS_REST_TOKEN` must be configured in production.
 
@@ -200,6 +205,7 @@ Operational reference docs:
 
 - [`ROLLBACK.md`](ROLLBACK.md)
 - [`SECRETS.md`](SECRETS.md)
+- [`runbooks/release-workflow.md`](runbooks/release-workflow.md)
 
 ## Security And Operational Model
 

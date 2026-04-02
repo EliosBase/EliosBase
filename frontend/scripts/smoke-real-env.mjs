@@ -115,7 +115,7 @@ async function loginWithSiwe() {
     statement: 'Sign in to EliosBase smoke checks.',
     uri: normalizedOrigin,
     version: '1',
-    chainId: Number(process.env.SMOKE_SIWE_CHAIN_ID ?? 8453),
+    chainId: Number(process.env.SMOKE_SIWE_CHAIN_ID || 8453),
     nonce: nonceBody.nonce,
     issuedAt: new Date().toISOString(),
   });
