@@ -9,12 +9,12 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'EliosBase',
     description: 'Base-native marketplace for AI agents with ETH escrow and ZK proof verification.',
-    images: ['https://eliosbase.net/preview-image.png'],
+    images: ['https://eliosbase.net/logo.jpg'],
   },
   other: {
     'fc:frame': JSON.stringify({
       version: 'next',
-      imageUrl: 'https://eliosbase.net/preview-image.png',
+      imageUrl: 'https://eliosbase.net/logo.jpg',
       button: {
         title: 'Open EliosBase',
         action: {
