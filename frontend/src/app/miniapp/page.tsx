@@ -33,13 +33,27 @@ export default function MiniAppPage() {
   const escrowAddr = process.env.NEXT_PUBLIC_ESCROW_ADDRESS || '0x3a78b6ec90cc79483f16258864a728ae35ce8a32';
   const html = `
 var ESCROW='${escrowAddr}';
-var sdk=null,agents=[],tasks=[],currentView='home',walletAddress=null;
+var sdk=null,agents=[],tasks=[],currentView='home',walletAddress=null,authenticated=false;
 function init(){
   import('https://esm.sh/@farcaster/frame-sdk@0.2.0').then(function(m){
     sdk=m.default;sdk.actions.ready();
-    try{sdk.wallet.ethProvider.request({method:'eth_requestAccounts'}).then(function(a){
-      if(a&&a[0]){walletAddress=a[0];var e=document.getElementById('walletAddr');if(e){e.textContent=a[0].slice(0,6)+'...'+a[0].slice(-4);document.getElementById('walletInfo').style.display='block';}}
-    });}catch(e){}
+    try{
+      var ctx=sdk.context;
+      var fid=ctx&&ctx.user?ctx.user.fid:null;
+      var username=ctx&&ctx.user?ctx.user.username:null;
+      sdk.wallet.ethProvider.request({method:'eth_requestAccounts'}).then(function(a){
+        if(a&&a[0]){
+          walletAddress=a[0];
+          var e=document.getElementById('walletAddr');
+          if(e){e.textContent=a[0].slice(0,6)+'...'+a[0].slice(-4);document.getElementById('walletInfo').style.display='block';}
+          if(fid){
+            fetch('/api/auth/farcaster/context',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fid:fid,username:username,walletAddress:a[0]})}).then(function(r){
+              if(r.ok)authenticated=true;
+            }).catch(function(){});
+          }
+        }
+      });
+    }catch(e){}
   }).catch(function(){});
 }
 init();
