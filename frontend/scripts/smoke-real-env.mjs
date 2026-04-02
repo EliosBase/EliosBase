@@ -12,6 +12,7 @@ const txSyncBody = parseJsonEnv('SMOKE_TX_SYNC_BODY');
 let sessionCookie = process.env.SMOKE_SESSION_COOKIE;
 const vercelProtectionBypass = process.env.SMOKE_VERCEL_PROTECTION_BYPASS;
 let vercelProtectionCookie = null;
+const expectAuthenticatedSession = Boolean(sessionCookie || siwePrivateKey);
 
 if (!baseUrl) {
   console.error('SMOKE_BASE_URL is required');
@@ -207,7 +208,7 @@ await checkJson('/api/stats', 'dashboard stats', 200, (body) => {
   assert(typeof body?.zkProofs === 'number', 'dashboard stats missing zkProofs');
 });
 
-if (sessionCookie) {
+if (expectAuthenticatedSession) {
   await checkJson('/api/auth/session', 'auth session authenticated', 200, (body) => {
     assert(body?.authenticated === true, 'auth session did not authenticate');
     assert(typeof body?.walletAddress === 'string', 'auth session missing walletAddress');
