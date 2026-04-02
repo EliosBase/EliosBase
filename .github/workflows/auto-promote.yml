@@ -1,21 +1,21 @@
-name: auto-promote
+name: release-pr
 
 on:
   workflow_dispatch:
   push:
-    branches-ignore:
-      - main
+    branches:
+      - staging
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
 
 concurrency:
-  group: auto-promote-${{ github.ref }}
+  group: release-pr-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  promote:
+  release-pr:
     if: github.event.repository.fork == false
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -25,44 +25,41 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPOSITORY: ${{ github.repository }}
-          BRANCH: ${{ github.ref_name }}
-          BASE: ${{ github.event.repository.default_branch }}
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          HEAD_BRANCH: staging
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -eu
 
-          if [ "$BRANCH" = "$BASE" ]; then
+          if [ "$HEAD_BRANCH" = "$BASE_BRANCH" ]; then
             exit 0
           fi
 
           pr_url=$(gh pr list \
             --repo "$REPOSITORY" \
-            --head "$BRANCH" \
-            --base "$BASE" \
+            --head "$HEAD_BRANCH" \
+            --base "$BASE_BRANCH" \
             --state open \
             --json url \
             --jq '.[0].url')
 
           if [ -z "$pr_url" ]; then
-            title=$(printf '%s\n' "$COMMIT_MESSAGE" | sed -n '1{/^$/d;p;}')
-
-            if [ -z "$title" ]; then
-              title="merge $BRANCH into $BASE"
-            fi
-
             pr_url=$(gh pr create \
               --repo "$REPOSITORY" \
-              --head "$BRANCH" \
-              --base "$BASE" \
-              --title "$title" \
-              --body "Auto-generated promotion PR for \`$BRANCH\`.")
+              --head "$HEAD_BRANCH" \
+              --base "$BASE_BRANCH" \
+              --title "release: staging to $BASE_BRANCH" \
+              --body "Release PR generated from the staging branch after the latest staging update.")
+          else
+            gh pr edit "$pr_url" \
+              --repo "$REPOSITORY" \
+              --title "release: staging to $BASE_BRANCH" \
+              --body "Release PR generated from the staging branch after the latest staging update."
           fi
 
           printf 'pr_url=%s\n' "$pr_url" >>"$GITHUB_OUTPUT"
 
-      - name: Enable auto-merge
+      - name: Summary
         if: steps.promote.outputs.pr_url != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ steps.promote.outputs.pr_url }}
-        run: gh pr merge --auto --squash --delete-branch "$PR_URL"
+        run: |
+          echo "### Release PR" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.promote.outputs.pr_url }}" >> "$GITHUB_STEP_SUMMARY"

@@ -1,6 +1,7 @@
 # Secrets Inventory
 
-Runtime secrets are stored in Vercel environment variables (Production + Preview).
+Runtime secrets are stored in Vercel environment variables.
+Production and staging must use separate values for stateful systems.
 CI-only smoke secrets are stored in GitHub Actions repository secrets.
 
 | Secret | Purpose | Configured In | Rotation Owner |
@@ -26,6 +27,13 @@ CI-only smoke secrets are stored in GitHub Actions repository secrets.
 | `SMOKE_TASK_CREATE_BODY` | JSON payload for live task creation smoke | GitHub Actions secrets | Lead dev |
 | `SMOKE_HIRE_BODY` | JSON payload for verified live hire smoke | GitHub Actions secrets | Lead dev |
 | `SMOKE_TX_SYNC_BODY` | JSON payload for live transaction sync smoke | GitHub Actions secrets | Lead dev |
+
+## Staging Rules
+
+- Do not copy production Supabase credentials into staging.
+- Do not reuse production signer keys or production contract addresses in staging.
+- `staging.eliosbase.net` should use a dedicated Vercel custom environment named `staging`.
+- Set `NEXT_PUBLIC_SITE_URL=https://staging.eliosbase.net` and `NEXT_PUBLIC_FRAMES_BASE_URL=https://staging.eliosbase.net` in staging.
 
 ## Rotation Procedure
 
