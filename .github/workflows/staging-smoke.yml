@@ -33,6 +33,7 @@ jobs:
         working-directory: frontend
     env:
       BASE_URL: ${{ inputs.base_url || vars.STAGING_BASE_URL || 'https://staging.eliosbase.net' }}
+      VERCEL_PROTECTION_BYPASS: ${{ secrets.STAGING_VERCEL_PROTECTION_BYPASS }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -54,7 +55,17 @@ jobs:
           set -eu
 
           for attempt in $(seq 1 30); do
-            status=$(curl -sS -o /tmp/staging-ready.json -w '%{http_code}' "$BASE_URL/api/ready" || true)
+            if [ -n "${VERCEL_PROTECTION_BYPASS:-}" ]; then
+              status=$(curl -sS \
+                -H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}" \
+                -H "x-vercel-set-bypass-cookie: true" \
+                -o /tmp/staging-ready.json \
+                -w '%{http_code}' \
+                "$BASE_URL/api/ready" || true)
+            else
+              status=$(curl -sS -o /tmp/staging-ready.json -w '%{http_code}' "$BASE_URL/api/ready" || true)
+            fi
+
             if [ "$status" = "200" ]; then
               echo "Staging is ready at $BASE_URL"
               exit 0
@@ -80,3 +91,4 @@ jobs:
           SMOKE_TASK_CREATE_BODY: ${{ secrets.STAGING_SMOKE_TASK_CREATE_BODY }}
           SMOKE_HIRE_BODY: ${{ secrets.STAGING_SMOKE_HIRE_BODY }}
           SMOKE_TX_SYNC_BODY: ${{ secrets.STAGING_SMOKE_TX_SYNC_BODY }}
+          SMOKE_VERCEL_PROTECTION_BYPASS: ${{ secrets.STAGING_VERCEL_PROTECTION_BYPASS }}
