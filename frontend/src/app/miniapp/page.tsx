@@ -157,7 +157,7 @@ function submitEscrowWithTask(i,taskId){
 }
 function loadT(){
   show('tk');var l=document.getElementById('tl');l.innerHTML='<p class="lo">Loading tasks...</p>';
-  fetch('/api/tasks?limit=20&mine=true').then(function(r){return r.json()}).then(function(d){
+  fetch('/api/tasks?limit=20&mine=true&_t='+Date.now()).then(function(r){return r.json()}).then(function(d){
     tasks=Array.isArray(d)?d:d.tasks||[];
     var h='<button class="pb" style="margin-bottom:16px" onclick="showCreateTask()">+ Create New Task</button>';
     if(!tasks.length){h+='<p class="lo">No tasks yet.</p>';}

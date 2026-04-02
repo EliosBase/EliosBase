@@ -49,13 +49,17 @@ export async function GET(req: NextRequest) {
       .filter((taskId): taskId is string => !!taskId),
   );
 
-  return jsonWithCache(
-    data.map((task) => toTask({
-      ...task,
-      has_open_dispute: openDisputes.has(task.id),
-    })),
-    PUBLIC_COLLECTION_CACHE_CONTROL,
-  );
+  const tasks = data.map((task) => toTask({
+    ...task,
+    has_open_dispute: openDisputes.has(task.id),
+  }));
+
+  // Don't cache user-specific queries
+  if (mine === 'true') {
+    return NextResponse.json(tasks);
+  }
+
+  return jsonWithCache(tasks, PUBLIC_COLLECTION_CACHE_CONTROL);
 }
 
 export async function POST(req: NextRequest) {
