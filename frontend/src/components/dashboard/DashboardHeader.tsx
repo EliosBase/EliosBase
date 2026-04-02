@@ -1,11 +1,14 @@
 'use client';
 
+import { useAppKit } from '@reown/appkit/react';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ExternalLink, LogOut, Menu } from 'lucide-react';
 import { useWallet } from '@/hooks/useWallet';
 import { useSiweContext } from '@/components/dashboard/AuthGate';
 import { useMounted } from '@/hooks/useMounted';
 import { useAuthContext } from '@/providers/AuthProvider';
+import { isE2EMode, writeE2EWalletState } from '@/lib/e2e';
+import { isAppKitEnabled } from '@/lib/wagmi';
 import FarcasterSignInButton from './FarcasterSignInButton';
 import type { WalletId } from '@/lib/wallets';
 
@@ -108,79 +111,113 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
           </button>
         </div>
       ) : (
-        <div className="relative" ref={walletMenuRef}>
-          <button
-            type="button"
-            onClick={handleConnectClick}
-            disabled={!mounted || showConnecting}
-            aria-expanded={isWalletMenuOpen}
-            aria-haspopup="dialog"
-            className="px-4 py-2 rounded-xl bg-white text-black text-sm font-semibold hover:bg-white/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
-          >
-            <span>{showConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
-            {showWalletMenuChevron ? <ChevronDown size={16} /> : null}
-          </button>
+        mounted && isAppKitEnabled ? (
+          <AppKitConnectTrigger disabled={showConnecting} isConnecting={showConnecting} />
+        ) : (
+          <div className="relative" ref={walletMenuRef}>
+            <button
+              type="button"
+              onClick={handleConnectClick}
+              disabled={!mounted || showConnecting}
+              aria-expanded={isWalletMenuOpen}
+              aria-haspopup="dialog"
+              className="px-4 py-2 rounded-xl bg-white text-black text-sm font-semibold hover:bg-white/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+            >
+              <span>{showConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
+              {showWalletMenuChevron ? <ChevronDown size={16} /> : null}
+            </button>
 
-          {isWalletMenuOpen ? (
-            <div className="absolute right-0 top-[calc(100%+0.75rem)] z-20 w-80 rounded-2xl border border-white/10 bg-[#0b0b10] p-4 shadow-2xl shadow-black/40">
-              <div className="mb-3">
-                <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)]">
-                  {installedWallets.length > 0 ? 'Connect Wallet' : 'Get a Wallet'}
-                </h2>
-                <p className="mt-1 text-xs text-white/45">
-                  {installedWallets.length > 0
-                    ? 'Choose a wallet to connect to Base.'
-                    : 'Install a supported wallet to get started.'}
-                </p>
-              </div>
-
-              {installedWallets.length > 0 ? (
-                <div className="space-y-2">
-                  {installedWallets.map((wallet) => (
-                    <button
-                      key={wallet.id}
-                      type="button"
-                      onClick={() => handleWalletChoice(wallet.id)}
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-left transition-colors hover:bg-white/10"
-                    >
-                      <span className="block text-sm font-medium text-white">{wallet.name}</span>
-                      <span className="mt-1 block text-xs text-white/45">Connect and sign in on Base</span>
-                    </button>
-                  ))}
+            {isWalletMenuOpen ? (
+              <div className="absolute right-0 top-[calc(100%+0.75rem)] z-20 w-80 rounded-2xl border border-white/10 bg-[#0b0b10] p-4 shadow-2xl shadow-black/40">
+                <div className="mb-3">
+                  <h2 className="text-sm font-semibold text-white font-[family-name:var(--font-heading)]">
+                    {installedWallets.length > 0 ? 'Connect Wallet' : 'Get a Wallet'}
+                  </h2>
+                  <p className="mt-1 text-xs text-white/45">
+                    {installedWallets.length > 0
+                      ? 'Choose a wallet to connect to Base.'
+                      : 'Install a supported wallet to get started.'}
+                  </p>
                 </div>
-              ) : null}
 
-              {installableWallets.length > 0 ? (
-                <div className={`${installedWallets.length > 0 ? 'mt-4 border-t border-white/8 pt-4' : ''} space-y-2`}>
-                  {installedWallets.length > 0 ? (
-                    <p className="text-[11px] uppercase tracking-[0.18em] text-white/25">Install a wallet</p>
-                  ) : null}
-                  {installableWallets.map((wallet) => (
-                    <a
-                      key={wallet.id}
-                      href={wallet.downloadUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center justify-between rounded-xl border border-white/10 bg-white/3 px-3 py-3 text-left transition-colors hover:bg-white/8"
-                    >
-                      <span>
+                {installedWallets.length > 0 ? (
+                  <div className="space-y-2">
+                    {installedWallets.map((wallet) => (
+                      <button
+                        key={wallet.id}
+                        type="button"
+                        onClick={() => handleWalletChoice(wallet.id)}
+                        className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-left transition-colors hover:bg-white/10"
+                      >
                         <span className="block text-sm font-medium text-white">{wallet.name}</span>
-                        <span className="mt-1 block text-xs text-white/45">Install wallet</span>
-                      </span>
-                      <ExternalLink size={14} className="text-white/35" />
-                    </a>
-                  ))}
-                </div>
-              ) : null}
+                        <span className="mt-1 block text-xs text-white/45">Connect and sign in on Base</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
 
-              {process.env.NEXT_PUBLIC_FC_AUTH_ENABLED === 'true' ? (
-                <FarcasterSignInButton onClose={() => setIsWalletMenuOpen(false)} />
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+                {installableWallets.length > 0 ? (
+                  <div className={`${installedWallets.length > 0 ? 'mt-4 border-t border-white/8 pt-4' : ''} space-y-2`}>
+                    {installedWallets.length > 0 ? (
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-white/25">Install a wallet</p>
+                    ) : null}
+                    {installableWallets.map((wallet) => (
+                      <a
+                        key={wallet.id}
+                        href={wallet.downloadUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between rounded-xl border border-white/10 bg-white/3 px-3 py-3 text-left transition-colors hover:bg-white/8"
+                      >
+                        <span>
+                          <span className="block text-sm font-medium text-white">{wallet.name}</span>
+                          <span className="mt-1 block text-xs text-white/45">Install wallet</span>
+                        </span>
+                        <ExternalLink size={14} className="text-white/35" />
+                      </a>
+                    ))}
+                  </div>
+                ) : null}
+
+                {process.env.NEXT_PUBLIC_FC_AUTH_ENABLED === 'true' ? (
+                  <FarcasterSignInButton onClose={() => setIsWalletMenuOpen(false)} />
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        )
       )}
     </header>
+  );
+}
+
+function AppKitConnectTrigger({
+  disabled,
+  isConnecting,
+}: {
+  disabled: boolean;
+  isConnecting: boolean;
+}) {
+  const { open } = useAppKit();
+
+  function handleClick() {
+    if (isE2EMode) {
+      writeE2EWalletState({ connected: true });
+      return;
+    }
+
+    open({ view: 'Connect' });
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={disabled}
+      className="px-4 py-2 rounded-xl bg-white text-black text-sm font-semibold hover:bg-white/90 transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+    >
+      <span>{isConnecting ? 'Connecting...' : 'Connect Wallet'}</span>
+    </button>
   );
 }
 

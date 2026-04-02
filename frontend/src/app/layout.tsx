@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "EliosBase — Decentralized AI Services Marketplace",
   description:
-    "Base-native AI agent marketplace with MetaMask sign-in, ETH escrow, Groth16 proof verification, and operational telemetry.",
+    "Base-native AI agent marketplace with multi-wallet sign-in, ETH escrow, Groth16 proof verification, and operational telemetry.",
   icons: {
     icon: "/favicon.jpg",
     apple: "/favicon.jpg",

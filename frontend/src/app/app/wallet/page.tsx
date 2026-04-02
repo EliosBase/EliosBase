@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Clock, Loader2, Shield, Users, WalletCards } from 'lucide-react';
 import { getAddress } from 'viem';
+import { useConnection } from 'wagmi';
 import StatCard from '@/components/dashboard/StatCard';
 import TransactionRow from '@/components/dashboard/TransactionRow';
 import WalletTransferCard from '@/components/dashboard/WalletTransferCard';
 import { useAgentWallets } from '@/hooks/useAgentWallets';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useWalletStats } from '@/hooks/useWalletStats';
-import { getInjectedProvider, type WalletWindow } from '@/lib/wallets';
 import { useAuthContext } from '@/providers/AuthProvider';
 import type { AgentWalletTransfer } from '@/lib/types';
 
@@ -86,6 +86,7 @@ function formatTimestamp(value?: string) {
 
 export default function WalletPage() {
   const queryClient = useQueryClient();
+  const connection = useConnection();
   const { isAuthenticated, session } = useAuthContext();
   const { data: transactions = [], isLoading } = useTransactions(isAuthenticated);
   const { data: stats } = useWalletStats(isAuthenticated);
@@ -119,6 +120,7 @@ export default function WalletPage() {
     [agentWalletData?.reviewQueue],
   );
   const isReviewer = session?.role === 'operator' || session?.role === 'admin';
+  const connectedWalletName = connection.connector?.name ?? 'Connected wallet';
 
   useEffect(() => {
     if (!selectedAgentId && ownedAgents.length > 0) {
@@ -172,6 +174,17 @@ export default function WalletPage() {
     ]);
   }
 
+  async function getActiveWalletProvider() {
+    const provider = await connection.connector?.getProvider?.().catch(() => undefined);
+    if (!provider) {
+      throw new Error('Connect a compatible wallet before signing Safe transactions.');
+    }
+
+    return provider as {
+      request?: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
+    };
+  }
+
   async function signPreparedSafeExecution(safeAddress: string, prepared: PreparedExecution) {
     if (!session?.walletAddress) {
       throw new Error('Sign in with the Safe owner wallet first.');
@@ -180,15 +193,12 @@ export default function WalletPage() {
       throw new Error('Prepared Safe transaction data is missing.');
     }
 
-    const injected = getInjectedProvider(window as Window & WalletWindow, 'metaMask');
-    if (!injected) {
-      throw new Error('MetaMask is required to sign the Safe execution.');
-    }
+    const provider = await getActiveWalletProvider();
 
     const { default: Safe } = await import('@safe-global/protocol-kit');
     const owner = getAddress(session.walletAddress);
     const safe = await Safe.init({
-      provider: injected as never,
+      provider: provider as never,
       signer: owner,
       safeAddress,
     });
@@ -222,12 +232,12 @@ export default function WalletPage() {
       throw new Error('Safe7579 session typed data is missing.');
     }
 
-    const injected = getInjectedProvider(window as Window & WalletWindow, 'metaMask');
-    if (!injected?.request) {
-      throw new Error('MetaMask is required to authorize the Smart Sessions validator.');
+    const provider = await getActiveWalletProvider();
+    if (!provider.request) {
+      throw new Error('The connected wallet does not support typed-data signing.');
     }
 
-    return injected.request({
+    return provider.request({
       method: 'eth_signTypedData_v4',
       params: [
         getAddress(session.walletAddress),
@@ -271,7 +281,7 @@ export default function WalletPage() {
       } else if (data.status === 'blocked') {
         setTransferStatus('Blocked by the agent wallet policy.');
       } else {
-        setTransferStatus('Auto-cleared by policy. Execute it from the queue with MetaMask.');
+        setTransferStatus('Auto-cleared by policy. Execute it from the queue with your wallet.');
       }
 
       setDestination('');
@@ -329,7 +339,7 @@ export default function WalletPage() {
 
       const ownerSignature = await signPreparedSafeExecution(safeAddress, prepared);
       if (!ownerSignature) {
-        setMaintenanceError('MetaMask signed the Safe migration transaction, but Elios could not read the owner signature.');
+        setMaintenanceError(`${connectedWalletName} signed the Safe migration transaction, but Elios could not read the owner signature.`);
         return;
       }
 
@@ -379,7 +389,7 @@ export default function WalletPage() {
 
     const ownerSignature = await signPreparedSafeExecution(safeAddress, prepared);
     if (!ownerSignature) {
-      throw new Error('MetaMask signed the session transaction, but Elios could not read the owner signature.');
+      throw new Error(`${connectedWalletName} signed the session transaction, but Elios could not read the owner signature.`);
     }
     const enableSessionSignature = await signEnableSessionTypedData(prepared.enableSessionTypedData);
 
@@ -464,7 +474,7 @@ export default function WalletPage() {
 
       const ownerSignature = await signPreparedSafeExecution(transfer.safeAddress, prepared);
       if (!ownerSignature) {
-        setQueueError('MetaMask signed the Safe transaction, but Elios could not read the owner signature.');
+        setQueueError(`${connectedWalletName} signed the Safe transaction, but Elios could not read the owner signature.`);
         return;
       }
 
@@ -745,7 +755,7 @@ export default function WalletPage() {
                   Agent Safe Transfer Queue
                 </h2>
                 <p className="text-[11px] text-white/30">
-                  Owners execute approved Safe transfers from MetaMask. Operators clear the review lane for queued items.
+                  Owners execute approved Safe transfers from their connected wallet. Operators clear the review lane for queued items.
                 </p>
               </div>
             </div>
@@ -797,7 +807,7 @@ export default function WalletPage() {
                           className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black transition-colors hover:bg-white/90 disabled:opacity-60"
                         >
                           {isExecuting ? <Loader2 size={12} className="animate-spin" /> : null}
-                          {isExecuting ? 'Signing Safe Tx…' : 'Execute with MetaMask'}
+                          {isExecuting ? 'Signing Safe Tx…' : 'Execute with wallet'}
                         </button>
                       ) : null}
                     </div>

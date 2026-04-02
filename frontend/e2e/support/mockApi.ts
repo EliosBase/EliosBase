@@ -69,6 +69,8 @@ const defaultWalletStats = {
   stakedTrend: 'Stable',
 };
 
+const e2eBaseUrl = process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:34117';
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -90,6 +92,18 @@ function fulfillJson(route: Route, body: unknown, status = 200) {
   });
 }
 
+async function seedAppSessionCookie(page: Page) {
+  await page.context().addCookies([
+    {
+      name: 'eliosbase_session',
+      value: 'playwright-session',
+      url: e2eBaseUrl,
+      httpOnly: true,
+      sameSite: 'Lax',
+    },
+  ]);
+}
+
 export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
   let session = clone(options.session ?? { authenticated: false });
   const tasks = clone(options.tasks ?? []);
@@ -104,6 +118,10 @@ export async function mockAppApi(page: Page, options: MockAppOptions = {}) {
   let alerts = clone(options.alerts ?? []);
   let guardrails = clone(options.guardrails ?? []);
   let auditLog = clone(options.auditLog ?? []);
+
+  // Middleware protects /app using the presence of the session cookie.
+  // Seed it here so page-level auth states are still exercised by the mocked API session.
+  await seedAppSessionCookie(page);
 
   await page.addInitScript(
     ({ connected, verifiedTasks, chainId }) => {
