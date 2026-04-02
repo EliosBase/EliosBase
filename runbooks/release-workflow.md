@@ -94,6 +94,7 @@ Shared external service secrets can be reused if that is intentional:
 - Use separate Base contracts and signer keys for staging.
 - Point `NEXT_PUBLIC_SITE_URL` and `NEXT_PUBLIC_FRAMES_BASE_URL` at `https://staging.eliosbase.net`.
 - Keep staging cron enabled only after the staging signer and chain config are in place.
+- Until isolated staging infra exists, keep `STAGING_SMOKE_*` secrets unset so staging smoke stays read-only.
 
 ## Fast Summary For Another Agent
 
