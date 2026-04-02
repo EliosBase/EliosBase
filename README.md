@@ -206,6 +206,7 @@ Operational reference docs:
 - Privileged routes are role-gated for `operator` and `admin`
 - Escrow release and refund actions are verified against on-chain receipts
 - The repo ships with commit and push guards through [`scripts/identity_guard.sh`](scripts/identity_guard.sh) and [`.githooks/`](.githooks)
+  Local exact-identity pinning is opt-in per checkout through [`scripts/install_identity_guard.sh`](scripts/install_identity_guard.sh); repo and CI scans only block legacy identifiers
 - Guardrails, alerts, and audit logs are first-class product surfaces, not afterthoughts
 
 ## Current Scope

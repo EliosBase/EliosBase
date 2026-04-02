@@ -24,7 +24,10 @@ jobs:
           submodules: recursive
 
       - name: Mark hook scripts executable
-        run: chmod +x scripts/identity_guard.sh .githooks/pre-commit .githooks/prepare-commit-msg .githooks/commit-msg .githooks/pre-push
+        run: chmod +x scripts/identity_guard.sh scripts/test_identity_guard.sh .githooks/pre-commit .githooks/prepare-commit-msg .githooks/commit-msg .githooks/pre-push
 
       - name: Scan repository tree for blocked identifiers
         run: scripts/identity_guard.sh scan-tree
+
+      - name: Run identity guard regression checks
+        run: scripts/test_identity_guard.sh

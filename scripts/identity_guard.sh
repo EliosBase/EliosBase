@@ -70,14 +70,20 @@ normalize_email() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
-require_expected_identity() {
+load_expected_identity() {
   guard_name=$(expected_name)
   guard_email=$(expected_email)
 
+  if [ -z "$guard_name" ] && [ -z "$guard_email" ]; then
+    return 1
+  fi
+
   if [ -z "$guard_name" ] || [ -z "$guard_email" ]; then
-    printf '%s\n' 'identity guard misconfigured: set identity.guard.name and identity.guard.email or export IDENTITY_GUARD_NAME and IDENTITY_GUARD_EMAIL' >&2
+    printf '%s\n' 'identity guard misconfigured: set both identity.guard.name and identity.guard.email, or unset both to disable exact-identity mode' >&2
     exit 1
   fi
+
+  return 0
 }
 
 extract_ident_name() {
@@ -125,7 +131,9 @@ check_exact_identity() {
   actual_name="$2"
   actual_email="$3"
 
-  require_expected_identity
+  if ! load_expected_identity; then
+    return 0
+  fi
 
   if [ "$actual_name" != "$guard_name" ] || [ "$(normalize_email "$actual_email")" != "$(normalize_email "$guard_email")" ]; then
     printf '%s\n' "identity guard blocked: $label must be '$guard_name <$guard_email>' but was '$actual_name <$actual_email>'" >&2
@@ -204,22 +212,10 @@ check_commit_metadata() {
   pattern=$(denylist_pattern)
   commit_sha="$1"
   metadata=$(git show -s --format='%an%n%ae%n%cn%n%ce%n%B' "$commit_sha")
-  identity_fields=$(git show -s --format='%an%x1f%ae%x1f%cn%x1f%ce' "$commit_sha")
-  ident_sep=$(printf '\037')
-
-  old_ifs=$IFS
-  IFS="$ident_sep"
-  read -r author_name author_email committer_name committer_email <<EOF
-$identity_fields
-EOF
-  IFS=$old_ifs
 
   if printf '%s\n' "$metadata" | LC_ALL=C grep -Eiq "$pattern"; then
     fail_with_commit "check failed: $(denylist_label) found in commit metadata" "$commit_sha"
   fi
-
-  check_exact_identity "commit $commit_sha author" "$author_name" "$author_email"
-  check_exact_identity "commit $commit_sha committer" "$committer_name" "$committer_email"
 }
 
 check_commit_tree() {
