@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getConfiguredReownProjectId, getRuntimeConfigurationStatus } from '@/lib/runtimeConfig';
+import {
+  getConfiguredFramesBaseUrl,
+  getConfiguredReownProjectId,
+  getConfiguredSiteUrl,
+  getRuntimeConfigurationStatus,
+} from '@/lib/runtimeConfig';
 
 const originalEnv = { ...process.env };
 
@@ -31,6 +36,9 @@ function configureRuntimeEnv(overrides: Record<string, string | undefined> = {})
     SENTRY_PROJECT: 'frontend',
     SAFE_POLICY_SIGNER_PRIVATE_KEY: '0x1234',
     PROOF_SUBMITTER_PRIVATE_KEY: undefined,
+    NEXT_PUBLIC_VERCEL_BRANCH_URL: undefined,
+    NEXT_PUBLIC_VERCEL_URL: undefined,
+    NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL: undefined,
     ...overrides,
   };
 }
@@ -116,5 +124,16 @@ describe('getRuntimeConfigurationStatus', () => {
     delete process.env.NEXT_PUBLIC_PROJECT_ID;
 
     expect(runtimeConfig.getConfiguredReownProjectId()).toBe('reown-project-id');
+  });
+
+  it('derives preview URLs from the Vercel branch URL when the site URL is unset', () => {
+    configureRuntimeEnv({
+      NEXT_PUBLIC_SITE_URL: undefined,
+      NEXT_PUBLIC_FRAMES_BASE_URL: undefined,
+      NEXT_PUBLIC_VERCEL_BRANCH_URL: 'frontend-git-feature-auth-preview.vercel.app',
+    });
+
+    expect(getConfiguredSiteUrl()).toBe('https://frontend-git-feature-auth-preview.vercel.app');
+    expect(getConfiguredFramesBaseUrl()).toBe('https://frontend-git-feature-auth-preview.vercel.app');
   });
 });

@@ -54,3 +54,4 @@ jobs:
           SMOKE_TASK_CREATE_BODY: ${{ secrets.SMOKE_TASK_CREATE_BODY }}
           SMOKE_HIRE_BODY: ${{ secrets.SMOKE_HIRE_BODY }}
           SMOKE_TX_SYNC_BODY: ${{ secrets.SMOKE_TX_SYNC_BODY }}
+          SMOKE_VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}

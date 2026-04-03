@@ -25,17 +25,11 @@ jobs:
 
           case "$BASE_BRANCH" in
             main)
-              if [ "$HEAD_BRANCH" != "staging" ]; then
-                echo "::error::Pull requests into main must come from staging."
-                exit 1
-              fi
-              ;;
-            staging)
               case "$HEAD_BRANCH" in
                 feature/*|fix/*|hotfix/*|chore/*|codex/*|deps/*|dependabot/*)
                   ;;
                 *)
-                  echo "::error::Pull requests into staging must come from feature-style branches (feature/*, fix/*, hotfix/*, chore/*, codex/*, deps/*, dependabot/*)."
+                  echo "::error::Pull requests into main must come from a feature-style branch (feature/*, fix/*, hotfix/*, chore/*, codex/*, deps/*, dependabot/*)."
                   exit 1
                   ;;
               esac

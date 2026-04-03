@@ -1,7 +1,24 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
-const siteOrigin = process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net';
+function normalizeOrigin(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  const trimmed = value.replace(/\/+$/, '');
+  if (/^https?:\/\//.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+}
+
+const siteOrigin =
+  normalizeOrigin(process.env.NEXT_PUBLIC_SITE_URL)
+  ?? normalizeOrigin(process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL)
+  ?? normalizeOrigin(process.env.NEXT_PUBLIC_VERCEL_URL)
+  ?? 'https://eliosbase.net';
 
 // Allow Farcaster clients to embed the app as a Mini App
 const contentSecurityPolicy = [

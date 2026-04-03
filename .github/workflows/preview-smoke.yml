@@ -1,0 +1,188 @@
+name: preview-smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Override the preview base URL
+        required: false
+        type: string
+      task_id:
+        description: Optional completed task id for protected result verification
+        required: false
+        type: string
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: preview-smoke-${{ github.event.pull_request.number || inputs.base_url || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preview-smoke:
+    name: preview-smoke
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.base.ref == github.event.repository.default_branch && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      BASE_URL_OVERRIDE: ${{ inputs.base_url }}
+      PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
+    steps:
+      - name: Checkout trusted smoke runner
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Resolve preview deployment
+        id: preview
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          ;(async () => {
+            const output = process.env.GITHUB_OUTPUT;
+            const baseUrlOverride = process.env.BASE_URL_OVERRIDE?.trim();
+
+            if (baseUrlOverride) {
+              fs.appendFileSync(output, `base_url=${baseUrlOverride}\n`);
+              process.exit(0);
+            }
+
+            const missing = ['VERCEL_PROJECT_ID', 'VERCEL_TEAM_ID', 'VERCEL_TOKEN', 'PR_HEAD_SHA', 'PR_HEAD_REF']
+              .filter((name) => !process.env[name]);
+
+            if (missing.length > 0) {
+              throw new Error(`Missing preview deployment config: ${missing.join(', ')}`);
+            }
+
+            const headers = { Authorization: `Bearer ${process.env.VERCEL_TOKEN}` };
+            const endpoint = new URL('https://api.vercel.com/v6/deployments');
+            endpoint.searchParams.set('projectId', process.env.VERCEL_PROJECT_ID);
+            endpoint.searchParams.set('teamId', process.env.VERCEL_TEAM_ID);
+            endpoint.searchParams.set('limit', '20');
+
+            const sha = process.env.PR_HEAD_SHA;
+            const ref = process.env.PR_HEAD_REF;
+
+            for (let attempt = 1; attempt <= 30; attempt += 1) {
+              const res = await fetch(endpoint, { headers });
+              if (!res.ok) {
+                throw new Error(`Failed to list Vercel deployments (${res.status})`);
+              }
+
+              const data = await res.json();
+              const deployments = Array.isArray(data.deployments) ? data.deployments : [];
+              const branchDeployments = deployments.filter((deployment) => {
+                if (deployment.target === 'production') {
+                  return false;
+                }
+
+                const meta = deployment.meta || {};
+                const deploymentRef = meta.githubCommitRef || meta.gitCommitRef;
+                return deploymentRef === ref;
+              });
+
+              const exactDeployment = branchDeployments.find((deployment) => {
+                const meta = deployment.meta || {};
+                const deploymentSha = meta.githubCommitSha || meta.gitCommitSha;
+                return deploymentSha === sha;
+              });
+
+              const readyDeployment = exactDeployment && (exactDeployment.readyState === 'READY' || exactDeployment.state === 'READY')
+                ? exactDeployment
+                : null;
+
+              if (readyDeployment?.url) {
+                const baseUrl = `https://${readyDeployment.url}`;
+                fs.appendFileSync(output, `base_url=${baseUrl}\n`);
+                console.log(`Resolved preview deployment: ${baseUrl}`);
+                process.exit(0);
+              }
+
+              const currentState = exactDeployment?.readyState || exactDeployment?.state;
+              console.log(
+                currentState
+                  ? `Attempt ${attempt}/30: preview for ${ref}@${sha} is ${currentState}`
+                  : `Attempt ${attempt}/30: waiting for preview deployment for ${ref}@${sha}`,
+              );
+
+              await new Promise((resolve) => setTimeout(resolve, 20000));
+            }
+
+            throw new Error(`Timed out waiting for preview deployment for ${ref}@${sha}`);
+          })().catch((error) => {
+            console.error(error.stack || String(error));
+            process.exit(1);
+          });
+          NODE
+
+      - name: Wait for preview readiness
+        env:
+          BASE_URL: ${{ steps.preview.outputs.base_url }}
+        run: |
+          set -eu
+          cookie_jar=/tmp/preview-vercel-cookies.txt
+          rm -f "$cookie_jar"
+
+          for attempt in $(seq 1 30); do
+            if [ -n "${VERCEL_PROTECTION_BYPASS:-}" ]; then
+              status=$(curl -sS \
+                -L \
+                -c "$cookie_jar" \
+                -b "$cookie_jar" \
+                -o /tmp/preview-ready.json \
+                -w '%{http_code}' \
+                "${BASE_URL}/api/ready?x-vercel-set-bypass-cookie=true&x-vercel-protection-bypass=${VERCEL_PROTECTION_BYPASS}" || true)
+            else
+              status=$(curl -sS -o /tmp/preview-ready.json -w '%{http_code}' "$BASE_URL/api/ready" || true)
+            fi
+
+            if [ "$status" = "200" ]; then
+              echo "Preview is ready at $BASE_URL"
+              exit 0
+            fi
+
+            sleep 20
+          done
+
+          echo "::error::Timed out waiting for $BASE_URL/api/ready"
+          cat /tmp/preview-ready.json 2>/dev/null || true
+          exit 1
+
+      - name: Run preview smoke checks
+        env:
+          SMOKE_BASE_URL: ${{ steps.preview.outputs.base_url }}
+          SMOKE_TASK_ID: ${{ inputs.task_id }}
+          SMOKE_VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
+        run: npm run smoke:real
+
+      - name: Summary
+        run: |
+          echo "### Preview smoke" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.preview.outputs.base_url }}" >> "$GITHUB_STEP_SUMMARY"
