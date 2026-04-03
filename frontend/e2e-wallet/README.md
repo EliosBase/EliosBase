@@ -50,6 +50,8 @@ Optional:
 
 - `PLAYWRIGHT_WALLET_DEBUG=1`
   - Keeps the extra wallet harness logging on.
+- `PLAYWRIGHT_WALLET_CHROME_PROFILE="Profile 2"`
+  - Pins the copied-profile harness to a specific real Chrome profile instead of auto-picking the newest candidate.
 - `PLAYWRIGHT_REOWN_PROJECT_ID`
   - Overrides the default Reown project id for wallet E2E.
 
