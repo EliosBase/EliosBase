@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getConfiguredFramesBaseUrl } from '@/lib/runtimeConfig';
 
-const baseUrl = process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net';
+const baseUrl = getConfiguredFramesBaseUrl() || 'https://eliosbase.net';
 
 // GET — cast action metadata (returned when the action is installed)
 export async function GET() {

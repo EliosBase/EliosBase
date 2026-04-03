@@ -2,6 +2,7 @@
 
 import { type Frog, Button } from 'frog';
 import { createPublicServerClient } from '@/lib/supabase/server';
+import { getConfiguredFramesBaseUrl } from '@/lib/runtimeConfig';
 import {
   FrameContainer,
   FrameTitle,
@@ -14,7 +15,7 @@ import {
 const TASK_STEPS = ['Submitted', 'Decomposed', 'Assigned', 'Executing', 'ZK Verifying', 'Complete'];
 
 export function registerTaskFrames(app: Frog) {
-  const baseUrl = (process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net').trim();
+  const baseUrl = getConfiguredFramesBaseUrl() || 'https://eliosbase.net';
 
   // Task status frame
   app.frame('/task/:taskId', async (c) => {

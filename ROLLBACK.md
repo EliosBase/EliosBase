@@ -7,11 +7,12 @@
 3. Click "..." > **Promote to Production**
 4. Verify the site is working at https://eliosbase.net
 
-### Staging
+### Preview Pull Requests
 
-1. Promote the last known good `staging` deployment inside the Vercel `staging` custom environment
-2. Verify `https://staging.eliosbase.net/api/ready`
-3. Re-run `staging-smoke` if the rollback changed behavior
+1. Open the PR in Vercel and identify the last known good preview deployment for the branch
+2. If needed, redeploy or revert the branch commit that broke the preview
+3. Verify the preview at `/api/ready`
+4. Re-run `preview-smoke` on the pull request before merging
 
 ## Database (Supabase)
 

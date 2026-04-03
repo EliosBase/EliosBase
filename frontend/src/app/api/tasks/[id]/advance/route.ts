@@ -8,6 +8,7 @@ import { validateOrigin } from '@/lib/csrf';
 import { AgentExecutionError, DEFAULT_AGENT_EXECUTION_MODEL, executeAgentTask, serializeExecutionResult } from '@/lib/agentExecutor';
 import { generateTaskProof } from '@/lib/zkProof';
 import { submitProofOnChain } from '@/lib/proofSubmitter';
+import { getConfiguredFramesBaseUrl } from '@/lib/runtimeConfig';
 import { getExecutionFailure, getExecutionResult } from '@/lib/types';
 
 // Step transition rules: [currentStep, nextStep, minSecondsElapsed]
@@ -559,7 +560,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         if (signer) {
           const { publishCast } = await import('@/lib/neynar');
-          const framesBaseUrl = process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net';
+          const framesBaseUrl = getConfiguredFramesBaseUrl() || 'https://eliosbase.net';
           const castText = `Task completed on EliosBase: "${updated.title}" — verified with ZK proof on Base`;
           const embedUrl = `${framesBaseUrl}/api/frames/task/${updated.id}`;
 

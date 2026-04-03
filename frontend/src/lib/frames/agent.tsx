@@ -2,6 +2,7 @@
 
 import { type Frog, Button } from 'frog';
 import { createPublicServerClient } from '@/lib/supabase/server';
+import { getConfiguredFramesBaseUrl } from '@/lib/runtimeConfig';
 import {
   FrameContainer,
   FrameTitle,
@@ -12,7 +13,7 @@ import {
 } from './components';
 
 export function registerAgentFrames(app: Frog) {
-  const baseUrl = (process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net').trim();
+  const baseUrl = getConfiguredFramesBaseUrl() || 'https://eliosbase.net';
 
   // Agent preview frame
   app.frame('/agent/:agentId', async (c) => {

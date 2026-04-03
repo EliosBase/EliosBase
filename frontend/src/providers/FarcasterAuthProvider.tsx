@@ -1,17 +1,20 @@
 'use client';
 
 import { AuthKitProvider } from '@farcaster/auth-kit';
+import { getConfiguredSiteUrl } from '@/lib/runtimeConfig';
+
+const siteUrl = getConfiguredSiteUrl();
 
 const farcasterConfig = {
   rpcUrl: 'https://mainnet.optimism.io',
   domain: typeof window !== 'undefined'
     ? window.location.host
-    : (process.env.NEXT_PUBLIC_SITE_URL
-      ? new URL(process.env.NEXT_PUBLIC_SITE_URL).host
+    : (siteUrl
+      ? new URL(siteUrl).host
       : 'eliosbase.net'),
   siweUri: typeof window !== 'undefined'
     ? window.location.origin
-    : (process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net'),
+    : (siteUrl || 'https://eliosbase.net'),
 };
 
 export default function FarcasterAuthProvider({ children }: { children: React.ReactNode }) {

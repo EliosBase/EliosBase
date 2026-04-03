@@ -10,6 +10,9 @@ describe('validateOrigin', () => {
   it('fails closed in production when NEXT_PUBLIC_SITE_URL is missing', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     delete process.env.NEXT_PUBLIC_SITE_URL;
+    delete process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL;
+    delete process.env.NEXT_PUBLIC_VERCEL_URL;
+    delete process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL;
 
     const response = validateOrigin(new NextRequest('https://eliosbase.test/api/tasks', {
       method: 'POST',

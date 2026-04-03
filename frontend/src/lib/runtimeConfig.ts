@@ -55,6 +55,9 @@ const PUBLIC_RUNTIME_ENV = {
   NEXT_PUBLIC_FC_AUTH_ENABLED: process.env.NEXT_PUBLIC_FC_AUTH_ENABLED,
   NEXT_PUBLIC_REOWN_PROJECT_ID: process.env.NEXT_PUBLIC_REOWN_PROJECT_ID,
   NEXT_PUBLIC_PROJECT_ID: process.env.NEXT_PUBLIC_PROJECT_ID,
+  NEXT_PUBLIC_VERCEL_BRANCH_URL: process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL,
+  NEXT_PUBLIC_VERCEL_URL: process.env.NEXT_PUBLIC_VERCEL_URL,
+  NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL: process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL,
 } as const;
 
 const SAFE7579_DEFAULT_RUNTIME_ENV = {
@@ -83,12 +86,36 @@ function readConfiguredEnv(name: string) {
   return configured ?? SAFE7579_DEFAULT_RUNTIME_ENV[name as keyof typeof SAFE7579_DEFAULT_RUNTIME_ENV];
 }
 
+function normalizeUrl(value: string | undefined) {
+  const normalized = readEnv(value);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const trimmed = normalized.replace(/\/+$/, '');
+  if (/^https?:\/\//.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `https://${trimmed}`;
+}
+
+function getDerivedVercelSiteUrl() {
+  return normalizeUrl(PUBLIC_RUNTIME_ENV.NEXT_PUBLIC_VERCEL_BRANCH_URL ?? process.env.NEXT_PUBLIC_VERCEL_BRANCH_URL)
+    ?? normalizeUrl(PUBLIC_RUNTIME_ENV.NEXT_PUBLIC_VERCEL_URL ?? process.env.NEXT_PUBLIC_VERCEL_URL)
+    ?? normalizeUrl(PUBLIC_RUNTIME_ENV.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL ?? process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL);
+}
+
 export function isProductionRuntime() {
   return process.env.NODE_ENV === 'production';
 }
 
 export function getConfiguredSiteUrl() {
-  return readConfiguredEnv('NEXT_PUBLIC_SITE_URL');
+  return normalizeUrl(readConfiguredEnv('NEXT_PUBLIC_SITE_URL')) ?? getDerivedVercelSiteUrl();
+}
+
+export function getConfiguredFramesBaseUrl() {
+  return normalizeUrl(readConfiguredEnv('NEXT_PUBLIC_FRAMES_BASE_URL')) ?? getConfiguredSiteUrl();
 }
 
 export function getConfiguredReownProjectId() {
@@ -120,7 +147,9 @@ export function requireConfiguredCronSecret() {
 export function getRequiredRuntimeChecks() {
   const checks: RuntimeCheck[] = REQUIRED_RUNTIME_ENV.map((name) => ({
     name,
-    configured: Boolean(readConfiguredEnv(name)),
+    configured: name === 'NEXT_PUBLIC_SITE_URL'
+      ? Boolean(getConfiguredSiteUrl())
+      : Boolean(readConfiguredEnv(name)),
   }));
 
   checks.push({
