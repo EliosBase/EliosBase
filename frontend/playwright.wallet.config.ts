@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 const port = 34118;
-const baseURL = `http://127.0.0.1:${port}`;
+const baseURL = `http://localhost:${port}`;
 const reownProjectId =
   process.env.PLAYWRIGHT_REOWN_PROJECT_ID
   ?? process.env.NEXT_PUBLIC_REOWN_PROJECT_ID
@@ -23,9 +23,9 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: `npm run dev -- --hostname 127.0.0.1 --port ${port}`,
+    command: `npm run dev -- --webpack --hostname 127.0.0.1 --port ${port}`,
     url: baseURL,
-    reuseExistingServer: false,
+    reuseExistingServer: true,
     timeout: 120_000,
     env: {
       ANTHROPIC_API_KEY: 'playwright-anthropic-key',

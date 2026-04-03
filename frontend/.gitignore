@@ -17,7 +17,11 @@
 
 # next.js
 /.next/
+/.next.pre-*
+/.next.post-install-*
+/.next.wallet-*
 /out/
+/output/playwright/
 
 # production
 /build
@@ -25,6 +29,7 @@
 # misc
 .DS_Store
 *.pem
+/.tmp/
 
 # debug
 npm-debug.log*
