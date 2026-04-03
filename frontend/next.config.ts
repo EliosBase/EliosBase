@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import { buildContentSecurityPolicy } from "./src/lib/csp";
 
 function normalizeOrigin(value?: string) {
   if (!value) {
@@ -20,21 +21,7 @@ const siteOrigin =
   ?? normalizeOrigin(process.env.NEXT_PUBLIC_VERCEL_URL)
   ?? 'https://eliosbase.net';
 
-// Allow Farcaster clients to embed the app as a Mini App
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "object-src 'none'",
-  "frame-ancestors *",
-  "form-action 'self'",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data: https://fonts.gstatic.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://esm.sh",
-  "connect-src 'self' https: wss: https://relay.farcaster.xyz",
-  "worker-src 'self' blob:",
-  "frame-src 'self' https://warpcast.com https://relay.farcaster.xyz",
-].join('; ');
+const contentSecurityPolicy = buildContentSecurityPolicy();
 
 const nextConfig: NextConfig = {
   // snarkjs uses file:// URLs that Turbopack can't trace

@@ -1,0 +1,101 @@
+name: production-live-e2e
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Core gate only, or core plus seeded release/refund fixtures
+        required: true
+        type: choice
+        default: core
+        options:
+          - core
+          - full-fixture
+      base_url:
+        description: Override the production base URL
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-live-e2e-${{ inputs.mode }}-${{ inputs.base_url || vars.PRODUCTION_BASE_URL || 'https://eliosbase.net' }}
+  cancel-in-progress: false
+
+jobs:
+  production-live-e2e:
+    name: production-live-e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      BASE_URL: ${{ inputs.base_url || vars.PRODUCTION_BASE_URL || 'https://eliosbase.net' }}
+      ARTIFACT_DIR: output/production-live-e2e/${{ github.run_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for production deployment
+        run: |
+          set -eu
+
+          for attempt in $(seq 1 30); do
+            status=$(curl -sS -o /tmp/production-live-ready.json -w '%{http_code}' "$BASE_URL/api/ready" || true)
+            if [ "$status" = "200" ]; then
+              echo "Production is ready at $BASE_URL"
+              exit 0
+            fi
+
+            sleep 20
+          done
+
+          echo "::error::Timed out waiting for $BASE_URL/api/ready"
+          cat /tmp/production-live-ready.json 2>/dev/null || true
+          exit 1
+
+      - name: Run live production write-path smoke
+        run: npm run smoke:prod-live
+        env:
+          SMOKE_BASE_URL: ${{ env.BASE_URL }}
+          SMOKE_MODE: ${{ inputs.mode }}
+          SMOKE_SIWE_PRIVATE_KEY: ${{ secrets.SMOKE_SIWE_PRIVATE_KEY }}
+          SMOKE_AGENT_ID: ${{ secrets.SMOKE_AGENT_ID }}
+          SMOKE_TASK_REWARD_WEI: ${{ secrets.SMOKE_TASK_REWARD_WEI }}
+          SMOKE_ESCROW_LOCK_WEI: ${{ secrets.SMOKE_ESCROW_LOCK_WEI }}
+          SMOKE_SYNC_TX_MODE: ${{ vars.SMOKE_SYNC_TX_MODE || 'self-transfer' }}
+          SMOKE_POST_RUN_ADVANCE: '1'
+          SMOKE_CAPTURE_SCREENSHOTS: '1'
+          SMOKE_CRON_SECRET: ${{ secrets.SMOKE_CRON_SECRET }}
+          SMOKE_RELEASE_TASK_ID: ${{ secrets.SMOKE_RELEASE_TASK_ID }}
+          SMOKE_RELEASE_TX_HASH: ${{ secrets.SMOKE_RELEASE_TX_HASH }}
+          SMOKE_REFUND_TASK_ID: ${{ secrets.SMOKE_REFUND_TASK_ID }}
+          SMOKE_REFUND_TX_HASH: ${{ secrets.SMOKE_REFUND_TX_HASH }}
+          SMOKE_VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
+          SMOKE_ARTIFACT_DIR: ${{ env.ARTIFACT_DIR }}
+
+      - name: Upload live smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-live-e2e-${{ github.run_id }}
+          path: frontend/${{ env.ARTIFACT_DIR }}
+          if-no-files-found: warn
