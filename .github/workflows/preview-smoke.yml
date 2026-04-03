@@ -186,7 +186,7 @@ jobs:
       - name: Create fallback preview deployment
         id: manual_preview
         if: steps.scope.outputs.needs_preview == 'true' && steps.preview.outputs.base_url == '' && steps.preview.outputs.needs_manual_deploy == 'true'
-        working-directory: preview-source/frontend
+        working-directory: preview-source
         env:
           VERCEL_ORG_ID: ${{ vars.VERCEL_TEAM_ID }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
