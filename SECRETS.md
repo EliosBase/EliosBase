@@ -1,7 +1,7 @@
 # Secrets Inventory
 
 Runtime secrets are stored in Vercel environment variables.
-Production and staging must use separate values for stateful systems.
+Production and preview should use separate values for stateful systems whenever preview writes are enabled.
 CI-only smoke secrets are stored in GitHub Actions repository secrets.
 
 | Secret | Purpose | Configured In | Rotation Owner |
@@ -28,12 +28,12 @@ CI-only smoke secrets are stored in GitHub Actions repository secrets.
 | `SMOKE_HIRE_BODY` | JSON payload for verified live hire smoke | GitHub Actions secrets | Lead dev |
 | `SMOKE_TX_SYNC_BODY` | JSON payload for live transaction sync smoke | GitHub Actions secrets | Lead dev |
 
-## Staging Rules
+## Preview Rules
 
-- Do not copy production Supabase credentials into staging.
-- Do not reuse production signer keys or production contract addresses in staging.
-- `staging.eliosbase.net` should use a dedicated Vercel custom environment named `staging`.
-- Set `NEXT_PUBLIC_SITE_URL=https://staging.eliosbase.net` and `NEXT_PUBLIC_FRAMES_BASE_URL=https://staging.eliosbase.net` in staging.
+- Do not point preview deployments at production Supabase, signer keys, or contract addresses once preview writes are enabled.
+- On Vercel, store shared preview runtime config in the standard `preview` environment unless a branch needs an explicit override.
+- Do not hard-code `NEXT_PUBLIC_SITE_URL` or `NEXT_PUBLIC_FRAMES_BASE_URL` for preview branches. The app derives preview origins from `NEXT_PUBLIC_VERCEL_BRANCH_URL`.
+- `preview-smoke` uses GitHub repository secrets `VERCEL_TOKEN` and `VERCEL_PROTECTION_BYPASS` to locate and validate the PR preview deployment.
 
 ## Rotation Procedure
 

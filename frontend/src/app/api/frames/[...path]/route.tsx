@@ -6,6 +6,7 @@ import { registerAgentFrames } from '@/lib/frames/agent';
 import { registerTaskFrames } from '@/lib/frames/task';
 import { registerEscrowFrames } from '@/lib/frames/escrow';
 import { framesRateLimitMiddleware } from '@/lib/frames/middleware';
+import { getConfiguredFramesBaseUrl } from '@/lib/runtimeConfig';
 
 const app = new Frog({
   basePath: '/api/frames',
@@ -38,7 +39,7 @@ app.use(framesRateLimitMiddleware);
 
 // Landing frame
 app.frame('/', (c) => {
-  const baseUrl = (process.env.NEXT_PUBLIC_FRAMES_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://eliosbase.net').trim();
+  const baseUrl = getConfiguredFramesBaseUrl() || 'https://eliosbase.net';
 
   return c.res({
     image: (
