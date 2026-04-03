@@ -1,0 +1,63 @@
+name: main-auto-merge
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+      - labeled
+      - unlabeled
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: main-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  sync-auto-merge:
+    if: github.actor != 'dependabot[bot]' && github.event.pull_request.base.ref == github.event.repository.default_branch && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Sync auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -eu
+
+          case "$HEAD_BRANCH" in
+            feature/*|fix/*|hotfix/*|chore/*|codex/*|deps/*)
+              ;;
+            *)
+              echo "Skipping auto-merge for unsupported branch $HEAD_BRANCH."
+              exit 0
+              ;;
+          esac
+
+          has_label="$(
+            gh pr view "$PR_URL" --json labels --jq 'any(.labels[]?; .name == "automerge")'
+          )"
+
+          is_draft="$(
+            gh pr view "$PR_URL" --json isDraft --jq '.isDraft'
+          )"
+
+          if [ "$has_label" = "true" ] && [ "$is_draft" = "false" ]; then
+            gh pr merge --auto --squash --delete-branch "$PR_URL"
+            exit 0
+          fi
+
+          has_auto_merge="$(
+            gh pr view "$PR_URL" --json autoMergeRequest --jq '.autoMergeRequest != null'
+          )"
+
+          if [ "$has_auto_merge" = "true" ]; then
+            gh pr merge --disable-auto "$PR_URL"
+          fi

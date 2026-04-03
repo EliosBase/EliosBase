@@ -10,6 +10,7 @@
 
 - `branch-policy` fails any PR into `main` unless the head branch uses an approved feature-style prefix.
 - `preview-smoke` runs against the Vercel preview deployment for the PR head commit.
+- `main-auto-merge` enables GitHub auto-merge for PRs into `main` when the PR has the `automerge` label.
 - `branch-cleanup` deletes merged feature branches.
 - Dependabot opens and auto-merges only into `main`, never into a separate staging branch.
 
@@ -19,8 +20,9 @@
 2. Open a PR into `main`.
 3. Let Vercel build the branch preview deployment.
 4. Let `preview-smoke` validate that preview deployment.
-5. Merge into `main` after `preview-smoke` and the required PR checks are green.
-6. Let `production-smoke` validate `https://eliosbase.net` after the production deploy lands.
+5. Add the `automerge` label if the PR should merge as soon as it is approved and checks pass.
+6. Merge into `main` after `preview-smoke` and the required PR checks are green, or let GitHub auto-merge it if `automerge` is enabled.
+7. Let `production-smoke` validate `https://eliosbase.net` after the production deploy lands.
 
 ## Required GitHub Branch Protection
 
@@ -61,10 +63,18 @@ The linked Vercel project already exists. Use the standard `preview` environment
 - Vercel cron only targets production, so preview branches remain read-only unless someone explicitly calls a protected route.
 - If preview infra is not fully isolated yet, keep preview smoke read-only by leaving authenticated mutation smoke secrets unset.
 
+## Auto-Merge Standard
+
+- Use the `automerge` label only when the PR should merge without another manual click.
+- `automerge` does not bypass protection. `main` still requires at least 1 approval and all required checks.
+- Removing the `automerge` label disables GitHub auto-merge for that PR.
+- Draft PRs never auto-merge.
+
 ## Fast Summary For Another Agent
 
 - Feature branches open PRs directly into `main`.
 - Each PR gets a Vercel preview deployment.
 - `preview-smoke` must pass before `main` can be merged.
+- Add `automerge` to let GitHub merge the PR automatically after approval and green checks.
 - `production-smoke` runs after merge to `main`.
 - Preview URLs are per-branch, not a shared staging domain.
