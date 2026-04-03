@@ -15,7 +15,9 @@
     "e2e:wallet:metamask": "npx --yes tsx scripts/wallet-e2e-run.ts metamask",
     "e2e:wallet:phantom": "npx --yes tsx scripts/wallet-e2e-run.ts phantom",
     "e2e:wallet:coinbase": "npx --yes tsx scripts/wallet-e2e-run.ts coinbase",
-    "smoke:real": "node scripts/smoke-real-env.mjs"
+    "smoke:real": "node scripts/smoke-real-env.mjs",
+    "smoke:prod-live": "node scripts/smoke-production-live.mjs",
+    "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
@@ -24,7 +26,6 @@
     "@farcaster/auth-kit": "^0.8.2",
     "@farcaster/frame-node": "^0.2.0",
     "@farcaster/frame-sdk": "^0.2.0",
-    "@metamask/connect-evm": "^0.9.1",
     "@neynar/nodejs-sdk": "^3.137.2",
     "@reown/appkit": "^1.8.19",
     "@reown/appkit-adapter-wagmi": "^1.8.19",

@@ -24,6 +24,7 @@
 5. Add the `automerge` label if the PR should merge as soon as it is approved and checks pass.
 6. Merge into `main` after `preview-smoke` and the required PR checks are green, or let GitHub auto-merge it if `automerge` is enabled.
 7. Let `production-smoke` validate `https://eliosbase.net` after the production deploy lands.
+8. Run `production-live-e2e` before launch sign-off or after any production change that touches live write paths.
 
 ## Required GitHub Branch Protection
 
@@ -78,4 +79,5 @@ The linked Vercel project already exists. Use the standard `preview` environment
 - `preview-smoke` must pass before `main` can be merged.
 - Add `automerge` to let GitHub merge the PR automatically after approval and green checks.
 - `production-smoke` runs after merge to `main`.
+- `production-live-e2e` is the manual live write-path sign-off for production.
 - Preview URLs are per-branch, not a shared staging domain.
