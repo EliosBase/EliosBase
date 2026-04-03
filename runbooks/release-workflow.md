@@ -10,6 +10,7 @@
 
 - `branch-policy` fails any PR into `main` unless the head branch uses an approved feature-style prefix.
 - `preview-smoke` runs against the Vercel preview deployment for the PR head commit.
+- `preview-smoke` skips cleanly when a PR does not touch `frontend/`.
 - `main-auto-merge` enables GitHub auto-merge for PRs into `main` when the PR has the `automerge` label.
 - `branch-cleanup` deletes merged feature branches.
 - Dependabot opens and auto-merges only into `main`, never into a separate staging branch.

@@ -179,6 +179,7 @@ CI workflows:
 - `codeql`: scheduled and PR security analysis for the TypeScript codebase
 - `dependency-review`: blocks risky dependency changes in pull requests
 - `preview-smoke`: PR preview smoke checks against the Vercel deployment for the head commit
+  It skips cleanly for PRs that do not change `frontend/`.
 - `main-auto-merge`: enables GitHub auto-merge for labeled PRs into `main`
 - `production-smoke`: post-deploy smoke checks against `https://eliosbase.net`
 - `real-smoke`: manually triggered live smoke run against a supplied URL
