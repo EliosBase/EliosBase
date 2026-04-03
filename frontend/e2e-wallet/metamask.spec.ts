@@ -3,7 +3,6 @@ import { mockAppApi } from '../e2e/support/mockApi';
 import {
   approveMetaMaskConnect,
   approveMetaMaskSignature,
-  chooseWalletExtension,
   launchMetaMask,
 } from './support/synpressWallets';
 
@@ -50,6 +49,17 @@ async function disconnectIfNeeded(page: Page) {
   await expect(page.getByRole('button', { name: 'Connect Wallet' })).toBeVisible({ timeout: 30_000 });
 }
 
+async function connectWithMetaMask(page: Page) {
+  await expect(page.getByRole('button', { name: 'Connect Wallet' }).first()).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Connect Wallet' }).first().click();
+
+  const walletButton = page.getByRole('button', { name: 'MetaMask' }).first();
+  await expect(walletButton).toBeVisible({ timeout: 30_000 });
+  await walletButton.evaluate((button: HTMLButtonElement) => {
+    button.click();
+  });
+}
+
 test('connects and signs in with MetaMask', async () => {
   const baseURL = String(test.info().project.use.baseURL);
   const { context, extensionId } = await launchMetaMask();
@@ -70,15 +80,12 @@ test('connects and signs in with MetaMask', async () => {
     await page.goto(new URL('/app', baseURL).toString(), { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(/\/app(?:\?|#|$)/, { timeout: 30_000 });
     await disconnectIfNeeded(page);
-    await page.getByRole('button', { name: 'Connect Wallet' }).click();
-    await page.locator('w3m-modal').waitFor({ state: 'visible' });
-    await page.locator('w3m-modal').getByText('MetaMask', { exact: true }).click();
-    await chooseWalletExtension(context, 'MetaMask');
+    await connectWithMetaMask(page);
     await approveMetaMaskConnect(context, extensionId);
     const verifyResponse = page.waitForResponse((response) => (
       response.url().includes('/api/auth/verify')
       && response.request().method() === 'POST'
-    ));
+    ), { timeout: 30_000 });
     await approveMetaMaskSignature(context, extensionId);
     await verifyResponse;
     await expect.poll(async () => page.evaluate(async () => {

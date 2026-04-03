@@ -18,6 +18,30 @@ import {
 } from '@/lib/wallets';
 
 const launchWalletIds = new Set<WalletId>(['metaMask', 'coinbaseWallet', 'phantom', 'rabby']);
+const walletHarnessEnabled = process.env.NODE_ENV !== 'production';
+
+type WalletUiEvent = {
+  type: string;
+  ts: number;
+  walletId?: WalletId;
+  connectorId?: string;
+  connectorName?: string;
+};
+
+function pushWalletUiEvent(event: WalletUiEvent) {
+  if (!walletHarnessEnabled || typeof window === 'undefined') {
+    return;
+  }
+
+  const browserWindow = window as typeof window & {
+    __ELIOS_WALLET_UI_EVENTS__?: WalletUiEvent[];
+  };
+
+  browserWindow.__ELIOS_WALLET_UI_EVENTS__ = [
+    ...(browserWindow.__ELIOS_WALLET_UI_EVENTS__ ?? []),
+    event,
+  ];
+}
 
 export interface WalletOption {
   id: WalletId;
@@ -27,7 +51,7 @@ export interface WalletOption {
 }
 
 export function useWallet() {
-  const { connectors, connect, isPending } = useConnect();
+  const { connectors, connect, error: connectError, isPending } = useConnect();
   const connection = useConnection();
   const { disconnect } = useDisconnect();
   const [e2eState, setE2EState] = useState(() => readE2EWalletState());
@@ -105,14 +129,26 @@ export function useWallet() {
   );
 
   const connectWallet = useCallback((walletId: WalletId) => {
+    pushWalletUiEvent({ type: 'connectWallet', walletId, ts: Date.now() });
+
     if (isE2EMode) {
       writeE2EWalletState({ connected: true });
       return;
     }
 
     const connector = resolveWalletConnector(walletId, connectors);
-    if (!connector) return;
+    if (!connector) {
+      pushWalletUiEvent({ type: 'connectWallet:no-connector', walletId, ts: Date.now() });
+      return;
+    }
 
+    pushWalletUiEvent({
+      type: 'connectWallet:connector',
+      walletId,
+      connectorId: connector.id,
+      connectorName: connector.name,
+      ts: Date.now(),
+    });
     connect({ connector });
   }, [connectors, connect]);
 
@@ -136,6 +172,56 @@ export function useWallet() {
   const shortAddress = resolvedAddress
     ? `${resolvedAddress.slice(0, 6)}...${resolvedAddress.slice(-4)}`
     : null;
+
+  useEffect(() => {
+    if (!walletHarnessEnabled || typeof window === 'undefined') {
+      return;
+    }
+
+    (window as typeof window & { __ELIOS_WALLET_STATE__?: unknown }).__ELIOS_WALLET_STATE__ = {
+      address: resolvedAddress,
+      availableConnectors: connectors.map((connector) => ({
+        id: connector.id,
+        name: connector.name,
+        type: connector.type,
+      })),
+      connectionAddress: connection.address,
+      connectorId: connection.connector?.id,
+      connectError: connectError?.message ?? null,
+      isConnected: resolvedConnected,
+      isConnecting: isE2EMode ? false : connection.isConnecting || isPending,
+      installedWalletIds,
+    };
+  }, [
+    connection.address,
+    connection.connector?.id,
+    connection.isConnecting,
+    connectError?.message,
+    connectors,
+    installedWalletIds,
+    isPending,
+    resolvedAddress,
+    resolvedConnected,
+  ]);
+
+  useEffect(() => {
+    if (!walletHarnessEnabled || typeof window === 'undefined') {
+      return;
+    }
+
+    const browserWindow = window as typeof window & {
+      __ELIOS_CONNECT_WALLET__?: (walletId: WalletId) => void;
+      __ELIOS_DISCONNECT_WALLET__?: () => void;
+    };
+
+    browserWindow.__ELIOS_CONNECT_WALLET__ = connectWallet;
+    browserWindow.__ELIOS_DISCONNECT_WALLET__ = disconnectWallet;
+
+    return () => {
+      delete browserWindow.__ELIOS_CONNECT_WALLET__;
+      delete browserWindow.__ELIOS_DISCONNECT_WALLET__;
+    };
+  }, [connectWallet, disconnectWallet]);
 
   return {
     address: resolvedAddress,
