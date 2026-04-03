@@ -45,9 +45,50 @@ describe('getConnectedInjectedProvider', () => {
 });
 
 describe('signWithInjectedProvider', () => {
-  it('uses eth_sign for phantom', async () => {
+  it('uses Phantom signMessage for SIWE payloads', async () => {
     const request = vi.fn(async ({ method }: { method: string }) => {
-      if (method === 'eth_sign') {
+      if (method === 'signMessage') {
+        return 'phantom-signature';
+      }
+
+      return ['0x00000000000000000000000000000000000000AA'];
+    });
+
+    const signature = await signWithInjectedProvider({
+      isMetaMask: true,
+      isPhantom: true,
+      request,
+    }, '0x00000000000000000000000000000000000000AA', `example.com wants you to sign in with your Ethereum account:
+0x00000000000000000000000000000000000000AA
+
+Sign in to EliosBase
+URI: http://127.0.0.1:34118
+Version: 1
+Chain ID: 8453
+Nonce: abc123
+Issued At: 2026-04-03T00:00:00.000Z`);
+
+    expect(signature).toBe('phantom-signature');
+    expect(request).toHaveBeenCalledWith({
+      method: 'signMessage',
+      params: {
+        display: 'utf8',
+        message: new TextEncoder().encode(`example.com wants you to sign in with your Ethereum account:
+0x00000000000000000000000000000000000000AA
+
+Sign in to EliosBase
+URI: http://127.0.0.1:34118
+Version: 1
+Chain ID: 8453
+Nonce: abc123
+Issued At: 2026-04-03T00:00:00.000Z`),
+      },
+    });
+  });
+
+  it('falls back to personal_sign for non-SIWE phantom payloads', async () => {
+    const request = vi.fn(async ({ method }: { method: string }) => {
+      if (method === 'personal_sign') {
         return 'phantom-signature';
       }
 
@@ -62,8 +103,8 @@ describe('signWithInjectedProvider', () => {
 
     expect(signature).toBe('phantom-signature');
     expect(request).toHaveBeenCalledWith({
-      method: 'eth_sign',
-      params: ['0x00000000000000000000000000000000000000AA', 'hello'],
+      method: 'personal_sign',
+      params: ['0x68656c6c6f', '0x00000000000000000000000000000000000000AA'],
     });
   });
 

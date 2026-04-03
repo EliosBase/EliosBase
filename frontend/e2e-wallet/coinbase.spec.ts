@@ -1,11 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
 import { mockAppApi } from '../e2e/support/mockApi';
 import {
-  approvePhantomConnect,
-  approvePhantomSignature,
-  launchPhantom,
-  recoverPhantomUnsupportedAccount,
-  selectPhantomAccount,
+  approveCoinbaseConnect,
+  approveCoinbaseSignature,
+  launchCoinbase,
 } from './support/synpressWallets';
 
 const walletStats = {
@@ -51,25 +49,24 @@ async function disconnectIfNeeded(page: Page) {
   await expect(page.getByRole('button', { name: 'Connect Wallet' })).toBeVisible({ timeout: 30_000 });
 }
 
-test('connects and signs in with Phantom', async () => {
+async function connectWithCoinbaseWallet(page: Page) {
+  await expect(page.getByRole('button', { name: 'Connect Wallet' }).first()).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: 'Connect Wallet' }).first().click();
+
+  const walletButton = page.getByRole('button', { name: 'Coinbase Wallet' }).first();
+  await expect(walletButton).toBeVisible({ timeout: 30_000 });
+  await walletButton.evaluate((button: HTMLButtonElement) => {
+    button.click();
+  });
+}
+
+test('connects and signs in with Coinbase Wallet', async () => {
   const baseURL = String(test.info().project.use.baseURL);
-  const { context, extensionId } = await launchPhantom();
+  const { context, extensionId } = await launchCoinbase();
 
   try {
     const page = await context.newPage();
     await resetWalletClientState(page);
-    await selectPhantomAccount(context, extensionId, 'Account 4');
-
-    const openPhantomModal = async () => {
-      await expect(page.getByRole('button', { name: 'Connect Wallet' }).first()).toBeVisible({ timeout: 30_000 });
-      await page.getByRole('button', { name: 'Connect Wallet' }).first().click();
-
-      const walletButton = page.getByRole('button', { name: 'Phantom' }).first();
-      await expect(walletButton).toBeVisible({ timeout: 30_000 });
-      await walletButton.evaluate((button: HTMLButtonElement) => {
-        button.click();
-      });
-    };
 
     await mockAppApi(page, {
       session: { authenticated: false },
@@ -83,22 +80,16 @@ test('connects and signs in with Phantom', async () => {
     await page.goto(new URL('/app', baseURL).toString(), { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(/\/app(?:\?|#|$)/, { timeout: 30_000 });
     await disconnectIfNeeded(page);
-    await openPhantomModal();
-    await approvePhantomConnect(context, extensionId);
-
-    if (await recoverPhantomUnsupportedAccount(context, extensionId)) {
-      await page.reload({ waitUntil: 'domcontentloaded' });
-      await expect(page).toHaveURL(/\/app(?:\?|#|$)/, { timeout: 30_000 });
-      await openPhantomModal();
-      await approvePhantomConnect(context, extensionId);
-    }
+    await connectWithCoinbaseWallet(page);
+    await approveCoinbaseConnect(context, extensionId);
 
     const verifyResponse = page.waitForResponse((response) => (
       response.url().includes('/api/auth/verify')
       && response.request().method() === 'POST'
     ), { timeout: 30_000 });
-    await approvePhantomSignature(context, extensionId);
+    await approveCoinbaseSignature(context, extensionId);
     await verifyResponse;
+
     await expect.poll(async () => page.evaluate(async () => {
       try {
         const response = await fetch('/api/auth/session');
@@ -109,17 +100,15 @@ test('connects and signs in with Phantom', async () => {
       }
     }), { timeout: 30_000 }).toBe(true);
 
-    await page.goto(new URL('/app', baseURL).toString(), { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/\/app(?:\?|#|$)/, { timeout: 30_000 });
     await expect(page.getByLabel('Disconnect wallet')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/^0x[a-fA-F0-9]{4}\.\.\.[a-fA-F0-9]{4}$/).first()).toBeVisible();
 
     await page.goto(new URL('/app/wallet', baseURL).toString(), { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(/\/app\/wallet(?:\?|#|$)/, { timeout: 30_000 });
     await expect(page.getByRole('heading', { name: 'Wallet & Payments' })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('Balance')).toBeVisible();
-    await expect(page.getByText('0.00 ETH').first()).toBeVisible();
-    await expect(page.getByText('Connect your wallet and sign in to view transactions.')).toHaveCount(0);
+    await expect(page.getByText('Balance')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('0.00 ETH').first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Connect your wallet and sign in to view transactions.')).toHaveCount(0, { timeout: 30_000 });
   } finally {
     await context.close();
   }

@@ -11,6 +11,11 @@ import { activeChain } from '@/lib/wagmi';
 import { getConnectedInjectedProvider, signWithInjectedProvider } from '@/lib/siweSignature';
 
 const skipWalletE2EChainSwitch = process.env.NEXT_PUBLIC_WALLET_E2E_SKIP_CHAIN_SWITCH === '1';
+const walletHarnessEnabled = process.env.NODE_ENV !== 'production';
+
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 async function signSiweMessage(
   address: string,
@@ -19,17 +24,36 @@ async function signSiweMessage(
 ) {
   const injectedProvider = await getConnectedInjectedProvider(window, address);
   if (injectedProvider) {
+    if (injectedProvider.isPhantom) {
+      await delay(1_500);
+    }
+
+    if (walletHarnessEnabled) {
+      (window as typeof window & { __ELIOS_SIWE_SIGN_PATH__?: string }).__ELIOS_SIWE_SIGN_PATH__ =
+        injectedProvider.isPhantom
+          ? 'injected:phantom'
+          : injectedProvider.isMetaMask
+            ? 'injected:metamask'
+            : injectedProvider.isCoinbaseWallet
+              ? 'injected:coinbase'
+              : 'injected:unknown';
+    }
+
     const signature = await signWithInjectedProvider(injectedProvider, address, message);
     if (signature) {
       return signature;
     }
   }
 
+  if (walletHarnessEnabled) {
+    (window as typeof window & { __ELIOS_SIWE_SIGN_PATH__?: string }).__ELIOS_SIWE_SIGN_PATH__ = 'wagmi';
+  }
+
   return signMessageAsync({ message });
 }
 
 export function useSiwe() {
-  const { address, isConnected, isReconnecting } = useAccount();
+  const { address, chainId, isConnected, isReconnecting } = useAccount();
   const { disconnect } = useDisconnect();
   const { signMessageAsync } = useSignMessage();
   const { switchChainAsync } = useSwitchChain();
@@ -52,17 +76,15 @@ export function useSiwe() {
     if (!address || isSigningIn) return;
     setIsSigningIn(true);
     try {
-      if (!skipWalletE2EChainSwitch) {
+      if (!skipWalletE2EChainSwitch && chainId !== activeChain.id) {
         await switchChainAsync({ chainId: activeChain.id });
       }
 
       const nonceRes = await fetch('/api/auth/nonce');
       const { nonce } = await nonceRes.json();
       const checksumAddress = getAddress(address);
-      const scheme = window.location.protocol.replace(/:$/, '');
 
       const message = new SiweMessage({
-        scheme,
         domain: window.location.host,
         address: checksumAddress,
         statement: 'Sign in to EliosBase',
@@ -72,8 +94,15 @@ export function useSiwe() {
         nonce,
       });
       const messageStr = message.prepareMessage();
+      if (walletHarnessEnabled && typeof window !== 'undefined') {
+        (window as typeof window & { __ELIOS_SIWE_MESSAGE__?: string }).__ELIOS_SIWE_MESSAGE__ = messageStr;
+      }
 
-      const signature = await signSiweMessage(checksumAddress, messageStr, signMessageAsync);
+      const signature = await signSiweMessage(
+        checksumAddress,
+        messageStr,
+        signMessageAsync,
+      );
 
       const verifyRes = await fetch('/api/auth/verify', {
         method: 'POST',
@@ -99,6 +128,7 @@ export function useSiwe() {
     }
   }, [
     address,
+    chainId,
     isSigningIn,
     queryClient,
     refreshSession,
@@ -120,6 +150,21 @@ export function useSiwe() {
 
   // Auto-logout when wallet address changes (user switched accounts)
   const { session } = useAuthContext();
+  useEffect(() => {
+    if (!walletHarnessEnabled || typeof window === 'undefined') {
+      return;
+    }
+
+    (window as typeof window & { __ELIOS_SIWE_STATE__?: unknown }).__ELIOS_SIWE_STATE__ = {
+      address,
+      isAuthenticated,
+      isConnected,
+      isReconnecting,
+      isSessionLoading,
+      isSigningIn,
+    };
+  }, [address, isAuthenticated, isConnected, isReconnecting, isSessionLoading, isSigningIn]);
+
   useEffect(() => {
     if (
       isAuthenticated &&
