@@ -22,6 +22,7 @@ const chromeUserDataRoot = path.join(
   'Library/Application Support/Google/Chrome',
 );
 const chromeExecutablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const forcedChromeProfile = process.env.PLAYWRIGHT_WALLET_CHROME_PROFILE?.trim() || null;
 const cacheRoot = path.join(process.cwd(), '.cache-synpress', 'wallet-e2e');
 const walletProfileVersion = 'v2';
 const fixturePassword = 'Password123!';
@@ -42,7 +43,7 @@ const metaMaskHomeSelector = 'button[data-testid="app-header-logo"]';
 const metaMaskChromeExtensionId = 'nkbihfbeogaeaoehlefnkodbefgpgknn';
 const phantomChromeExtensionId = 'bfnaelmomeimhlpmgjnjophhpkkoljpa';
 const coinbaseChromeExtensionId = 'hnfanknocfeofbddgcijnmhnfnkdnaad';
-const chromeProfileCandidates = ['Default', 'Profile 2'];
+const chromeProfileCandidates = forcedChromeProfile ? [forcedChromeProfile] : ['Default', 'Profile 2'];
 const copiedChromeExtensionIds = [
   metaMaskChromeExtensionId,
   phantomChromeExtensionId,

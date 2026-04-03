@@ -7,7 +7,8 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 const chromeExecutablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const chromeUserDataRoot = path.join(os.homedir(), 'Library/Application Support/Google/Chrome');
-const profiles = ['Default', 'Profile 2'];
+const forcedProfile = process.env.PLAYWRIGHT_WALLET_CHROME_PROFILE?.trim() || null;
+const profiles = forcedProfile ? [forcedProfile] : ['Default', 'Profile 2'];
 const wallets = [
   { name: 'MetaMask', extensionId: 'nkbihfbeogaeaoehlefnkodbefgpgknn' },
   { name: 'Phantom', extensionId: 'bfnaelmomeimhlpmgjnjophhpkkoljpa' },
@@ -89,6 +90,10 @@ if (await isChromeRunning()) {
   warn('Google Chrome is running. Close it before wallet E2E copies a profile.');
 } else {
   ok('Google Chrome is closed');
+}
+
+if (forcedProfile) {
+  ok(`doctor pinned to Chrome profile ${forcedProfile}`);
 }
 
 for (const profileName of profiles) {
