@@ -89,6 +89,15 @@ jobs:
         if: steps.scope.outputs.needs_preview == 'true'
         run: npm ci
 
+      - name: Checkout PR source for fallback preview deploy
+        if: steps.scope.outputs.needs_preview == 'true' && github.event_name == 'pull_request_target'
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: preview-source
+          submodules: recursive
+          persist-credentials: false
+
       - name: Resolve preview deployment
         id: preview
         if: steps.scope.outputs.needs_preview == 'true'
@@ -120,7 +129,7 @@ jobs:
             const sha = process.env.PR_HEAD_SHA;
             const ref = process.env.PR_HEAD_REF;
 
-            for (let attempt = 1; attempt <= 30; attempt += 1) {
+            for (let attempt = 1; attempt <= 5; attempt += 1) {
               const res = await fetch(endpoint, { headers });
               if (!res.ok) {
                 throw new Error(`Failed to list Vercel deployments (${res.status})`);
@@ -158,24 +167,65 @@ jobs:
               const currentState = exactDeployment?.readyState || exactDeployment?.state;
               console.log(
                 currentState
-                  ? `Attempt ${attempt}/30: preview for ${ref}@${sha} is ${currentState}`
-                  : `Attempt ${attempt}/30: waiting for preview deployment for ${ref}@${sha}`,
+                  ? `Attempt ${attempt}/5: preview for ${ref}@${sha} is ${currentState}`
+                  : `Attempt ${attempt}/5: waiting for preview deployment for ${ref}@${sha}`,
               );
 
               await new Promise((resolve) => setTimeout(resolve, 20000));
             }
 
-            throw new Error(`Timed out waiting for preview deployment for ${ref}@${sha}`);
+            fs.appendFileSync(output, 'needs_manual_deploy=true\n');
+            console.log(`No matching preview deployment found for ${ref}@${sha}. Falling back to a manual Vercel preview deploy.`);
+            process.exit(0);
           })().catch((error) => {
             console.error(error.stack || String(error));
             process.exit(1);
           });
           NODE
 
+      - name: Create fallback preview deployment
+        id: manual_preview
+        if: steps.scope.outputs.needs_preview == 'true' && steps.preview.outputs.base_url == '' && steps.preview.outputs.needs_manual_deploy == 'true'
+        working-directory: preview-source/frontend
+        env:
+          VERCEL_ORG_ID: ${{ vars.VERCEL_TEAM_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+
+          npx vercel pull --yes --environment=preview --token "$VERCEL_TOKEN"
+
+          deploy_output=$(
+            npx vercel deploy \
+              --yes \
+              --archive=tgz \
+              --token "$VERCEL_TOKEN" \
+              --meta githubCommitRef="$PR_HEAD_REF" \
+              --meta gitCommitRef="$PR_HEAD_REF" \
+              --meta githubCommitSha="$PR_HEAD_SHA" \
+              --meta gitCommitSha="$PR_HEAD_SHA" \
+              2>&1 | tee /tmp/vercel-preview-deploy.log
+          )
+
+          base_url=$(printf '%s\n' "$deploy_output" | grep -Eo '(https://)?[^[:space:]]+\.vercel\.app' | tail -n1)
+          if [ -z "$base_url" ]; then
+            echo "::error::Failed to parse preview deployment URL from Vercel CLI output"
+            cat /tmp/vercel-preview-deploy.log
+            exit 1
+          fi
+
+          case "$base_url" in
+            https://*) ;;
+            *) base_url="https://$base_url" ;;
+          esac
+
+          echo "base_url=$base_url" >> "$GITHUB_OUTPUT"
+          echo "Created fallback preview deployment: $base_url"
+
       - name: Wait for preview readiness
         if: steps.scope.outputs.needs_preview == 'true'
         env:
-          BASE_URL: ${{ steps.preview.outputs.base_url }}
+          BASE_URL: ${{ steps.preview.outputs.base_url || steps.manual_preview.outputs.base_url }}
         run: |
           set -eu
           cookie_jar=/tmp/preview-vercel-cookies.txt
@@ -209,7 +259,7 @@ jobs:
       - name: Run preview smoke checks
         if: steps.scope.outputs.needs_preview == 'true'
         env:
-          SMOKE_BASE_URL: ${{ steps.preview.outputs.base_url }}
+          SMOKE_BASE_URL: ${{ steps.preview.outputs.base_url || steps.manual_preview.outputs.base_url }}
           SMOKE_TASK_ID: ${{ inputs.task_id }}
           SMOKE_VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
         run: npm run smoke:real
@@ -218,6 +268,6 @@ jobs:
         run: |
           echo "### Preview smoke" >> "$GITHUB_STEP_SUMMARY"
           echo "${{ steps.scope.outputs.summary }}" >> "$GITHUB_STEP_SUMMARY"
-          if [ -n "${{ steps.preview.outputs.base_url }}" ]; then
-            echo "${{ steps.preview.outputs.base_url }}" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${{ steps.preview.outputs.base_url || steps.manual_preview.outputs.base_url }}" ]; then
+            echo "${{ steps.preview.outputs.base_url || steps.manual_preview.outputs.base_url }}" >> "$GITHUB_STEP_SUMMARY"
           fi
