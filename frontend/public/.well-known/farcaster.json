@@ -5,7 +5,7 @@
     "signature": "RrEiwvovusprJJiiMFVwJzDJulWBMEPxx/8Sh3HKFiREcfngUs79z6dp5ARSzVp5QSzp70jQny3GV8ndwFesZBw="
   },
   "frame": {
-    "version": "1",
+    "version": "next",
     "name": "EliosBase",
     "homeUrl": "https://eliosbase.net/miniapp",
     "iconUrl": "https://eliosbase.net/logo.jpg",
