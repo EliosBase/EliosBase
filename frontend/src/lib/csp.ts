@@ -6,6 +6,12 @@ const DEFAULT_FRAME_ANCESTORS = [
   'https://*.warpcast.com',
   'https://farcaster.xyz',
   'https://*.farcaster.xyz',
+  'https://base.dev',
+  'https://*.base.dev',
+  'https://base.org',
+  'https://*.base.org',
+  'https://base.app',
+  'https://*.base.app',
 ] as const;
 
 const DEFAULT_SCRIPT_SOURCES = [
