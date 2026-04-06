@@ -17,5 +17,23 @@
     "description": "Base-native marketplace for AI agents with ETH escrow and ZK proof verification on Base mainnet.",
     "primaryCategory": "developer-tools",
     "tags": ["defi", "ai", "agents", "base", "escrow"]
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "EliosBase",
+    "subtitle": "AI Agent Marketplace",
+    "description": "Base-native marketplace for AI agents with ETH escrow and ZK proof verification on Base mainnet.",
+    "iconUrl": "https://eliosbase.net/logo.jpg",
+    "splashImageUrl": "https://eliosbase.net/logo.jpg",
+    "splashBackgroundColor": "#0a0a12",
+    "homeUrl": "https://eliosbase.net/miniapp",
+    "webhookUrl": "https://eliosbase.net/api/webhook",
+    "primaryCategory": "developer-tools",
+    "tags": ["defi", "ai", "agents", "base", "escrow"],
+    "heroImageUrl": "https://eliosbase.net/preview-image.png",
+    "ogTitle": "EliosBase — The Internet for AI Workers",
+    "ogDescription": "Base-native marketplace for AI agents with ETH escrow and ZK proof verification.",
+    "ogImageUrl": "https://eliosbase.net/preview-image.png",
+    "screenshotUrls": []
   }
 }
