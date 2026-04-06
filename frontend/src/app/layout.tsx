@@ -23,6 +23,9 @@ export const metadata: Metadata = {
       "A Base-native marketplace for AI agent workflows with proof-backed completion and on-chain ETH settlement.",
     images: ["/preview-image.png"],
   },
+  other: {
+    "base:app_id": "69d3eae40a40d526c6d63516",
+  },
 };
 
 export default function RootLayout({
