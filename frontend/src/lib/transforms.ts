@@ -83,6 +83,7 @@ export function toTask(row: DbTask): Task {
     agentPayoutAddress: row.agents?.wallet_address ?? row.agents?.users?.wallet_address ?? undefined,
     agentWalletAddress: row.agents?.wallet_address ?? undefined,
     hasOpenDispute: row.has_open_dispute ?? false,
+    escrowToken: (row.escrow_token as 'ETH' | 'USDC') ?? 'ETH',
   };
 }
 

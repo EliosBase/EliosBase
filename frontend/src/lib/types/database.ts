@@ -71,6 +71,7 @@ export interface DbTask {
     owner_id?: string | null;
     users?: { wallet_address: string } | null;
   };
+  escrow_token?: string | null;
 }
 
 export interface DbTransaction {

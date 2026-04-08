@@ -160,6 +160,136 @@ export const ESCROW_ABI = [
 
 export const ESCROW_CONTRACT_ADDRESS = (readEnv(process.env.NEXT_PUBLIC_ESCROW_ADDRESS) ?? '0x') as `0x${string}`;
 
+// ─── USDC Escrow Contract ──────────────────────────────────────────
+
+export const USDC_TOKEN_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as `0x${string}`;
+
+export const USDC_TOKEN_ABI = [
+  {
+    type: 'function',
+    name: 'approve',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'allowance',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'balanceOf',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'decimals',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint8' }],
+    stateMutability: 'view',
+  },
+] as const;
+
+export const USDC_ESCROW_ABI = [
+  {
+    type: 'constructor',
+    inputs: [{ name: '_usdc', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'lockFunds',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'agentId', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'amount', type: 'uint256', internalType: 'uint256' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'releaseFunds',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', internalType: 'bytes32' },
+      { name: 'recipient', type: 'address', internalType: 'address' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'refund',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', internalType: 'bytes32' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'getEscrow',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', internalType: 'bytes32' },
+    ],
+    outputs: [
+      { name: 'depositor', type: 'address' },
+      { name: 'agentId', type: 'bytes32' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'lockedAt', type: 'uint256' },
+      { name: 'state', type: 'uint8' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    name: 'FundsLocked',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', indexed: true },
+      { name: 'agentId', type: 'bytes32', indexed: true },
+      { name: 'depositor', type: 'address', indexed: false },
+      { name: 'amount', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'FundsReleased',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', indexed: true },
+      { name: 'recipient', type: 'address', indexed: false },
+      { name: 'amount', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'FundsRefunded',
+    inputs: [
+      { name: 'taskId', type: 'bytes32', indexed: true },
+      { name: 'depositor', type: 'address', indexed: false },
+      { name: 'amount', type: 'uint256', indexed: false },
+    ],
+  },
+  { type: 'error', name: 'NotAuthorized', inputs: [] },
+  { type: 'error', name: 'InvalidAmount', inputs: [] },
+  { type: 'error', name: 'InvalidState', inputs: [] },
+  { type: 'error', name: 'TransferFailed', inputs: [] },
+  { type: 'error', name: 'LockNotExpired', inputs: [] },
+  { type: 'error', name: 'InvalidSplit', inputs: [] },
+] as const;
+
+export const USDC_ESCROW_CONTRACT_ADDRESS = (readEnv(process.env.NEXT_PUBLIC_USDC_ESCROW_ADDRESS) ?? '0x') as `0x${string}`;
+
 // ─── ZK Proof Verifier Contract ────────────────────────────────────
 
 export const VERIFIER_CONTRACT_ADDRESS = (readEnv(process.env.NEXT_PUBLIC_VERIFIER_ADDRESS) ?? '0x') as `0x${string}`;

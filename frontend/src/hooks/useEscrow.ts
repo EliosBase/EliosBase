@@ -2,8 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useReadContract, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
-import { parseEther, stringToHex } from 'viem';
-import { ESCROW_ABI, ESCROW_CONTRACT_ADDRESS } from '@/lib/contracts';
+import { parseEther, parseUnits, stringToHex } from 'viem';
+import {
+  ESCROW_ABI,
+  ESCROW_CONTRACT_ADDRESS,
+  USDC_ESCROW_ABI,
+  USDC_ESCROW_CONTRACT_ADDRESS,
+  USDC_TOKEN_ABI,
+  USDC_TOKEN_ADDRESS,
+} from '@/lib/contracts';
 import { parseRewardAmount } from '@/lib/audit';
 import { isE2EMode, readE2EWalletState } from '@/lib/e2e';
 
@@ -205,6 +212,177 @@ export function useEscrowStatus(taskId: string) {
 
   const data = contract.data as readonly [`0x${string}`, `0x${string}`, bigint, number] | undefined;
   const [depositor = '0x0000000000000000000000000000000000000000', , amount = 0n, stateValue = 0] = data ?? [];
+
+  return {
+    amount,
+    depositor,
+    isLoading: contract.isLoading,
+    state: escrowStates[stateValue] ?? 'None',
+  };
+}
+
+// ─── USDC Escrow Hooks ─────────────────────────────────────────────
+
+/**
+ * Hook for approving USDC spending and locking in USDC escrow.
+ * Two-step: approve → lockFunds.
+ */
+export function useUSDCEscrowLock() {
+  const e2eTx = useE2ETransaction();
+  const { writeContract: writeApprove, data: approveTxHash, isPending: isApproving, error: approveError, reset: resetApprove } = useWriteContract();
+  const { writeContract: writeLock, data: lockTxHash, isPending: isLocking, error: lockError, reset: resetLock } = useWriteContract();
+
+  const { isSuccess: approveConfirmed } = useWaitForTransactionReceipt({ hash: approveTxHash });
+  const { isLoading: isMining, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: lockTxHash });
+
+  const [step, setStep] = useState<'idle' | 'approving' | 'locking'>('idle');
+  const pendingLock = useRef<{ taskId: string; agentId: string; amount: bigint } | null>(null);
+
+  // After approve confirms, automatically lock
+  useEffect(() => {
+    if (approveConfirmed && step === 'approving' && pendingLock.current) {
+      setStep('locking');
+      const { taskId, agentId, amount } = pendingLock.current;
+      writeLock({
+        address: USDC_ESCROW_CONTRACT_ADDRESS,
+        abi: USDC_ESCROW_ABI,
+        functionName: 'lockFunds',
+        args: [toBytes32(taskId), toBytes32(agentId), amount],
+      });
+    }
+  }, [approveConfirmed, step, writeLock]);
+
+  function lock(taskId: string, agentId: string, amountStr: string) {
+    const numericAmount = parseRewardAmount(amountStr);
+    if (numericAmount <= 0) return;
+
+    // USDC has 6 decimals
+    const usdcAmount = parseUnits(numericAmount.toString(), 6);
+
+    if (isE2EMode) {
+      e2eTx.start();
+      return;
+    }
+
+    pendingLock.current = { taskId, agentId, amount: usdcAmount };
+    setStep('approving');
+
+    // Step 1: Approve USDC spending
+    writeApprove({
+      address: USDC_TOKEN_ADDRESS,
+      abi: USDC_TOKEN_ABI,
+      functionName: 'approve',
+      args: [USDC_ESCROW_CONTRACT_ADDRESS, usdcAmount],
+    });
+  }
+
+  function reset() {
+    setStep('idle');
+    pendingLock.current = null;
+    resetApprove();
+    resetLock();
+    if (isE2EMode) e2eTx.reset();
+  }
+
+  const isSigning = isE2EMode ? e2eTx.isSigning : (isApproving || isLocking);
+
+  return {
+    lock,
+    txHash: isE2EMode ? e2eTx.txHash : lockTxHash,
+    isSigning,
+    isMining: isE2EMode ? e2eTx.isMining : isMining,
+    isConfirmed: isE2EMode ? e2eTx.isConfirmed : isConfirmed,
+    error: isE2EMode ? e2eTx.error : (approveError || lockError),
+    reset,
+    step,
+  };
+}
+
+/**
+ * Hook for releasing USDC escrowed funds.
+ */
+export function useUSDCEscrowRelease() {
+  const e2eTx = useE2ETransaction();
+  const { writeContract, data: txHash, isPending: isSigning, error: writeError, reset } = useWriteContract();
+  const { isLoading: isMining, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
+
+  function release(taskId: string, recipient: `0x${string}`) {
+    if (isE2EMode) { e2eTx.start(); return; }
+    writeContract({
+      address: USDC_ESCROW_CONTRACT_ADDRESS,
+      abi: USDC_ESCROW_ABI,
+      functionName: 'releaseFunds',
+      args: [toBytes32(taskId), recipient],
+    });
+  }
+
+  return {
+    release,
+    txHash: isE2EMode ? e2eTx.txHash : txHash,
+    isSigning: isE2EMode ? e2eTx.isSigning : isSigning,
+    isMining: isE2EMode ? e2eTx.isMining : isMining,
+    isConfirmed: isE2EMode ? e2eTx.isConfirmed : isConfirmed,
+    error: isE2EMode ? e2eTx.error : writeError,
+    reset: isE2EMode ? e2eTx.reset : reset,
+  };
+}
+
+/**
+ * Hook for refunding USDC escrowed funds.
+ */
+export function useUSDCEscrowRefund() {
+  const e2eTx = useE2ETransaction();
+  const { writeContract, data: txHash, isPending: isSigning, error: writeError, reset } = useWriteContract();
+  const { isLoading: isMining, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
+
+  function refundFunds(taskId: string) {
+    if (isE2EMode) { e2eTx.start(); return; }
+    writeContract({
+      address: USDC_ESCROW_CONTRACT_ADDRESS,
+      abi: USDC_ESCROW_ABI,
+      functionName: 'refund',
+      args: [toBytes32(taskId)],
+    });
+  }
+
+  return {
+    refundFunds,
+    txHash: isE2EMode ? e2eTx.txHash : txHash,
+    isSigning: isE2EMode ? e2eTx.isSigning : isSigning,
+    isMining: isE2EMode ? e2eTx.isMining : isMining,
+    isConfirmed: isE2EMode ? e2eTx.isConfirmed : isConfirmed,
+    error: isE2EMode ? e2eTx.error : writeError,
+    reset: isE2EMode ? e2eTx.reset : reset,
+  };
+}
+
+/**
+ * Hook to read USDC escrow status for a task.
+ */
+export function useUSDCEscrowStatus(taskId: string) {
+  const taskIdBytes = toBytes32(taskId);
+  const e2eWallet = readE2EWalletState();
+  const contract = useReadContract({
+    address: USDC_ESCROW_CONTRACT_ADDRESS,
+    abi: USDC_ESCROW_ABI,
+    functionName: 'getEscrow',
+    args: [taskIdBytes],
+    query: {
+      enabled: !isE2EMode && USDC_ESCROW_CONTRACT_ADDRESS !== '0x',
+    },
+  });
+
+  if (isE2EMode) {
+    return {
+      amount: 0n,
+      depositor: e2eWallet.address as `0x${string}`,
+      state: (e2eWallet.connected ? 'Locked' : 'None') as EscrowState,
+      isLoading: false,
+    };
+  }
+
+  const data = contract.data as readonly [`0x${string}`, `0x${string}`, bigint, bigint, number] | undefined;
+  const [depositor = '0x0000000000000000000000000000000000000000', , amount = 0n, , stateValue = 0] = data ?? [];
 
   return {
     amount,

@@ -6,7 +6,7 @@
 
 ## Tier 1 — High Impact, Ship First
 
-- [ ] **1. USDC Escrow** — Add USDC as second escrow option to eliminate price volatility
+- [x] **1. USDC Escrow** — Add USDC as second escrow option to eliminate price volatility
 - [ ] **2. x402 Protocol** — HTTP-native USDC payments for agent API calls and pay-per-task endpoints
 - [x] **3. Basenames** — Replace hex addresses with `.base.eth` names across UI
 - [x] **4. Coinbase Paymaster** — Sponsor gas for non-payment interactions ($15K free credit)
