@@ -11,6 +11,7 @@ import { isE2EMode, writeE2EWalletState } from '@/lib/e2e';
 import { isAppKitEnabled } from '@/lib/wagmi';
 import FarcasterSignInButton from './FarcasterSignInButton';
 import BasenameDisplay from './BasenameDisplay';
+import { useGasSponsored } from '@/hooks/useGasSponsoredWrite';
 import type { WalletId } from '@/lib/wallets';
 
 interface DashboardHeaderProps {
@@ -48,6 +49,7 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
   } = useWallet();
   const { signOut } = useSiweContext();
   const { session } = useAuthContext();
+  const isGasSponsored = useGasSponsored();
   const mounted = useMounted();
   const forceConnectorE2E = process.env.NEXT_PUBLIC_WALLET_E2E_FORCE_CONNECTORS === '1';
   const [isWalletMenuOpen, setIsWalletMenuOpen] = useState(false);
@@ -120,8 +122,13 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
       ) : process.env.NEXT_PUBLIC_FC_AUTH_ENABLED === 'true' ? (
         <LinkFarcasterButton />
       ) : null}
-      <span className="inline-flex min-h-11 max-w-full items-center rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/80 font-[family-name:var(--font-mono)]">
+      <span className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/80 font-[family-name:var(--font-mono)]">
         {address ? <BasenameDisplay address={address} /> : shortAddress}
+        {isGasSponsored && (
+          <span className="rounded-md bg-green-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-green-400 border border-green-500/20">
+            Gas Free
+          </span>
+        )}
       </span>
       <button
         onClick={() => signOut()}

@@ -13,9 +13,27 @@ const disableWalletReconnect = process.env.NEXT_PUBLIC_WALLET_E2E_DISABLE_RECONN
 const targetedInjectedConnectorOptions = { shimDisconnect: false } as const;
 const genericInjectedConnectorOptions = { shimDisconnect: !useWalletE2EConnectorMode } as const;
 
+const cdpApiKey = process.env.NEXT_PUBLIC_CDP_API_KEY;
+const paymasterUrl = cdpApiKey
+  ? `https://api.developer.coinbase.com/rpc/v1/base/${cdpApiKey}`
+  : undefined;
+
 const walletConnectors = [
   metaMask(),
-  coinbaseWallet({ appName: 'EliosBase', preference: { options: 'all' } }),
+  coinbaseWallet({
+    appName: 'EliosBase',
+    preference: { options: 'all' },
+    ...(paymasterUrl
+      ? {
+          capabilities: {
+            paymasterService: {
+              [base.id]: { url: paymasterUrl },
+              ...(isTestnet ? { [baseSepolia.id]: { url: paymasterUrl.replace('/base/', '/base-sepolia/') } } : {}),
+            },
+          },
+        }
+      : {}),
+  }),
   injected({ ...targetedInjectedConnectorOptions, target: 'phantom' }),
   injected({ ...targetedInjectedConnectorOptions, target: 'rabby' }),
   injected(genericInjectedConnectorOptions),
