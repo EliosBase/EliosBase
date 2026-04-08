@@ -30,7 +30,8 @@ import type {
 } from '@/lib/types';
 
 const DEFAULT_FACILITATOR_URL = 'https://x402.org/facilitator';
-const DEFAULT_NETWORK = 'eip155:84532' as const;
+const DEFAULT_MAINNET_NETWORK = 'eip155:8453' as const;
+const DEFAULT_TESTNET_NETWORK = 'eip155:84532' as const;
 const DEFAULT_PRICE_USD = '$0.05';
 const DEFAULT_TIMEOUT_SECONDS = 180;
 const EXECUTE_ROUTE_PATTERN = 'POST /api/agents/:id/execute';
@@ -84,8 +85,26 @@ export function getConfiguredX402FacilitatorUrl() {
   return readEnv(process.env.X402_FACILITATOR_URL) ?? DEFAULT_FACILITATOR_URL;
 }
 
+function getDefaultX402Network(): X402Network {
+  const explicitChainId = readEnv(process.env.NEXT_PUBLIC_BASE_CHAIN_ID);
+  if (explicitChainId === '8453') {
+    return DEFAULT_MAINNET_NETWORK;
+  }
+
+  if (explicitChainId === '84532') {
+    return DEFAULT_TESTNET_NETWORK;
+  }
+
+  const explicitChain = readEnv(process.env.NEXT_PUBLIC_CHAIN);
+  if (explicitChain === 'mainnet' || explicitChain === 'base') {
+    return DEFAULT_MAINNET_NETWORK;
+  }
+
+  return DEFAULT_TESTNET_NETWORK;
+}
+
 export function getConfiguredX402Network() {
-  return (readEnv(process.env.X402_NETWORK) ?? DEFAULT_NETWORK) as X402Network;
+  return (readEnv(process.env.X402_NETWORK) ?? getDefaultX402Network()) as X402Network;
 }
 
 export function getConfiguredX402TimeoutSeconds() {
