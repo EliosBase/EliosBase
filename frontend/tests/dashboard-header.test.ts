@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   useMounted: vi.fn(),
   useSiweContext: vi.fn(),
   useAuthContext: vi.fn(),
+  useGasSponsored: vi.fn(),
 }));
 
 const originalEnv = { ...process.env };
@@ -34,6 +35,10 @@ vi.mock('@/providers/AuthProvider', () => ({
   useAuthContext: mocks.useAuthContext,
 }));
 
+vi.mock('@/hooks/useGasSponsoredWrite', () => ({
+  useGasSponsored: mocks.useGasSponsored,
+}));
+
 vi.mock('@/lib/wagmi', () => ({
   isAppKitEnabled: true,
 }));
@@ -55,6 +60,7 @@ describe('DashboardHeader', () => {
     mocks.useMounted.mockReturnValue(true);
     mocks.useSiweContext.mockReturnValue({ signOut: vi.fn() });
     mocks.useAuthContext.mockReturnValue({ session: null, isAuthenticated: false });
+    mocks.useGasSponsored.mockReturnValue(false);
     mocks.useWallet.mockReturnValue({
       isConnected: false,
       isConnecting: false,
@@ -80,6 +86,7 @@ describe('DashboardHeader', () => {
     mocks.useMounted.mockReturnValue(true);
     mocks.useSiweContext.mockReturnValue({ signOut: vi.fn() });
     mocks.useAuthContext.mockReturnValue({ session: null, isAuthenticated: false });
+    mocks.useGasSponsored.mockReturnValue(false);
     mocks.useWallet.mockReturnValue({
       isConnected: false,
       isConnecting: false,
@@ -108,6 +115,7 @@ describe('DashboardHeader', () => {
     mocks.useMounted.mockReturnValue(true);
     mocks.useSiweContext.mockReturnValue({ signOut: vi.fn() });
     mocks.useAuthContext.mockReturnValue({ session: null, isAuthenticated: false });
+    mocks.useGasSponsored.mockReturnValue(false);
     mocks.useWallet.mockReturnValue({
       isConnected: false,
       isConnecting: false,
@@ -136,6 +144,7 @@ describe('DashboardHeader', () => {
     mocks.useMounted.mockReturnValue(false);
     mocks.useSiweContext.mockReturnValue({ signOut: vi.fn() });
     mocks.useAuthContext.mockReturnValue({ session: null, isAuthenticated: false });
+    mocks.useGasSponsored.mockReturnValue(false);
     mocks.useWallet.mockReturnValue({
       isConnected: false,
       isConnecting: true,
@@ -161,6 +170,7 @@ describe('DashboardHeader', () => {
     mocks.useMounted.mockReturnValue(true);
     mocks.useSiweContext.mockReturnValue({ signOut: vi.fn() });
     mocks.useAuthContext.mockReturnValue({ session: null, isAuthenticated: false });
+    mocks.useGasSponsored.mockReturnValue(false);
     mocks.useWallet.mockReturnValue({
       isConnected: false,
       isConnecting: true,
