@@ -3,6 +3,7 @@
 import { type Frog, Button } from 'frog';
 import { createPublicServerClient } from '@/lib/supabase/server';
 import { getConfiguredFramesBaseUrl } from '@/lib/runtimeConfig';
+import { getTaskPath } from '@/lib/web4Links';
 import {
   FrameContainer,
   FrameTitle,
@@ -68,7 +69,7 @@ export function registerTaskFrames(app: Frog) {
       ),
       intents: [
         <Button action={`/task/${taskId}`}>Refresh</Button>,
-        <Button.Link href={`${baseUrl}/app/tasks`}>View on EliosBase</Button.Link>,
+        <Button.Link href={`${baseUrl}${getTaskPath(taskId)}`}>Open Receipt</Button.Link>,
       ],
     });
   });

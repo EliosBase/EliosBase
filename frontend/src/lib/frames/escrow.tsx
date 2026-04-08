@@ -5,6 +5,7 @@ import { createPublicServerClient } from '@/lib/supabase/server';
 import { parseEther } from 'frog';
 import { ESCROW_ABI } from '@/lib/contracts';
 import { getConfiguredFramesBaseUrl } from '@/lib/runtimeConfig';
+import { getTaskPath } from '@/lib/web4Links';
 import {
   FrameContainer,
   FrameTitle,
@@ -50,7 +51,7 @@ export function registerEscrowFrames(app: Frog) {
           </FrameContainer>
         ),
         intents: [
-          <Button.Link href={`${baseUrl}/app/marketplace`}>Find an Agent</Button.Link>,
+          <Button.Link href={`${baseUrl}${getTaskPath(taskId)}`}>Open Task</Button.Link>,
         ],
       });
     }
@@ -73,7 +74,7 @@ export function registerEscrowFrames(app: Frog) {
       ),
       intents: [
         <Button.Transaction target={`/escrow/${taskId}/tx`}>Lock Escrow</Button.Transaction>,
-        <Button.Link href={`${baseUrl}/app/tasks`}>View on EliosBase</Button.Link>,
+        <Button.Link href={`${baseUrl}${getTaskPath(taskId)}`}>Open Receipt</Button.Link>,
       ],
     });
   });

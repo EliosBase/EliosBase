@@ -76,9 +76,14 @@ function loadA(){
 function showA(i){
   var a=agents[i];if(!a)return;var e=document.getElementById('ad');
   var caps='';if(a.capabilities&&a.capabilities.length){caps='<div style="margin-bottom:16px"><span class="sl">Capabilities</span><div class="cs">';for(var j=0;j<a.capabilities.length;j++)caps+='<span class="cp">'+esc(a.capabilities[j])+'</span>';caps+='</div></div>';}
+  var passport='<button style="display:block;width:100%;margin-top:12px;padding:12px;border-radius:14px;background:rgba(34,211,238,0.12);border:1px solid rgba(34,211,238,0.22);color:#a5f3fc;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="openPassport('+i+')">Open Agent Passport</button>';
   var hire=a.status==='online'?'<button class="pb" onclick="hireA('+i+')">Hire Agent — '+esc(a.pricePerTask)+'</button>':a.status==='busy'?'<div style="text-align:center;padding:12px;font-size:13px;color:rgba(234,179,8,0.8)">Currently busy</div>':'<div style="text-align:center;padding:12px;font-size:13px;color:rgba(255,255,255,0.3)">Offline</div>';
-  e.innerHTML='<div class="ah"><div class="ai">🤖</div><div><div class="an">'+esc(a.name)+'</div><div style="display:flex;align-items:center;gap:8px;margin-top:2px"><span class="'+bc(a.status)+'">'+esc(a.status)+'</span>'+(a.type?'<span style="font-size:11px;color:rgba(255,255,255,0.4);text-transform:capitalize">'+esc(a.type)+'</span>':'')+'</div></div></div><p class="dd">'+esc(a.description)+'</p><div class="sg"><div class="sb"><div class="sl">Reputation</div><div class="sv">'+a.reputation+'%</div></div><div class="sb"><div class="sl">Tasks Done</div><div class="sv">'+a.tasksCompleted+'</div></div><div class="sb"><div class="sl">Price</div><div class="sv">'+esc(a.pricePerTask)+'</div></div></div>'+caps+hire;
+  e.innerHTML='<div class="ah"><div class="ai">🤖</div><div><div class="an">'+esc(a.name)+'</div><div style="display:flex;align-items:center;gap:8px;margin-top:2px"><span class="'+bc(a.status)+'">'+esc(a.status)+'</span>'+(a.type?'<span style="font-size:11px;color:rgba(255,255,255,0.4);text-transform:capitalize">'+esc(a.type)+'</span>':'')+'</div></div></div><p class="dd">'+esc(a.description)+'</p><div class="sg"><div class="sb"><div class="sl">Reputation</div><div class="sv">'+a.reputation+'%</div></div><div class="sb"><div class="sl">Tasks Done</div><div class="sv">'+a.tasksCompleted+'</div></div><div class="sb"><div class="sl">Price</div><div class="sv">'+esc(a.pricePerTask)+'</div></div></div>'+caps+hire+passport;
   show('ad');
+}
+function openPassport(i){
+  var a=agents[i];if(!a)return;
+  window.open('/agents/'+a.id,'_blank','noopener,noreferrer');
 }
 var hireTasks=[];
 function hireA(i){
@@ -200,8 +205,13 @@ function showT(i){
   var pf=t.zkProofId?'Verified':t.currentStep==='ZK Verifying'?'Verifying...':'Pending';
   var canDelete=(t.currentStep==='Submitted'||t.currentStep==='Decomposed');
   var delBtn=canDelete?'<button style="display:block;width:100%;margin-top:16px;padding:12px;border-radius:14px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);color:#f87171;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="deleteTask('+i+')">Delete Task</button>':'';
-  e.innerHTML='<h2 style="font-size:20px;font-weight:700;margin-bottom:4px">'+esc(t.title)+'</h2><div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span class="'+bc(t.status)+'">'+esc(t.status)+'</span>'+(t.assignedAgent?'<span style="font-size:11px;color:rgba(255,255,255,0.4)">🤖 '+esc(t.assignedAgent)+'</span>':'')+'</div><p class="dd">'+esc(t.description)+'</p>'+pg+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="sb"><div class="sl">Reward</div><div class="sv">'+esc(t.reward)+'</div></div><div class="sb"><div class="sl">ZK Proof</div><div class="sv">'+pf+'</div></div></div>'+delBtn;
+  var receiptBtn='<button style="display:block;width:100%;margin-top:12px;padding:12px;border-radius:14px;background:rgba(34,211,238,0.12);border:1px solid rgba(34,211,238,0.22);color:#a5f3fc;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit" onclick="openReceipt('+i+')">Open Task Receipt</button>';
+  e.innerHTML='<h2 style="font-size:20px;font-weight:700;margin-bottom:4px">'+esc(t.title)+'</h2><div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span class="'+bc(t.status)+'">'+esc(t.status)+'</span>'+(t.assignedAgent?'<span style="font-size:11px;color:rgba(255,255,255,0.4)">🤖 '+esc(t.assignedAgent)+'</span>':'')+'</div><p class="dd">'+esc(t.description)+'</p>'+pg+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="sb"><div class="sl">Reward</div><div class="sv">'+esc(t.reward)+'</div></div><div class="sb"><div class="sl">ZK Proof</div><div class="sv">'+pf+'</div></div></div>'+receiptBtn+delBtn;
   show('td');
+}
+function openReceipt(i){
+  var t=tasks[i];if(!t)return;
+  window.open('/tasks/'+t.id,'_blank','noopener,noreferrer');
 }
 `;
 

@@ -113,11 +113,31 @@ function isRecord(value) {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-async function checkHtml(path, label) {
+function assertAbsoluteUrl(url, label, expectedPath) {
+  const parsed = new URL(url);
+  assert(parsed.origin === normalizedOrigin, `${label} must use ${normalizedOrigin}`);
+  assert(parsed.pathname === expectedPath, `${label} must resolve to ${expectedPath}`);
+  return parsed;
+}
+
+function assertWarpcastShareUrl(url, label, expectedEmbedUrl) {
+  const parsed = new URL(url);
+  assert(parsed.origin === 'https://warpcast.com', `${label} must use warpcast.com`);
+  assert(parsed.pathname === '/~/compose', `${label} must use /~/compose`);
+  assert(parsed.searchParams.get('embeds[]') === expectedEmbedUrl, `${label} must embed ${expectedEmbedUrl}`);
+  assert(typeof parsed.searchParams.get('text') === 'string' && parsed.searchParams.get('text').trim().length > 0, `${label} must include share text`);
+  return parsed;
+}
+
+async function checkHtml(path, label, requiredSnippets = []) {
   const { res, body } = await request(path);
   assert(res.ok, `${label} returned ${res.status}`);
   assert(typeof body === 'string' && body.includes('<html'), `${label} did not return HTML`);
+  requiredSnippets.forEach((snippet) => {
+    assert(body.includes(snippet), `${label} is missing "${snippet}"`);
+  });
   console.log(`PASS ${label}`);
+  return body;
 }
 
 async function checkJson(path, label, expectedStatus, validate, init = {}) {
@@ -190,17 +210,111 @@ await checkJson('/api/auth/session', 'auth session', 200, (body) => {
   assert(typeof body?.authenticated === 'boolean', 'auth session missing authenticated flag');
 });
 
-await checkJson('/api/agents', 'agents listing', 200, (body) => {
+const agents = await checkJson('/api/agents', 'agents listing', 200, (body) => {
   assert(Array.isArray(body), 'agents listing is not an array');
 });
 
-await checkJson('/api/tasks', 'tasks listing', 200, (body) => {
+const tasks = await checkJson('/api/tasks', 'tasks listing', 200, (body) => {
   assert(Array.isArray(body), 'tasks listing is not an array');
 });
 
 await checkJson('/api/activity', 'activity feed', 200, (body) => {
   assert(Array.isArray(body), 'activity feed is not an array');
 });
+
+const publicAgent = Array.isArray(agents) ? agents[0] : null;
+if (publicAgent?.id) {
+  const agentPath = `/agents/${encodeURIComponent(publicAgent.id)}`;
+  const agentFramePath = `/api/frames/agent/${encodeURIComponent(publicAgent.id)}`;
+  const passport = await checkJson(`/api/agents/${publicAgent.id}/passport`, 'agent passport json', 200, (body) => {
+    assert(body?.identity?.id === publicAgent.id, 'agent passport missing identity.id');
+    assert(typeof body?.pageUrl === 'string', 'agent passport missing pageUrl');
+    assert(typeof body?.frameUrl === 'string', 'agent passport missing frameUrl');
+    assert(typeof body?.warpcastShareUrl === 'string', 'agent passport missing warpcastShareUrl');
+    assert(Array.isArray(body?.activity), 'agent passport missing activity');
+    assert(body?.trust?.reputationBreakdown?.score === body?.trust?.reputationScore, 'agent passport reputation breakdown is inconsistent');
+    assert(typeof body?.wallet?.sessionKeyStatus?.status === 'string', 'agent passport missing session key status');
+  });
+
+  assertAbsoluteUrl(passport.pageUrl, 'agent passport pageUrl', agentPath);
+  assertAbsoluteUrl(passport.frameUrl, 'agent passport frameUrl', agentFramePath);
+  assertWarpcastShareUrl(passport.warpcastShareUrl, 'agent passport warpcastShareUrl', passport.pageUrl);
+
+  await checkHtml(agentPath, 'agent passport page', [
+    'Protocol Links',
+    'Canonical Page',
+    'Frame URL',
+    'Warpcast Share',
+    passport.pageUrl,
+    passport.frameUrl,
+  ]);
+  await checkHtml(agentFramePath, 'agent passport frame', [
+    'fc:frame',
+    'Open Passport',
+    passport.pageUrl,
+  ]);
+}
+
+const publicTask = Array.isArray(tasks) ? tasks[0] : null;
+if (publicTask?.id) {
+  const taskPath = `/tasks/${encodeURIComponent(publicTask.id)}`;
+  const taskFramePath = `/api/frames/task/${encodeURIComponent(publicTask.id)}`;
+  const receipt = await checkJson(`/api/tasks/${publicTask.id}/receipt`, 'task receipt json', 200, (body) => {
+    assert(body?.identity?.id === publicTask.id, 'task receipt missing identity.id');
+    assert(typeof body?.pageUrl === 'string', 'task receipt missing pageUrl');
+    assert(typeof body?.frameUrl === 'string', 'task receipt missing frameUrl');
+    assert(typeof body?.warpcastShareUrl === 'string', 'task receipt missing warpcastShareUrl');
+    assert(Array.isArray(body?.timeline), 'task receipt missing timeline');
+    assert(typeof body?.proof?.proofStatus === 'string', 'task receipt missing proofStatus');
+    assert(typeof body?.escrow?.escrowStatus === 'string', 'task receipt missing escrowStatus');
+  });
+
+  assertAbsoluteUrl(receipt.pageUrl, 'task receipt pageUrl', taskPath);
+  assertAbsoluteUrl(receipt.frameUrl, 'task receipt frameUrl', taskFramePath);
+  assertWarpcastShareUrl(receipt.warpcastShareUrl, 'task receipt warpcastShareUrl', receipt.pageUrl);
+
+  await checkHtml(taskPath, 'task receipt page', [
+    'Protocol Links',
+    'Canonical Page',
+    'Frame URL',
+    'Warpcast Share',
+    receipt.pageUrl,
+    receipt.frameUrl,
+  ]);
+  await checkHtml(taskFramePath, 'task receipt frame', [
+    'fc:frame',
+    'Open Receipt',
+    receipt.pageUrl,
+  ]);
+}
+
+await checkJson('/api/activity?entityType=task&limit=5', 'task graph feed', 200, (body) => {
+  assert(Array.isArray(body), 'task graph feed is not an array');
+  body.forEach((event) => {
+    assert(typeof event?.eventType === 'string', 'task graph feed missing eventType');
+    assert(event?.entityType === 'task', 'task graph feed returned non-task entity');
+    if (event?.entityUrl) {
+      const parsed = new URL(event.entityUrl);
+      assert(parsed.origin === normalizedOrigin, 'task graph feed entityUrl must use preview origin');
+      assert(parsed.pathname.startsWith('/tasks/'), 'task graph feed entityUrl must target a task receipt');
+    }
+  });
+});
+
+if (publicTask?.id) {
+  await checkJson(`/api/activity?entityType=task&entityId=${encodeURIComponent(publicTask.id)}&limit=5`, 'task graph feed by entity id', 200, (body) => {
+    assert(Array.isArray(body), 'task graph feed by entity id is not an array');
+    body.forEach((event) => {
+      assert(event?.entityType === 'task', 'task graph feed by entity id returned non-task entity');
+      assert(event?.entityId === publicTask.id, 'task graph feed by entity id returned the wrong task');
+      if (event?.entityUrl) {
+        const parsed = new URL(event.entityUrl);
+        assert(parsed.origin === normalizedOrigin, 'task graph feed by entity id must use preview origin');
+        assert(parsed.pathname === `/tasks/${encodeURIComponent(publicTask.id)}`, 'task graph feed by entity id must link to the filtered task receipt');
+      }
+    });
+  });
+}
 
 await checkJson('/api/stats', 'dashboard stats', 200, (body) => {
   assert(typeof body?.activeAgents === 'number', 'dashboard stats missing activeAgents');

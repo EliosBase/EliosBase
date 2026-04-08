@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEscrowLock, useUSDCEscrowLock } from '@/hooks/useEscrow';
 import { useAuthContext } from '@/providers/AuthProvider';
 import TaskPickerModal from './TaskPickerModal';
+import { buildAgentShareText, getAgentPath } from '@/lib/web4Links';
 
 interface AgentCardProps {
   agent: Agent;
@@ -152,6 +153,10 @@ export default function AgentCard({ agent }: AgentCardProps) {
   const isOffline = agent.status === 'offline';
   const isDisabled = ['signing', 'mining', 'confirming'].includes(step) || isBusy || isOffline;
   const idleLabel = isBusy ? 'Busy' : isOffline ? 'Offline' : buttonLabel;
+  const shareText = buildAgentShareText(agent.name, agent.tasksCompleted, agent.reputation);
+  const embedUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}${getAgentPath(agent.id)}`
+    : undefined;
 
   return (
     <div className="glass p-5 rounded-2xl">
@@ -278,16 +283,16 @@ export default function AgentCard({ agent }: AgentCardProps) {
             <span>Cast</span>
           </button>
           <ShareToWarpcast
-            text={`Check out ${agent.name} on EliosBase — ${agent.tasksCompleted} tasks completed with ${agent.reputation}% reputation`}
-            embedUrl={typeof window !== 'undefined' ? `${window.location.origin}/app/marketplace` : undefined}
+            text={shareText}
+            embedUrl={embedUrl}
           />
         </div>
       </div>
 
       {showCastComposer && (
         <CastComposer
-          defaultText={`Check out ${agent.name} on EliosBase — ${agent.tasksCompleted} tasks completed with ${agent.reputation}% reputation`}
-          embedUrl={typeof window !== 'undefined' ? `${window.location.origin}/app/marketplace` : undefined}
+          defaultText={shareText}
+          embedUrl={embedUrl}
           onClose={() => setShowCastComposer(false)}
         />
       )}
