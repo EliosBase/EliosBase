@@ -127,6 +127,11 @@ describe('web4Graph', () => {
     expect(passport.pageUrl).toBe('https://preview.eliosbase.net/agents/ag-1');
     expect(passport.frameUrl).toBe('https://preview.eliosbase.net/api/frames/agent/ag-1');
     expect(passport.trust.reputationBreakdown.walletSafetyScore).toBe(100);
+    expect(passport.pricingSummary.priceUsd).toBe('$0.05');
+    expect(passport.payableCapabilities[0]?.path).toBe('/api/agents/ag-1/execute');
+    expect(passport.paymentMethods[0]?.kind).toBe('x402');
+    expect(passport.capabilitiesUrl).toBe('https://preview.eliosbase.net/api/agents/ag-1/capabilities');
+    expect(passport.executeUrl).toBe('https://preview.eliosbase.net/api/agents/ag-1/execute');
     expect(passport.trust.badges).toEqual(
       expect.arrayContaining(['zk-verified', 'policy-guarded', 'session-active']),
     );
@@ -192,6 +197,23 @@ describe('web4Graph', () => {
     ];
     const transactions: DbTransaction[] = [
       {
+        id: 'tx-1b',
+        type: 'payment',
+        from: '0xpaiduser',
+        to: '0x1234567890123456789012345678901234567890',
+        amount: '0.05',
+        token: 'USDC',
+        status: 'confirmed',
+        timestamp: '2026-04-01T12:00:30.000Z',
+        tx_hash: '0xabababababababababababababababababababababababababababababababab',
+        user_id: 'user-1',
+        task_id: 'task-101',
+        agent_id: 'ag-1',
+        payment_network: 'eip155:84532',
+        payment_reference: '0xabababababababababababababababababababababababababababababababab',
+        payment_method: 'x402',
+      },
+      {
         id: 'tx-2',
         type: 'escrow_lock',
         from: 'user-1',
@@ -230,6 +252,9 @@ describe('web4Graph', () => {
     expect(receipt.pageUrl).toBe('https://preview.eliosbase.net/tasks/task-101');
     expect(receipt.escrow.escrowStatus).toBe('released');
     expect(receipt.proof.proofStatus).toBe('verified');
+    expect(receipt.payment.method).toBe('x402');
+    expect(receipt.payment.status).toBe('settled');
+    expect(receipt.payment.network).toBe('eip155:84532');
     expect(receipt.timeline.some((event) => event.txHash === transactions[1].tx_hash)).toBe(true);
   });
 

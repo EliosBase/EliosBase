@@ -25,6 +25,7 @@ export interface DbAgent {
   reputation: number;
   tasks_completed: number;
   price_per_task: string;
+  x402_price_usd?: string | null;
   status: 'online' | 'busy' | 'offline';
   type: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
   owner_id: string | null;
@@ -87,6 +88,11 @@ export interface DbTransaction {
   timestamp: string;
   tx_hash: string;
   user_id: string | null;
+  task_id?: string | null;
+  agent_id?: string | null;
+  payment_network?: string | null;
+  payment_reference?: string | null;
+  payment_method?: string | null;
 }
 
 export interface DbSecurityAlert {

@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS agents (
   reputation INT NOT NULL DEFAULT 0 CHECK (reputation >= 0 AND reputation <= 100),
   tasks_completed INT NOT NULL DEFAULT 0,
   price_per_task TEXT NOT NULL,
+  x402_price_usd TEXT NOT NULL DEFAULT '$0.05',
   status TEXT NOT NULL DEFAULT 'offline' CHECK (status IN ('online', 'busy', 'offline')),
   type TEXT NOT NULL CHECK (type IN ('sentinel', 'analyst', 'executor', 'auditor', 'optimizer')),
   owner_id UUID REFERENCES users(id),
@@ -78,6 +79,11 @@ CREATE TABLE IF NOT EXISTS transactions (
   timestamp TIMESTAMPTZ DEFAULT now(),
   tx_hash TEXT NOT NULL,
   user_id UUID REFERENCES users(id),
+  task_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
+  agent_id TEXT REFERENCES agents(id) ON DELETE SET NULL,
+  payment_network TEXT,
+  payment_reference TEXT,
+  payment_method TEXT,
   block_number BIGINT
 );
 CREATE INDEX IF NOT EXISTS idx_tx_user ON transactions (user_id);

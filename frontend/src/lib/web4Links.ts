@@ -6,6 +6,14 @@ export function getAgentPath(id: string) {
   return `/agents/${encodeURIComponent(id)}`;
 }
 
+export function getAgentCapabilitiesPath(id: string) {
+  return `/api/agents/${encodeURIComponent(id)}/capabilities`;
+}
+
+export function getAgentExecutePath(id: string) {
+  return `/api/agents/${encodeURIComponent(id)}/execute`;
+}
+
 export function getTaskPath(id: string) {
   return `/tasks/${encodeURIComponent(id)}`;
 }

@@ -129,6 +129,31 @@ function assertWarpcastShareUrl(url, label, expectedEmbedUrl) {
   return parsed;
 }
 
+function unique(values) {
+  return [...new Set(values.filter((value) => typeof value === 'string' && value.length > 0))];
+}
+
+async function resolvePayableAgent(agentIds) {
+  for (const candidateId of unique(agentIds)) {
+    const { res, body, contentType } = await request(`/api/agents/${encodeURIComponent(candidateId)}/capabilities`);
+    if (res.status === 404) {
+      continue;
+    }
+
+    assert(res.status === 200, `agent capabilities for ${candidateId} returned ${res.status}`);
+    assert(contentType.includes('application/json'), `agent capabilities for ${candidateId} did not return JSON`);
+    assert(body?.agentId === candidateId, `agent capabilities for ${candidateId} missing agentId`);
+    assert(Array.isArray(body?.paymentMethods) && body.paymentMethods.length > 0, `agent capabilities for ${candidateId} missing paymentMethods`);
+    assert(Array.isArray(body?.payableCapabilities) && body.payableCapabilities.length > 0, `agent capabilities for ${candidateId} missing payableCapabilities`);
+    assert(typeof body?.links?.capabilitiesUrl === 'string', `agent capabilities for ${candidateId} missing capabilitiesUrl`);
+    assert(typeof body?.links?.executeUrl === 'string', `agent capabilities for ${candidateId} missing executeUrl`);
+    console.log(`PASS agent capabilities (${candidateId})`);
+    return { agentId: candidateId, manifest: body };
+  }
+
+  throw new Error('No x402-configured agent found for smoke checks');
+}
+
 async function checkHtml(path, label, requiredSnippets = []) {
   const { res, body } = await request(path);
   assert(res.ok, `${label} returned ${res.status}`);
@@ -230,14 +255,20 @@ if (publicAgent?.id) {
     assert(body?.identity?.id === publicAgent.id, 'agent passport missing identity.id');
     assert(typeof body?.pageUrl === 'string', 'agent passport missing pageUrl');
     assert(typeof body?.frameUrl === 'string', 'agent passport missing frameUrl');
+    assert(typeof body?.capabilitiesUrl === 'string', 'agent passport missing capabilitiesUrl');
+    assert(typeof body?.executeUrl === 'string', 'agent passport missing executeUrl');
     assert(typeof body?.warpcastShareUrl === 'string', 'agent passport missing warpcastShareUrl');
     assert(Array.isArray(body?.activity), 'agent passport missing activity');
+    assert(Array.isArray(body?.payableCapabilities), 'agent passport missing payableCapabilities');
+    assert(Array.isArray(body?.paymentMethods), 'agent passport missing paymentMethods');
     assert(body?.trust?.reputationBreakdown?.score === body?.trust?.reputationScore, 'agent passport reputation breakdown is inconsistent');
     assert(typeof body?.wallet?.sessionKeyStatus?.status === 'string', 'agent passport missing session key status');
   });
 
   assertAbsoluteUrl(passport.pageUrl, 'agent passport pageUrl', agentPath);
   assertAbsoluteUrl(passport.frameUrl, 'agent passport frameUrl', agentFramePath);
+  assertAbsoluteUrl(passport.capabilitiesUrl, 'agent passport capabilitiesUrl', `/api/agents/${encodeURIComponent(publicAgent.id)}/capabilities`);
+  assertAbsoluteUrl(passport.executeUrl, 'agent passport executeUrl', `/api/agents/${encodeURIComponent(publicAgent.id)}/execute`);
   assertWarpcastShareUrl(passport.warpcastShareUrl, 'agent passport warpcastShareUrl', passport.pageUrl);
 
   await checkHtml(agentPath, 'agent passport page', [
@@ -245,8 +276,12 @@ if (publicAgent?.id) {
     'Canonical Page',
     'Frame URL',
     'Warpcast Share',
+    'Capabilities JSON',
+    'Paid Execute',
     passport.pageUrl,
     passport.frameUrl,
+    passport.capabilitiesUrl,
+    passport.executeUrl,
   ]);
   await checkHtml(agentFramePath, 'agent passport frame', [
     'fc:frame',
@@ -254,6 +289,45 @@ if (publicAgent?.id) {
     passport.pageUrl,
   ]);
 }
+
+const payableAgent = await resolvePayableAgent([
+  agentId,
+  publicAgent?.id,
+  ...((Array.isArray(agents) ? agents : []).map((agent) => agent?.id)),
+]);
+assertAbsoluteUrl(
+  payableAgent.manifest.links.capabilitiesUrl,
+  'agent capabilities canonical link',
+  `/api/agents/${encodeURIComponent(payableAgent.agentId)}/capabilities`,
+);
+assertAbsoluteUrl(
+  payableAgent.manifest.links.executeUrl,
+  'agent execute canonical link',
+  `/api/agents/${encodeURIComponent(payableAgent.agentId)}/execute`,
+);
+
+const executePath = `/api/agents/${encodeURIComponent(payableAgent.agentId)}/execute`;
+await checkJson(
+  executePath,
+  'agent execute unpaid challenge',
+  402,
+  (body) => {
+    assert(body?.code === 'payment_required', 'agent execute challenge missing payment_required code');
+    assert(body?.agentId === payableAgent.agentId, 'agent execute challenge missing agentId');
+    assert(Array.isArray(body?.paymentMethods) && body.paymentMethods.length > 0, 'agent execute challenge missing paymentMethods');
+    assert(Array.isArray(body?.payableCapabilities) && body.payableCapabilities.length > 0, 'agent execute challenge missing payableCapabilities');
+    assert(typeof body?.pricingSummary?.network === 'string', 'agent execute challenge missing pricingSummary.network');
+    assert(typeof body?.links?.executeUrl === 'string', 'agent execute challenge missing executeUrl');
+  },
+  {
+    method: 'POST',
+    headers: makeMutationHeaders(),
+    body: JSON.stringify({
+      title: `Preview x402 smoke ${Date.now()}`,
+      description: 'Validate the unpaid x402 challenge path on the canonical execute route.',
+    }),
+  },
+);
 
 const publicTask = Array.isArray(tasks) ? tasks[0] : null;
 if (publicTask?.id) {

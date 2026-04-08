@@ -27,6 +27,9 @@ CI-only smoke secrets are stored in GitHub Actions repository secrets.
 | `SMOKE_TASK_CREATE_BODY` | JSON payload for live task creation smoke | GitHub Actions secrets | Lead dev |
 | `SMOKE_HIRE_BODY` | JSON payload for verified live hire smoke | GitHub Actions secrets | Lead dev |
 | `SMOKE_TX_SYNC_BODY` | JSON payload for live transaction sync smoke | GitHub Actions secrets | Lead dev |
+| `PREVIEW_X402_PRIVATE_KEY` | Preview-only funded wallet for manual x402 paid execution smoke | GitHub Actions secrets | Lead dev |
+| `PREVIEW_X402_AGENT_ID` | Optional payable preview agent override for `preview-live-x402` | GitHub Actions secrets | Lead dev |
+| `PREVIEW_X402_NETWORK` | Optional preview x402 network override | GitHub Actions vars | Lead dev |
 
 ## Preview Rules
 
@@ -34,6 +37,7 @@ CI-only smoke secrets are stored in GitHub Actions repository secrets.
 - On Vercel, store shared preview runtime config in the standard `preview` environment unless a branch needs an explicit override.
 - Do not hard-code `NEXT_PUBLIC_SITE_URL` or `NEXT_PUBLIC_FRAMES_BASE_URL` for preview branches. The app derives preview origins from `NEXT_PUBLIC_VERCEL_BRANCH_URL`.
 - `preview-smoke` uses GitHub repository secrets `VERCEL_TOKEN` and `VERCEL_PROTECTION_BYPASS` to locate and validate the PR preview deployment.
+- `preview-live-x402` uses `PREVIEW_X402_PRIVATE_KEY` and optionally `PREVIEW_X402_AGENT_ID` to run one real paid preview execution before merge.
 
 ## Rotation Procedure
 

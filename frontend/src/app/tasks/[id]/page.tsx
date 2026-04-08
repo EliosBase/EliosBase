@@ -66,6 +66,7 @@ export default async function TaskReceiptPage({ params }: Props) {
           <MetricGrid
             items={[
               { label: 'Reward', value: receipt.economics.reward },
+              { label: 'Payment', value: receipt.payment.status },
               { label: 'Escrow', value: receipt.escrow.escrowStatus },
               { label: 'Proof', value: receipt.proof.proofStatus },
               { label: 'Dispute', value: receipt.resolution.hasOpenDispute ? 'Open' : 'Clear' },
@@ -102,6 +103,19 @@ export default async function TaskReceiptPage({ params }: Props) {
             { label: 'Release Tx', value: receipt.escrow.releaseTxHash ? 'Recorded' : 'Pending', subvalue: receipt.escrow.releaseTxHash },
             { label: 'Refund Tx', value: receipt.escrow.refundTxHash ? 'Recorded' : 'Pending', subvalue: receipt.escrow.refundTxHash },
             { label: 'Proof ID', value: receipt.proof.zkProofId ?? 'Pending', subvalue: receipt.proof.zkVerifyTxHash },
+          ]}
+        />
+      </SectionCard>
+
+      <SectionCard title="Payment Settlement">
+        <MetricGrid
+          items={[
+            { label: 'Method', value: receipt.payment.method },
+            { label: 'Amount', value: receipt.payment.amount ? `${receipt.payment.amount} ${receipt.payment.currency ?? ''}`.trim() : 'n/a' },
+            { label: 'Network', value: receipt.payment.network ?? 'n/a' },
+            { label: 'Status', value: receipt.payment.status },
+            { label: 'Payer', value: receipt.payment.payer ?? 'n/a', subvalue: receipt.payment.txHash },
+            { label: 'Reference', value: receipt.payment.paymentReference ?? 'n/a' },
           ]}
         />
       </SectionCard>
