@@ -5,9 +5,8 @@ import ProofBadge from './ProofBadge';
 import TaskResultModal from './TaskResultModal';
 import { type Task } from '@/lib/types';
 import { TASK_STEPS } from '@/lib/constants';
-import { AlertTriangle, Bot, CheckCircle, Loader2, MessageCircle } from 'lucide-react';
+import { AlertTriangle, Bot, CheckCircle, Loader2 } from 'lucide-react';
 import ShareToWarpcast from './ShareToWarpcast';
-import CastComposer from './CastComposer';
 import { useEscrowRefund, useEscrowRelease, useEscrowStatus } from '@/hooks/useEscrow';
 import { useProofVerification } from '@/hooks/useProofVerification';
 import { useQueryClient } from '@tanstack/react-query';
@@ -39,7 +38,6 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
   const [refundStep, setRefundStep] = useState<EscrowActionStep>('idle');
   const [refundError, setRefundError] = useState('');
   const [showResult, setShowResult] = useState(false);
-  const [showCastComposer, setShowCastComposer] = useState(false);
   const [isDisputeComposerOpen, setIsDisputeComposerOpen] = useState(false);
   const [isSubmittingDispute, setIsSubmittingDispute] = useState(false);
   const [disputeError, setDisputeError] = useState('');
@@ -517,20 +515,10 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
             {task.reward}
           </span>
           {task.status === 'completed' && (
-            <>
-              <button
-                onClick={() => setShowCastComposer(true)}
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-purple-500/15 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-300 transition-colors hover:bg-purple-500/20"
-                title="Cast to Farcaster"
-              >
-                <MessageCircle size={12} />
-                <span>Cast</span>
-              </button>
               <ShareToWarpcast
                 text={`Task completed on EliosBase: "${task.title}" — verified with ZK proof on Base`}
                 embedUrl={typeof window !== 'undefined' ? `${window.location.origin}/app/tasks` : undefined}
               />
-            </>
           )}
         </div>
       </div>
@@ -550,13 +538,6 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
         />
       )}
 
-      {showCastComposer && (
-        <CastComposer
-          defaultText={`Task completed on EliosBase: "${task.title}" — verified with ZK proof on Base`}
-          embedUrl={typeof window !== 'undefined' ? `${window.location.origin}/app/tasks` : undefined}
-          onClose={() => setShowCastComposer(false)}
-        />
-      )}
     </div>
   );
 }
