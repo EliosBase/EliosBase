@@ -3,6 +3,7 @@
 import { type Frog, Button } from 'frog';
 import { createPublicServerClient } from '@/lib/supabase/server';
 import { getConfiguredFramesBaseUrl } from '@/lib/runtimeConfig';
+import { getAgentPath } from '@/lib/web4Links';
 import {
   FrameContainer,
   FrameTitle,
@@ -59,7 +60,7 @@ export function registerAgentFrames(app: Frog) {
       ),
       intents: [
         <Button action={`/agent/${agentId}`}>Refresh</Button>,
-        <Button.Link href={`${baseUrl}/app/marketplace`}>View on EliosBase</Button.Link>,
+        <Button.Link href={`${baseUrl}${getAgentPath(agentId)}`}>Open Passport</Button.Link>,
       ],
     });
   });

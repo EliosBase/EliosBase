@@ -1,28 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createPublicServerClient } from '@/lib/supabase/server';
-import { collapseNoisyActivity } from '@/lib/productionData';
-import { toActivityEvent } from '@/lib/transforms';
-import { parsePagination } from '@/lib/pagination';
+import { NextRequest } from 'next/server';
 import { jsonWithCache, PUBLIC_COLLECTION_CACHE_CONTROL } from '@/lib/httpCache';
+import { getPublicActivityFeed } from '@/lib/web4Graph';
 
 export async function GET(req: NextRequest) {
-  const supabase = createPublicServerClient();
-  const { limit, offset } = parsePagination(req.nextUrl.searchParams);
-  const fetchLimit = Math.min(100, Math.max(limit * 3, offset + limit));
+  const searchParams = req.nextUrl.searchParams;
+  const requestedLimit = Number.parseInt(searchParams.get('limit') ?? '20', 10);
+  const limit = Number.isFinite(requestedLimit) && requestedLimit > 0 ? requestedLimit : 20;
+  const result = await getPublicActivityFeed({
+    limit,
+    cursor: searchParams.get('cursor'),
+    entityType: searchParams.get('entityType') as Parameters<typeof getPublicActivityFeed>[0]['entityType'],
+    entityId: searchParams.get('entityId'),
+    eventType: searchParams.get('eventType'),
+  });
 
-  const { data, error } = await supabase
-    .from('activity_events')
-    .select('*')
-    .order('timestamp', { ascending: false })
-    .limit(fetchLimit);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  const response = jsonWithCache(result.items, PUBLIC_COLLECTION_CACHE_CONTROL);
+  if (result.nextCursor) {
+    response.headers.set('X-Activity-Next-Cursor', result.nextCursor);
   }
 
-  const activity = collapseNoisyActivity(data)
-    .slice(offset, offset + limit)
-    .map(toActivityEvent);
-
-  return jsonWithCache(activity, PUBLIC_COLLECTION_CACHE_CONTROL);
+  return response;
 }

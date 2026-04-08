@@ -7,6 +7,7 @@ import { type Task } from '@/lib/types';
 import { TASK_STEPS } from '@/lib/constants';
 import { AlertTriangle, Bot, CheckCircle, Loader2 } from 'lucide-react';
 import ShareToWarpcast from './ShareToWarpcast';
+import { buildTaskShareText, getTaskPath } from '@/lib/web4Links';
 import { useEscrowRefund, useEscrowRelease, useEscrowStatus } from '@/hooks/useEscrow';
 import { useProofVerification } from '@/hooks/useProofVerification';
 import { useQueryClient } from '@tanstack/react-query';
@@ -516,8 +517,8 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
           </span>
           {task.status === 'completed' && (
               <ShareToWarpcast
-                text={`Task completed on EliosBase: "${task.title}" — verified with ZK proof on Base`}
-                embedUrl={typeof window !== 'undefined' ? `${window.location.origin}/app/tasks` : undefined}
+                text={buildTaskShareText(task.title, proofStatus)}
+                embedUrl={typeof window !== 'undefined' ? `${window.location.origin}${getTaskPath(task.id)}` : undefined}
               />
           )}
         </div>

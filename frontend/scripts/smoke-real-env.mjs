@@ -190,16 +190,47 @@ await checkJson('/api/auth/session', 'auth session', 200, (body) => {
   assert(typeof body?.authenticated === 'boolean', 'auth session missing authenticated flag');
 });
 
-await checkJson('/api/agents', 'agents listing', 200, (body) => {
+const agents = await checkJson('/api/agents', 'agents listing', 200, (body) => {
   assert(Array.isArray(body), 'agents listing is not an array');
 });
 
-await checkJson('/api/tasks', 'tasks listing', 200, (body) => {
+const tasks = await checkJson('/api/tasks', 'tasks listing', 200, (body) => {
   assert(Array.isArray(body), 'tasks listing is not an array');
 });
 
 await checkJson('/api/activity', 'activity feed', 200, (body) => {
   assert(Array.isArray(body), 'activity feed is not an array');
+});
+
+const publicAgent = Array.isArray(agents) ? agents[0] : null;
+if (publicAgent?.id) {
+  await checkHtml(`/agents/${publicAgent.id}`, 'agent passport page');
+  await checkJson(`/api/agents/${publicAgent.id}/passport`, 'agent passport json', 200, (body) => {
+    assert(body?.identity?.id === publicAgent.id, 'agent passport missing identity.id');
+    assert(typeof body?.pageUrl === 'string', 'agent passport missing pageUrl');
+    assert(typeof body?.frameUrl === 'string', 'agent passport missing frameUrl');
+    assert(typeof body?.warpcastShareUrl === 'string', 'agent passport missing warpcastShareUrl');
+    assert(Array.isArray(body?.activity), 'agent passport missing activity');
+  });
+}
+
+const publicTask = Array.isArray(tasks) ? tasks[0] : null;
+if (publicTask?.id) {
+  await checkHtml(`/tasks/${publicTask.id}`, 'task receipt page');
+  await checkJson(`/api/tasks/${publicTask.id}/receipt`, 'task receipt json', 200, (body) => {
+    assert(body?.identity?.id === publicTask.id, 'task receipt missing identity.id');
+    assert(typeof body?.pageUrl === 'string', 'task receipt missing pageUrl');
+    assert(typeof body?.frameUrl === 'string', 'task receipt missing frameUrl');
+    assert(typeof body?.warpcastShareUrl === 'string', 'task receipt missing warpcastShareUrl');
+    assert(Array.isArray(body?.timeline), 'task receipt missing timeline');
+  });
+}
+
+await checkJson('/api/activity?entityType=task&limit=5', 'task graph feed', 200, (body) => {
+  assert(Array.isArray(body), 'task graph feed is not an array');
+  body.forEach((event) => {
+    assert(typeof event?.eventType === 'string', 'task graph feed missing eventType');
+  });
 });
 
 await checkJson('/api/stats', 'dashboard stats', 200, (body) => {

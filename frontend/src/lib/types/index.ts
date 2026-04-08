@@ -137,6 +137,16 @@ export type {
   CastPublishResponse,
 } from './farcaster';
 
+export type {
+  AgentPassport,
+  GraphActivityEvent,
+  GraphEntityType,
+  ReputationBreakdown,
+  SessionKeyStatus,
+  TaskReceipt,
+  WalletPolicySummary,
+} from './web4';
+
 // ─── Database Row Types ──────────────────────────────────────────
 
 export type {
