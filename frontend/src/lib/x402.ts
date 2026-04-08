@@ -86,6 +86,11 @@ export function getConfiguredX402FacilitatorUrl() {
 }
 
 function getDefaultX402Network(): X402Network {
+  const facilitatorUrl = readEnv(process.env.X402_FACILITATOR_URL);
+  if (!facilitatorUrl || facilitatorUrl === DEFAULT_FACILITATOR_URL) {
+    return DEFAULT_TESTNET_NETWORK;
+  }
+
   const explicitChainId = readEnv(process.env.NEXT_PUBLIC_BASE_CHAIN_ID);
   if (explicitChainId === '8453') {
     return DEFAULT_MAINNET_NETWORK;
