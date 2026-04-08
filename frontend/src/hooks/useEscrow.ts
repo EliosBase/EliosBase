@@ -235,14 +235,12 @@ export function useUSDCEscrowLock() {
   const { isSuccess: approveConfirmed } = useWaitForTransactionReceipt({ hash: approveTxHash });
   const { isLoading: isMining, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: lockTxHash });
 
-  const [step, setStep] = useState<'idle' | 'approving' | 'locking'>('idle');
   const pendingLock = useRef<{ taskId: string; agentId: string; amount: bigint } | null>(null);
 
-  // After approve confirms, automatically lock
   useEffect(() => {
-    if (approveConfirmed && step === 'approving' && pendingLock.current) {
-      setStep('locking');
+    if (approveConfirmed && pendingLock.current) {
       const { taskId, agentId, amount } = pendingLock.current;
+      pendingLock.current = null;
       writeLock({
         address: USDC_ESCROW_CONTRACT_ADDRESS,
         abi: USDC_ESCROW_ABI,
@@ -250,7 +248,7 @@ export function useUSDCEscrowLock() {
         args: [toBytes32(taskId), toBytes32(agentId), amount],
       });
     }
-  }, [approveConfirmed, step, writeLock]);
+  }, [approveConfirmed, writeLock]);
 
   function lock(taskId: string, agentId: string, amountStr: string) {
     const numericAmount = parseRewardAmount(amountStr);
@@ -265,9 +263,7 @@ export function useUSDCEscrowLock() {
     }
 
     pendingLock.current = { taskId, agentId, amount: usdcAmount };
-    setStep('approving');
 
-    // Step 1: Approve USDC spending
     writeApprove({
       address: USDC_TOKEN_ADDRESS,
       abi: USDC_TOKEN_ABI,
@@ -277,7 +273,6 @@ export function useUSDCEscrowLock() {
   }
 
   function reset() {
-    setStep('idle');
     pendingLock.current = null;
     resetApprove();
     resetLock();
@@ -285,6 +280,11 @@ export function useUSDCEscrowLock() {
   }
 
   const isSigning = isE2EMode ? e2eTx.isSigning : (isApproving || isLocking);
+  const step = Boolean(lockTxHash) || isLocking || isMining || isConfirmed
+    ? 'locking'
+    : approveConfirmed || Boolean(approveTxHash) || isApproving
+      ? 'approving'
+      : 'idle';
 
   return {
     lock,
