@@ -6,7 +6,7 @@ import { Bot, Star, CheckCircle, Loader2, MessageCircle } from 'lucide-react';
 import ShareToWarpcast from './ShareToWarpcast';
 import CastComposer from './CastComposer';
 import { useQueryClient } from '@tanstack/react-query';
-import { useEscrowLock } from '@/hooks/useEscrow';
+import { useEscrowLock, useUSDCEscrowLock } from '@/hooks/useEscrow';
 import { useAuthContext } from '@/providers/AuthProvider';
 import TaskPickerModal from './TaskPickerModal';
 
@@ -27,11 +27,14 @@ export default function AgentCard({ agent }: AgentCardProps) {
   const [error, setError] = useState('');
   const [showCastComposer, setShowCastComposer] = useState(false);
   const [showTaskPicker, setShowTaskPicker] = useState(false);
+  const [escrowToken, setEscrowToken] = useState<'ETH' | 'USDC'>('ETH');
   const selectedTaskId = useRef<string>('');
   const submittedHash = useRef<`0x${string}` | null>(null);
   const queryClient = useQueryClient();
   const { isAuthenticated, session } = useAuthContext();
-  const { lock, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = useEscrowLock();
+  const ethEscrow = useEscrowLock();
+  const usdcEscrow = useUSDCEscrowLock();
+  const { lock, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = escrowToken === 'USDC' ? usdcEscrow : ethEscrow;
 
   // Track contract interaction state
   useEffect(() => {
@@ -98,7 +101,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
       const res = await fetch(`/api/agents/${agent.id}/hire`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ txHash: hash, taskId: selectedTaskId.current }),
+        body: JSON.stringify({ txHash: hash, taskId: selectedTaskId.current, token: escrowToken }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: '' }));
@@ -208,6 +211,22 @@ export default function AgentCard({ agent }: AgentCardProps) {
           <p className="text-sm font-medium text-white font-[family-name:var(--font-mono)]">
             {agent.pricePerTask}
           </p>
+        </div>
+        <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 p-0.5">
+          <button
+            type="button"
+            onClick={() => setEscrowToken('ETH')}
+            className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors ${escrowToken === 'ETH' ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white/60'}`}
+          >
+            ETH
+          </button>
+          <button
+            type="button"
+            onClick={() => setEscrowToken('USDC')}
+            className={`rounded-md px-2.5 py-1 text-[10px] font-semibold transition-colors ${escrowToken === 'USDC' ? 'bg-blue-500/20 text-blue-300' : 'text-white/40 hover:text-white/60'}`}
+          >
+            USDC
+          </button>
         </div>
         <button
           onClick={step === 'error' ? retryHire : handleHire}
