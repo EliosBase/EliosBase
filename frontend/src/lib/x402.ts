@@ -30,7 +30,8 @@ import type {
 } from '@/lib/types';
 
 const DEFAULT_FACILITATOR_URL = 'https://x402.org/facilitator';
-const DEFAULT_NETWORK = 'eip155:84532' as const;
+const DEFAULT_MAINNET_NETWORK = 'eip155:8453' as const;
+const DEFAULT_TESTNET_NETWORK = 'eip155:84532' as const;
 const DEFAULT_PRICE_USD = '$0.05';
 const DEFAULT_TIMEOUT_SECONDS = 180;
 const EXECUTE_ROUTE_PATTERN = 'POST /api/agents/:id/execute';
@@ -84,8 +85,31 @@ export function getConfiguredX402FacilitatorUrl() {
   return readEnv(process.env.X402_FACILITATOR_URL) ?? DEFAULT_FACILITATOR_URL;
 }
 
+function getDefaultX402Network(): X402Network {
+  const facilitatorUrl = readEnv(process.env.X402_FACILITATOR_URL);
+  if (!facilitatorUrl || facilitatorUrl === DEFAULT_FACILITATOR_URL) {
+    return DEFAULT_TESTNET_NETWORK;
+  }
+
+  const explicitChainId = readEnv(process.env.NEXT_PUBLIC_BASE_CHAIN_ID);
+  if (explicitChainId === '8453') {
+    return DEFAULT_MAINNET_NETWORK;
+  }
+
+  if (explicitChainId === '84532') {
+    return DEFAULT_TESTNET_NETWORK;
+  }
+
+  const explicitChain = readEnv(process.env.NEXT_PUBLIC_CHAIN);
+  if (explicitChain === 'mainnet' || explicitChain === 'base') {
+    return DEFAULT_MAINNET_NETWORK;
+  }
+
+  return DEFAULT_TESTNET_NETWORK;
+}
+
 export function getConfiguredX402Network() {
-  return (readEnv(process.env.X402_NETWORK) ?? DEFAULT_NETWORK) as X402Network;
+  return (readEnv(process.env.X402_NETWORK) ?? getDefaultX402Network()) as X402Network;
 }
 
 export function getConfiguredX402TimeoutSeconds() {
@@ -143,6 +167,14 @@ function extractAgentId(path: string) {
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
+function isMissingColumnError(error: { code?: string; message?: string } | null | undefined, column: string) {
+  const message = error?.message ?? '';
+  return (
+    (error?.code === 'PGRST204' && message.includes(`'${column}' column`))
+    || (error?.code === '42703' && message.includes(column))
+  );
+}
+
 async function selectAgentExecutionPricingRow(agentId: string) {
   const supabase = createServiceClient();
   const { data, error } = await supabase
@@ -151,11 +183,28 @@ async function selectAgentExecutionPricingRow(agentId: string) {
     .eq('id', agentId)
     .single();
 
-  if (error || !data) {
+  if (!error && data) {
+    return data as AgentExecutionPricingRow;
+  }
+
+  if (!isMissingColumnError(error, 'x402_price_usd')) {
     return null;
   }
 
-  return data as AgentExecutionPricingRow;
+  const legacy = await supabase
+    .from('agents')
+    .select('id, name, description, status, type, capabilities, wallet_address, users:owner_id(wallet_address)')
+    .eq('id', agentId)
+    .single();
+
+  if (legacy.error || !legacy.data) {
+    return null;
+  }
+
+  return {
+    ...(legacy.data as Omit<AgentExecutionPricingRow, 'x402_price_usd'>),
+    x402_price_usd: null,
+  };
 }
 
 function resolvePayTo(row: AgentExecutionPricingRow) {

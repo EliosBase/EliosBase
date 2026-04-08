@@ -28,6 +28,7 @@ export interface RunningTaskExecution {
   model: string;
   agentType: string;
   capabilities: string[];
+  payment?: TaskExecutionPayment;
 }
 
 export interface TaskExecutionFailure {
@@ -46,12 +47,25 @@ export interface TaskExecutionFailure {
 export interface FailedTaskExecution {
   status: 'failed';
   failure: TaskExecutionFailure;
+  payment?: TaskExecutionPayment;
 }
 
 export interface SucceededTaskExecution {
   status: 'succeeded';
   completedAt: string;
   result: AgentExecutionResult;
+  payment?: TaskExecutionPayment;
+}
+
+export interface TaskExecutionPayment {
+  method: 'x402';
+  amount: string;
+  currency: 'USDC';
+  network: string;
+  payer: string;
+  status: 'accepted' | 'settled' | 'failed';
+  txHash: string;
+  paymentReference: string;
 }
 
 export type TaskExecutionState =
@@ -98,4 +112,28 @@ export function getExecutionFailure(value: unknown): FailedTaskExecution['failur
   }
 
   return null;
+}
+
+export function getExecutionPayment(value: unknown): TaskExecutionPayment | null {
+  if (!isRecord(value) || !isRecord(value.payment)) {
+    return null;
+  }
+
+  const payment = value.payment;
+  const status = payment.status;
+
+  if (
+    payment.method !== 'x402'
+    || typeof payment.amount !== 'string'
+    || payment.currency !== 'USDC'
+    || typeof payment.network !== 'string'
+    || typeof payment.payer !== 'string'
+    || (status !== 'accepted' && status !== 'settled' && status !== 'failed')
+    || typeof payment.txHash !== 'string'
+    || typeof payment.paymentReference !== 'string'
+  ) {
+    return null;
+  }
+
+  return payment as unknown as TaskExecutionPayment;
 }

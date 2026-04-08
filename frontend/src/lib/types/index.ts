@@ -8,11 +8,13 @@ export type {
   RunningTaskExecution,
   FailedTaskExecution,
   SucceededTaskExecution,
+  TaskExecutionPayment,
   TaskExecutionState,
 } from './agentExecution';
 
 export {
   getExecutionFailure,
+  getExecutionPayment,
   getExecutionResult,
   isAgentExecutionResult,
 } from './agentExecution';
@@ -68,6 +70,7 @@ export interface Task {
   agentOperatorAddress?: string;
   agentPayoutAddress?: string;
   agentWalletAddress?: string;
+  payment?: import('./web4').TaskPaymentReceipt;
   hasOpenDispute?: boolean;
   escrowToken?: 'ETH' | 'USDC';
   easAttestationUid?: string;

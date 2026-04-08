@@ -39,6 +39,7 @@ export interface DbAgent {
   session_key_address?: string | null;
   session_key_expires_at?: string | null;
   session_key_rotated_at?: string | null;
+  users?: { wallet_address?: string | null } | null;
   created_at: string;
 }
 
