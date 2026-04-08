@@ -1,5 +1,6 @@
 import { type Transaction } from '@/lib/types';
 import { ArrowUpRight, ArrowDownLeft, Lock, Unlock, Award } from 'lucide-react';
+import BasenameDisplay from './BasenameDisplay';
 
 const typeConfig = {
   escrow_lock: { icon: Lock, label: 'Escrow Lock', color: 'text-yellow-400' },
@@ -33,8 +34,8 @@ export default function TransactionRow({ tx }: TransactionRowProps) {
 
       <div className="flex-1 min-w-0">
         <p className="text-sm text-white/80 font-[family-name:var(--font-body)]">{label}</p>
-        <p className="break-all text-[11px] text-white/30 font-[family-name:var(--font-mono)]">
-          {tx.from} → {tx.to}
+        <p className="text-[11px] text-white/30 font-[family-name:var(--font-mono)]">
+          <BasenameDisplay address={tx.from} /> → <BasenameDisplay address={tx.to} />
         </p>
       </div>
 

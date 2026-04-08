@@ -6,6 +6,7 @@ import { LayoutDashboard, Store, ListChecks, Wallet, ShieldCheck, X } from 'luci
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useMounted } from '@/hooks/useMounted';
 import { useWallet } from '@/hooks/useWallet';
+import BasenameDisplay from './BasenameDisplay';
 
 const navItems = [
   { href: '/app', label: 'Dashboard', icon: LayoutDashboard },
@@ -21,7 +22,7 @@ interface SidebarProps {
 }
 
 function SidebarWalletStatus() {
-  const { isConnected, shortAddress, walletName } = useWallet();
+  const { isConnected, shortAddress, walletName, address } = useWallet();
   const { isAuthenticated } = useAuthContext();
   const label = walletName ? `${walletName} · Base` : 'Base';
 
@@ -46,7 +47,7 @@ function SidebarWalletStatus() {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs text-white/70 font-[family-name:var(--font-mono)] truncate">
-          {shortAddress}
+          {address ? <BasenameDisplay address={address} /> : shortAddress}
         </p>
         <p className="text-[10px] text-white/40 truncate">{label}</p>
       </div>

@@ -10,6 +10,7 @@ import { useAuthContext } from '@/providers/AuthProvider';
 import { isE2EMode, writeE2EWalletState } from '@/lib/e2e';
 import { isAppKitEnabled } from '@/lib/wagmi';
 import FarcasterSignInButton from './FarcasterSignInButton';
+import BasenameDisplay from './BasenameDisplay';
 import type { WalletId } from '@/lib/wallets';
 
 interface DashboardHeaderProps {
@@ -37,6 +38,7 @@ function pushWalletUiEvent(event: Record<string, unknown>) {
 export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderProps) {
   const appKit = useOptionalAppKit();
   const {
+    address,
     isConnected,
     isConnecting,
     shortAddress,
@@ -119,7 +121,7 @@ export default function DashboardHeader({ title, onMenuClick }: DashboardHeaderP
         <LinkFarcasterButton />
       ) : null}
       <span className="inline-flex min-h-11 max-w-full items-center rounded-xl border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/80 font-[family-name:var(--font-mono)]">
-        {shortAddress}
+        {address ? <BasenameDisplay address={address} /> : shortAddress}
       </span>
       <button
         onClick={() => signOut()}
