@@ -25,7 +25,7 @@ export function registerEscrowFrames(app: Frog) {
 
     const { data: task } = await supabase
       .from('tasks')
-      .select('id, title, reward, assigned_agent_id, assigned_agent_name, status')
+      .select('id, title, reward, assigned_agent, status, agents(name)')
       .eq('id', taskId)
       .single();
 
@@ -41,7 +41,7 @@ export function registerEscrowFrames(app: Frog) {
       });
     }
 
-    if (!task.assigned_agent_id) {
+    if (!task.assigned_agent) {
       return c.res({
         image: (
           <FrameContainer>
@@ -56,6 +56,9 @@ export function registerEscrowFrames(app: Frog) {
       });
     }
 
+    const joinedAgent = (Array.isArray(task.agents) ? task.agents[0] : task.agents) as { name?: string } | null | undefined;
+    const agentName = joinedAgent?.name ?? task.assigned_agent ?? 'Unknown';
+
     return c.res({
       image: (
         <FrameContainer>
@@ -66,7 +69,7 @@ export function registerEscrowFrames(app: Frog) {
           <FrameSubtitle>Lock ETH into the EliosBase escrow contract for this task.</FrameSubtitle>
           <div style={{ display: 'flex', gap: '16px', marginTop: '32px' }}>
             <FrameBadge label="Amount" value={task.reward ?? '—'} color="#22c55e" />
-            <FrameBadge label="Agent" value={task.assigned_agent_name ?? 'Unknown'} />
+            <FrameBadge label="Agent" value={agentName} />
             <FrameBadge label="Status" value={task.status ?? '—'} />
           </div>
           <FrameLogo />
@@ -86,11 +89,11 @@ export function registerEscrowFrames(app: Frog) {
 
     const { data: task } = await supabase
       .from('tasks')
-      .select('id, reward, assigned_agent_id')
+      .select('id, reward, assigned_agent')
       .eq('id', taskId)
       .single();
 
-    if (!task || !task.assigned_agent_id || !escrowAddress) {
+    if (!task || !task.assigned_agent || !escrowAddress) {
       throw new Error('Task, agent, or escrow contract not found');
     }
 
@@ -99,7 +102,7 @@ export function registerEscrowFrames(app: Frog) {
 
     // Convert IDs to bytes32
     const taskIdBytes32 = stringToBytes32(taskId);
-    const agentIdBytes32 = stringToBytes32(task.assigned_agent_id);
+    const agentIdBytes32 = stringToBytes32(task.assigned_agent);
 
     return c.contract({
       abi: ESCROW_ABI,

@@ -133,6 +133,30 @@ describe('web4Graph', () => {
     expect(passport.activity[0]?.entityId).toBe('ag-1');
   });
 
+  it('handles partial wallet policy rows from legacy agents', () => {
+    const passport = buildAgentPassport({
+      agent: makeAgent({
+        walletStandard: 'safe',
+        walletStatus: 'predicted',
+        walletPolicy: {} as Agent['walletPolicy'],
+      }),
+      assignedTasks: [makeTask()],
+      activityRows: [],
+      transactions: [],
+      alerts: [],
+      urls,
+    });
+
+    expect(passport.wallet.walletPolicySummary).toEqual(expect.objectContaining({
+      standard: 'safe',
+      threshold: 'unconfigured',
+      ownerCount: 0,
+      dailySpendLimitEth: '0',
+      timelockSeconds: 0,
+    }));
+    expect(passport.trust.reputationBreakdown.walletSafetyScore).toBe(70);
+  });
+
   it('builds a task receipt with canonical links and timeline events', () => {
     const task = makeTask({ hasOpenDispute: true });
     const agent = makeAgent();

@@ -25,7 +25,7 @@ export function registerTaskFrames(app: Frog) {
 
     const { data: task } = await supabase
       .from('tasks')
-      .select('id, title, description, status, current_step, reward, assigned_agent_name, zk_proof_id')
+      .select('id, title, description, status, current_step, reward, assigned_agent, zk_proof_id, agents(name)')
       .eq('id', taskId)
       .single();
 
@@ -49,6 +49,8 @@ export function registerTaskFrames(app: Frog) {
         : 'Pending';
 
     const proofColor = task.zk_proof_id ? '#22c55e' : task.current_step === 'ZK Verifying' ? '#eab308' : 'rgba(255,255,255,0.5)';
+    const joinedAgent = (Array.isArray(task.agents) ? task.agents[0] : task.agents) as { name?: string } | null | undefined;
+    const agentName = joinedAgent?.name ?? task.assigned_agent ?? 'Unassigned';
 
     return c.res({
       image: (
@@ -61,7 +63,7 @@ export function registerTaskFrames(app: Frog) {
           <FrameProgressBar steps={TASK_STEPS} currentIndex={currentStepIndex} />
           <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
             <FrameBadge label="Reward" value={task.reward ?? '—'} />
-            <FrameBadge label="Agent" value={task.assigned_agent_name ?? 'Unassigned'} />
+            <FrameBadge label="Agent" value={agentName} />
             <FrameBadge label="ZK Proof" value={proofStatus} color={proofColor} />
           </div>
           <FrameLogo />

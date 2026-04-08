@@ -1,4 +1,4 @@
-import { createWalletClient, createPublicClient, http, encodePacked, keccak256, encodeAbiParameters, parseAbiParameters, stringToHex } from 'viem';
+import { createWalletClient, createPublicClient, http, encodeAbiParameters, parseAbiParameters, stringToHex } from 'viem';
 import { base } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { readRequiredEnv } from '@/lib/env';

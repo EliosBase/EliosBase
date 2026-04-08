@@ -77,6 +77,9 @@ const PUBLIC_FETCH_LIMIT = 250;
 const RELATED_FETCH_LIMIT = 400;
 const GRAPH_FEED_DEFAULT_LIMIT = 20;
 const GRAPH_FEED_MAX_LIMIT = 100;
+const UNCONFIGURED_POLICY_VALUE = '0';
+
+type PartialWalletPolicy = Partial<NonNullable<Agent['walletPolicy']>>;
 
 function getUrlContext(): UrlContext {
   const siteUrl = getConfiguredSiteUrl() ?? DEFAULT_SITE_URL;
@@ -87,6 +90,19 @@ function getUrlContext(): UrlContext {
 
 function normalizeKey(value: string | null | undefined) {
   return (value ?? '').trim().toLowerCase();
+}
+
+function getWalletPolicy(agent: Agent): PartialWalletPolicy | null {
+  const policy = agent.walletPolicy;
+  if (!policy || typeof policy !== 'object') {
+    return null;
+  }
+
+  return policy;
+}
+
+function getWalletPolicyOwners(policy: PartialWalletPolicy) {
+  return Array.isArray(policy.owners) ? policy.owners : [];
 }
 
 function parseEthAmount(value: string | null | undefined) {
@@ -193,21 +209,31 @@ function findAgentByHint(index: EntityIndex, hint: string | null | undefined) {
 }
 
 function getWalletPolicySummary(agent: Agent): WalletPolicySummary | null {
-  if (!agent.walletPolicy) {
+  const policy = getWalletPolicy(agent);
+  if (!policy) {
     return null;
   }
 
+  const owners = getWalletPolicyOwners(policy);
+  const ownerCount = owners.length;
+  const threshold = typeof policy.threshold === 'number' && Number.isFinite(policy.threshold)
+    ? policy.threshold
+    : 0;
+  const timelockSeconds = typeof policy.timelockSeconds === 'number' && Number.isFinite(policy.timelockSeconds)
+    ? policy.timelockSeconds
+    : 0;
+
   return {
-    standard: agent.walletPolicy.standard,
-    threshold: `${agent.walletPolicy.threshold}-of-${agent.walletPolicy.owners.length}`,
-    ownerCount: agent.walletPolicy.owners.length,
-    dailySpendLimitEth: agent.walletPolicy.dailySpendLimitEth,
-    autoApproveThresholdEth: agent.walletPolicy.autoApproveThresholdEth,
-    reviewThresholdEth: agent.walletPolicy.reviewThresholdEth,
-    timelockThresholdEth: agent.walletPolicy.timelockThresholdEth,
-    timelockSeconds: agent.walletPolicy.timelockSeconds,
-    blockedDestinationCount: agent.walletPolicy.blockedDestinations.length,
-    allowlistedContractCount: agent.walletPolicy.allowlistedContracts?.length ?? 0,
+    standard: policy.standard ?? agent.walletStandard ?? 'safe',
+    threshold: threshold > 0 && ownerCount > 0 ? `${threshold}-of-${ownerCount}` : 'unconfigured',
+    ownerCount,
+    dailySpendLimitEth: policy.dailySpendLimitEth ?? UNCONFIGURED_POLICY_VALUE,
+    autoApproveThresholdEth: policy.autoApproveThresholdEth ?? UNCONFIGURED_POLICY_VALUE,
+    reviewThresholdEth: policy.reviewThresholdEth ?? UNCONFIGURED_POLICY_VALUE,
+    timelockThresholdEth: policy.timelockThresholdEth ?? UNCONFIGURED_POLICY_VALUE,
+    timelockSeconds,
+    blockedDestinationCount: Array.isArray(policy.blockedDestinations) ? policy.blockedDestinations.length : 0,
+    allowlistedContractCount: Array.isArray(policy.allowlistedContracts) ? policy.allowlistedContracts.length : 0,
   };
 }
 
@@ -248,15 +274,16 @@ function getWalletSafetyScore(agent: Agent, alerts: DbSecurityAlert[]) {
     return 0;
   }
 
-  if (!agent.walletPolicy) {
+  const policy = getWalletPolicy(agent);
+  if (!policy) {
     return 30;
   }
 
   const hasCorePolicyControls = Boolean(
-    agent.walletPolicy.dailySpendLimitEth
-    && agent.walletPolicy.reviewThresholdEth
-    && agent.walletPolicy.timelockThresholdEth
-    && agent.walletPolicy.timelockSeconds > 0,
+    policy.dailySpendLimitEth
+    && policy.reviewThresholdEth
+    && policy.timelockThresholdEth
+    && (policy.timelockSeconds ?? 0) > 0,
   );
   const hasBlockingAlerts = alerts.some((alert) => (
     !alert.resolved
