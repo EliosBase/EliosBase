@@ -156,6 +156,15 @@ cd frontend
 SMOKE_BASE_URL=https://eliosbase.net npm run smoke:real
 ```
 
+Preview x402 paid execution smoke:
+
+```bash
+cd frontend
+SMOKE_BASE_URL=https://preview.example.vercel.app \
+SMOKE_X402_PRIVATE_KEY=0x... \
+npm run smoke:preview:x402
+```
+
 Public launch smoke now expects:
 
 - `/api/health` and `/api/ready` to pass
@@ -164,6 +173,8 @@ Public launch smoke now expects:
 - authenticated security stats to return `auditEntries`
 - cron routes to reject unauthorized requests before accepting signed ones
 - optional authenticated smoke coverage for wallet session state, wallet transfers, task creation, verified hire, and transaction sync when the matching `SMOKE_*` secrets are configured in GitHub Actions
+- preview smoke now also verifies the public x402 capability manifest and the unpaid `402` challenge for one payable preview agent
+- paid preview execution is validated separately through `preview-live-x402`
 
 Contract tests:
 
@@ -180,6 +191,7 @@ CI workflows:
 - `dependency-review`: blocks risky dependency changes in pull requests
 - `preview-smoke`: PR preview smoke checks against the Vercel deployment for the head commit
   It skips cleanly for PRs that do not change `frontend/`.
+- `preview-live-x402`: manual paid execution validation against a preview deployment for the Week 2 x402 surface
 - `main-auto-merge`: enables GitHub auto-merge for labeled PRs into `main`
 - `production-smoke`: post-deploy smoke checks against `https://eliosbase.net`
 - `real-smoke`: manually triggered live smoke run against a supplied URL
@@ -197,6 +209,7 @@ The production web app is the [`frontend/`](frontend) project and is deployed on
 - Production target: [eliosbase.net](https://eliosbase.net)
 - Primary chain target: Base mainnet
 - Release train: feature branch -> preview deployment -> `main`
+- Week 2 paid execution changes require both `preview-smoke` and one manual `preview-live-x402` pass before merge
 - Optional fast path: add the `automerge` label to a PR so GitHub merges it after approval and green checks
 - The repo now uses separate CI, policy, dependency review, preview smoke, and production smoke workflows rather than one overloaded validation job
 
@@ -207,6 +220,8 @@ Operational reference docs:
 - [`ROLLBACK.md`](ROLLBACK.md)
 - [`SECRETS.md`](SECRETS.md)
 - [`runbooks/release-workflow.md`](runbooks/release-workflow.md)
+- [`runbooks/x402-http-api.md`](runbooks/x402-http-api.md)
+- [`runbooks/x402-preview-workflow.md`](runbooks/x402-preview-workflow.md)
 
 ## Security And Operational Model
 

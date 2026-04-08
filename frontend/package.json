@@ -17,6 +17,7 @@
     "e2e:wallet:coinbase": "npx --yes tsx scripts/wallet-e2e-run.ts coinbase",
     "smoke:real": "node scripts/smoke-real-env.mjs",
     "smoke:prod-live": "node scripts/smoke-production-live.mjs",
+    "smoke:preview:x402": "node scripts/smoke-preview-x402.mjs",
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
@@ -41,6 +42,10 @@
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
     "@walletconnect/ethereum-provider": "^2.23.9",
+    "@x402/core": "^2.9.0",
+    "@x402/evm": "^2.9.0",
+    "@x402/fetch": "^2.9.0",
+    "@x402/next": "^2.9.0",
     "bs58": "^6.0.0",
     "clsx": "^2.1.1",
     "ethers": "^6.16.0",

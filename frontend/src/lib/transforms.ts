@@ -38,6 +38,7 @@ export function toAgent(row: DbAgent): Agent {
     reputation: row.reputation,
     tasksCompleted: row.tasks_completed,
     pricePerTask: row.price_per_task,
+    x402PriceUsd: row.x402_price_usd ?? undefined,
     status: row.status,
     type: row.type,
     ownerId: row.owner_id ?? undefined,
@@ -99,6 +100,11 @@ export function toTransaction(row: DbTransaction): Transaction {
     status: row.status,
     timestamp: row.timestamp,
     txHash: row.tx_hash,
+    taskId: row.task_id ?? undefined,
+    agentId: row.agent_id ?? undefined,
+    paymentNetwork: row.payment_network ?? undefined,
+    paymentReference: row.payment_reference ?? undefined,
+    paymentMethod: row.payment_method ?? undefined,
   };
 }
 

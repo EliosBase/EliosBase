@@ -6,6 +6,7 @@ import { getConfiguredFramesBaseUrl, getConfiguredSiteUrl } from '@/lib/runtimeC
 import { getTaskIdFromDisputeSource, buildTaskDisputeSource } from '@/lib/taskDisputes';
 import { toAgent, toTask } from '@/lib/transforms';
 import { normalizeTransactionType } from '@/lib/transactions';
+import { buildAgentExecutionSurface } from '@/lib/x402';
 import {
   buildAbsoluteUrl,
   buildAgentShareText,
@@ -462,6 +463,9 @@ function getActivityEventType(message: string, type: GraphActivityEvent['type'])
   const normalized = message.toLowerCase();
 
   if (type === 'task') {
+    if (normalized.includes('execution started')) return 'execution.started';
+    if (normalized.includes('execution completed')) return 'execution.completed';
+    if (normalized.includes('execution failed')) return 'execution.failed';
     if (normalized.includes('assigned')) return 'task.assigned';
     if (normalized.includes('completed')) return 'task.completed';
     if (normalized.includes('deleted')) return 'task.deleted';
@@ -479,6 +483,8 @@ function getActivityEventType(message: string, type: GraphActivityEvent['type'])
   }
 
   if (type === 'payment') {
+    if (normalized.includes('payment required')) return 'payment.required';
+    if (normalized.includes('x402 payment accepted')) return 'payment.accepted';
     if (normalized.includes('locked')) return 'payment.escrow_locked';
     if (normalized.includes('released')) return 'payment.escrow_released';
     if (normalized.includes('refunded')) return 'payment.escrow_refunded';
@@ -645,7 +651,14 @@ function buildSecurityEvent(alert: DbSecurityAlert, taskId: string | undefined, 
 
 function buildTransactionEvent(row: DbTransaction, taskId: string, urls: UrlContext): GraphActivityEvent {
   const normalizedType = normalizeTransactionType(row);
-  const eventType = normalizedType === 'escrow_lock'
+  const isX402Payment = normalizedType === 'payment' && row.payment_method === 'x402';
+  const eventType = isX402Payment
+    ? row.status === 'confirmed'
+      ? 'payment.accepted'
+      : row.status === 'failed'
+        ? 'payment.failed'
+        : 'payment.pending'
+    : normalizedType === 'escrow_lock'
     ? 'payment.escrow_locked'
     : normalizedType === 'escrow_release'
       ? 'payment.escrow_released'
@@ -653,7 +666,9 @@ function buildTransactionEvent(row: DbTransaction, taskId: string, urls: UrlCont
         ? 'payment.escrow_refunded'
         : `payment.${normalizedType}`;
 
-  const message = normalizedType === 'escrow_lock'
+  const message = isX402Payment
+    ? `X402 payment accepted for task: ${taskId}`
+    : normalizedType === 'escrow_lock'
     ? `Escrow locked on Base: ${row.amount} ${row.token}`
     : normalizedType === 'escrow_release'
       ? `Escrow released on Base: ${row.amount} ${row.token}`
@@ -685,8 +700,13 @@ function pickClosestTransaction(transactions: DbTransaction[], referenceAt: stri
 }
 
 function pickTaskTransactions(task: Task, transactions: DbTransaction[], agent: Agent | null) {
+  const directTaskMatches = transactions.filter((row) => row.task_id === task.id);
+  const directAgentMatches = agent
+    ? transactions.filter((row) => row.agent_id === agent.id)
+    : [];
   const rewardAmount = parseEthAmount(task.reward);
   const agentHints = [
+    normalizeKey(agent?.id),
     normalizeKey(agent?.name),
     normalizeKey(agent?.walletAddress),
     normalizeKey(task.agentWalletAddress),
@@ -703,14 +723,17 @@ function pickTaskTransactions(task: Task, transactions: DbTransaction[], agent: 
   const lockReference = task.submittedAt;
   const completionReference = task.completedAt ?? task.submittedAt;
 
-  const lockCandidates = relatedByHint.filter((row) => normalizeTransactionType(row) === 'escrow_lock');
-  const releaseCandidates = relatedByHint.filter((row) => normalizeTransactionType(row) === 'escrow_release');
-  const refundCandidates = relatedByHint.filter((row) => normalizeTransactionType(row) === 'escrow_refund');
+  const relatedTransactions = [...directTaskMatches, ...directAgentMatches, ...relatedByHint];
+  const lockCandidates = relatedTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_lock');
+  const releaseCandidates = relatedTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_release');
+  const refundCandidates = relatedTransactions.filter((row) => normalizeTransactionType(row) === 'escrow_refund');
+  const paymentCandidates = relatedTransactions.filter((row) => normalizeTransactionType(row) === 'payment');
 
   return {
     lock: pickClosestTransaction(lockCandidates, lockReference),
     release: pickClosestTransaction(releaseCandidates, completionReference),
     refund: pickClosestTransaction(refundCandidates, completionReference),
+    payment: pickClosestTransaction(paymentCandidates, lockReference),
   };
 }
 
@@ -742,7 +765,7 @@ function buildTaskTimeline(params: {
     .map((alert) => buildSecurityEvent(alert, params.task.id, params.urls));
 
   const taskTransactions = pickTaskTransactions(params.task, params.transactions, params.agent);
-  const transactionEvents = [taskTransactions.lock, taskTransactions.release, taskTransactions.refund]
+  const transactionEvents = [taskTransactions.payment, taskTransactions.lock, taskTransactions.release, taskTransactions.refund]
     .filter((row): row is DbTransaction => Boolean(row))
     .map((row) => buildTransactionEvent(row, params.task.id, params.urls));
 
@@ -760,6 +783,14 @@ export function buildAgentPassport(params: {
   urls: UrlContext;
 }): AgentPassport {
   const relatedTransactions = params.transactions.filter((row) => {
+    if (row.agent_id === params.agent.id) {
+      return true;
+    }
+
+    if (row.task_id && params.assignedTasks.some((task) => task.id === row.task_id)) {
+      return true;
+    }
+
     const fromTo = `${row.from} ${row.to}`.toLowerCase();
     const agentKeys = [
       normalizeKey(params.agent.name),
@@ -804,6 +835,15 @@ export function buildAgentPassport(params: {
     getSessionStatus(params.agent).status === 'active' ? 'session-active' : null,
     metrics.disputedTasks.length === 0 && params.assignedTasks.length > 0 ? 'dispute-free' : null,
   ].filter((value): value is string => Boolean(value));
+  const paymentSurface = buildAgentExecutionSurface({
+    agentId: params.agent.id,
+    agentName: params.agent.name,
+    description: params.agent.description,
+    priceUsd: params.agent.x402PriceUsd,
+    payTo: params.agent.walletAddress,
+    siteUrl: params.urls.siteUrl,
+    framesBaseUrl: params.urls.framesBaseUrl,
+  });
 
   return {
     identity: {
@@ -833,8 +873,13 @@ export function buildAgentPassport(params: {
       walletPolicySummary: getWalletPolicySummary(params.agent),
       sessionKeyStatus: getSessionStatus(params.agent),
     },
+    pricingSummary: paymentSurface.pricingSummary,
+    payableCapabilities: paymentSurface.payableCapabilities,
+    paymentMethods: paymentSurface.paymentMethods,
     pageUrl,
     frameUrl,
+    capabilitiesUrl: paymentSurface.capabilitiesUrl,
+    executeUrl: paymentSurface.executeUrl,
     warpcastShareUrl: buildWarpcastComposeUrl(shareText, pageUrl),
     activity: recentActivity,
   };
@@ -853,6 +898,25 @@ export function buildTaskReceipt(params: {
   const proofStatus = getTaskProofStatus(params.task);
   const pageUrl = buildAbsoluteUrl(getTaskPath(params.task.id), params.urls.siteUrl);
   const frameUrl = buildAbsoluteUrl(getTaskFramePath(params.task.id), params.urls.framesBaseUrl);
+  const payment: TaskReceipt['payment'] = taskTransactions.payment
+    ? {
+      method: taskTransactions.payment.payment_method === 'x402' ? 'x402' : 'escrow',
+      amount: taskTransactions.payment.amount,
+      currency: taskTransactions.payment.token,
+      network: taskTransactions.payment.payment_network ?? undefined,
+      payer: taskTransactions.payment.from,
+      status: taskTransactions.payment.status === 'confirmed'
+        ? 'settled'
+        : taskTransactions.payment.status === 'failed'
+          ? 'failed'
+          : 'accepted',
+      txHash: taskTransactions.payment.tx_hash,
+      paymentReference: taskTransactions.payment.payment_reference ?? taskTransactions.payment.tx_hash,
+    }
+    : {
+      method: taskTransactions.lock || taskTransactions.release || taskTransactions.refund ? 'escrow' : 'none',
+      status: 'none' as const,
+    };
 
   return {
     identity: {
@@ -898,6 +962,7 @@ export function buildTaskReceipt(params: {
       hasOpenDispute: params.task.hasOpenDispute ?? false,
       executionFailureMessage: params.task.executionFailureMessage,
     },
+    payment,
     pageUrl,
     frameUrl,
     warpcastShareUrl: buildWarpcastComposeUrl(buildTaskShareText(params.task.title, proofStatus), pageUrl),

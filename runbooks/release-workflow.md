@@ -21,10 +21,11 @@
 2. Open a PR into `main`.
 3. Let Vercel build the branch preview deployment.
 4. Let `preview-smoke` validate that preview deployment.
-5. Add the `automerge` label if the PR should merge as soon as it is approved and checks pass.
-6. Merge into `main` after `preview-smoke` and the required PR checks are green, or let GitHub auto-merge it if `automerge` is enabled.
-7. Let `production-smoke` validate `https://eliosbase.net` after the production deploy lands.
-8. Run `production-live-e2e` before launch sign-off or after any production change that touches live write paths.
+5. Run `preview-live-x402` for any branch that changes the paid x402 execution surface.
+6. Add the `automerge` label if the PR should merge as soon as it is approved and checks pass.
+7. Merge into `main` after `preview-smoke` and the required PR checks are green, or let GitHub auto-merge it if `automerge` is enabled.
+8. Let `production-smoke` validate `https://eliosbase.net` after the production deploy lands.
+9. Run `production-live-e2e` before launch sign-off or after any production change that touches live write paths.
 
 ## Required GitHub Branch Protection
 
@@ -81,3 +82,4 @@ The linked Vercel project already exists. Use the standard `preview` environment
 - `production-smoke` runs after merge to `main`.
 - `production-live-e2e` is the manual live write-path sign-off for production.
 - Preview URLs are per-branch, not a shared staging domain.
+- Paid x402 changes need one successful `preview-live-x402` run before merge, even though that workflow is manual.

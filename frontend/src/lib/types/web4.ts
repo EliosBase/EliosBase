@@ -7,6 +7,39 @@ export type TaskStatus = 'active' | 'completed' | 'failed';
 export type TaskStep = 'Submitted' | 'Decomposed' | 'Assigned' | 'Executing' | 'ZK Verifying' | 'Complete';
 export type ActivityKind = 'task' | 'agent' | 'payment' | 'security' | 'proof';
 
+export interface AgentPricingSummary {
+  amount: string;
+  currency: 'USDC';
+  network: string;
+  priceUsd: string;
+}
+
+export interface AgentPaymentMethod {
+  kind: 'x402';
+  scheme: 'exact';
+  network: string;
+  currency: 'USDC';
+  facilitatorUrl: string;
+  resource: string;
+  payTo?: string;
+}
+
+export interface AgentPayableCapability {
+  id: 'execute-task';
+  method: 'POST';
+  path: string;
+  description: string;
+  priceUsd: string;
+  inputSchema: {
+    contentType: 'application/json';
+    required: string[];
+    properties: Record<string, {
+      type: string;
+      description: string;
+    }>;
+  };
+}
+
 export interface GraphActivityEvent {
   id: string;
   type: ActivityKind;
@@ -79,10 +112,26 @@ export interface AgentPassport {
     walletPolicySummary: WalletPolicySummary | null;
     sessionKeyStatus: SessionKeyStatus;
   };
+  pricingSummary: AgentPricingSummary;
+  payableCapabilities: AgentPayableCapability[];
+  paymentMethods: AgentPaymentMethod[];
   pageUrl: string;
   frameUrl: string;
+  capabilitiesUrl: string;
+  executeUrl: string;
   warpcastShareUrl: string;
   activity: GraphActivityEvent[];
+}
+
+export interface TaskPaymentReceipt {
+  method: 'x402' | 'escrow' | 'none';
+  amount?: string;
+  currency?: string;
+  network?: string;
+  payer?: string;
+  status: 'none' | 'required' | 'accepted' | 'settled' | 'failed';
+  txHash?: string;
+  paymentReference?: string;
 }
 
 export interface TaskReceipt {
@@ -119,6 +168,7 @@ export interface TaskReceipt {
     hasOpenDispute: boolean;
     executionFailureMessage?: string;
   };
+  payment: TaskPaymentReceipt;
   pageUrl: string;
   frameUrl: string;
   warpcastShareUrl: string;

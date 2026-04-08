@@ -32,6 +32,7 @@ export interface Agent {
   reputation: number;
   tasksCompleted: number;
   pricePerTask: string;
+  x402PriceUsd?: string;
   status: 'online' | 'busy' | 'offline';
   type: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
   ownerId?: string;
@@ -101,6 +102,11 @@ export interface Transaction {
   status: 'confirmed' | 'pending' | 'failed';
   timestamp: string;
   txHash: string;
+  taskId?: string;
+  agentId?: string;
+  paymentNetwork?: string;
+  paymentReference?: string;
+  paymentMethod?: string;
 }
 
 export interface SecurityAlert {
@@ -139,11 +145,15 @@ export type {
 } from './farcaster';
 
 export type {
+  AgentPayableCapability,
+  AgentPaymentMethod,
+  AgentPricingSummary,
   AgentPassport,
   GraphActivityEvent,
   GraphEntityType,
   ReputationBreakdown,
   SessionKeyStatus,
+  TaskPaymentReceipt,
   TaskReceipt,
   WalletPolicySummary,
 } from './web4';
