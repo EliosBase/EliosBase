@@ -5,11 +5,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 const mocks = vi.hoisted(() => ({
   useAuthContext: vi.fn(),
   useEscrowLock: vi.fn(),
+  useUSDCEscrowLock: vi.fn(),
   useQueryClient: vi.fn(),
 }));
 
 vi.mock('@/hooks/useEscrow', () => ({
   useEscrowLock: mocks.useEscrowLock,
+  useUSDCEscrowLock: mocks.useUSDCEscrowLock,
 }));
 
 vi.mock('@/providers/AuthProvider', () => ({
@@ -37,6 +39,16 @@ describe('AgentCard', () => {
       isConfirmed: false,
       error: null,
       reset: vi.fn(),
+    });
+    mocks.useUSDCEscrowLock.mockReturnValue({
+      lock: vi.fn(),
+      txHash: undefined,
+      isSigning: false,
+      isMining: false,
+      isConfirmed: false,
+      error: null,
+      reset: vi.fn(),
+      step: 'idle',
     });
 
     const html = renderToStaticMarkup(
