@@ -37,8 +37,8 @@ jobs:
         working-directory: frontend
     env:
       BASE_URL_OVERRIDE: ${{ inputs.base_url }}
-      PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_HEAD_REF: ${{ github.event.pull_request.head.ref || github.ref_name }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
       VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -89,11 +89,11 @@ jobs:
         if: steps.scope.outputs.needs_preview == 'true'
         run: npm ci
 
-      - name: Checkout PR source for fallback preview deploy
-        if: steps.scope.outputs.needs_preview == 'true' && github.event_name == 'pull_request_target'
+      - name: Checkout preview source for fallback preview deploy
+        if: steps.scope.outputs.needs_preview == 'true'
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           path: preview-source
           submodules: recursive
           persist-credentials: false
