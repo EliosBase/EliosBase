@@ -10,6 +10,7 @@ import { useEscrowLock, useUSDCEscrowLock } from '@/hooks/useEscrow';
 import { useAuthContext } from '@/providers/AuthProvider';
 import TaskPickerModal from './TaskPickerModal';
 import { buildAgentShareText, getAgentPath } from '@/lib/web4Links';
+import { useCoinbaseVerified } from '@/hooks/useCoinbaseVerified';
 
 interface AgentCardProps {
   agent: Agent;
@@ -33,6 +34,7 @@ export default function AgentCard({ agent }: AgentCardProps) {
   const submittedHash = useRef<`0x${string}` | null>(null);
   const queryClient = useQueryClient();
   const { isAuthenticated, session } = useAuthContext();
+  const { isVerified: isCbVerified } = useCoinbaseVerified(agent.walletAddress);
   const ethEscrow = useEscrowLock();
   const usdcEscrow = useUSDCEscrowLock();
   const { lock, txHash, isSigning, isMining, isConfirmed, error: contractError, reset } = escrowToken === 'USDC' ? usdcEscrow : ethEscrow;
@@ -175,6 +177,11 @@ export default function AgentCard({ agent }: AgentCardProps) {
               {isOwner && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/8 text-white/50 border border-white/10">
                   Your Agent
+                </span>
+              )}
+              {isCbVerified && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                  CB Verified
                 </span>
               )}
             </div>
