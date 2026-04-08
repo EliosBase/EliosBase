@@ -69,6 +69,7 @@ export interface Task {
   agentWalletAddress?: string;
   hasOpenDispute?: boolean;
   escrowToken?: 'ETH' | 'USDC';
+  easAttestationUid?: string;
 }
 
 export type {

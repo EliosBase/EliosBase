@@ -303,6 +303,16 @@ export default function TaskCard({ task, isSubmitter, canViewResult }: TaskCardP
               Funds Released
             </span>
           ) : null}
+          {task.easAttestationUid ? (
+            <a
+              href={`https://base.easscan.org/attestation/view/${task.easAttestationUid}`}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded-full border border-blue-500/25 bg-blue-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-blue-300 hover:bg-blue-500/20 transition-colors"
+            >
+              Attested
+            </a>
+          ) : null}
           <ProofBadge status={proofStatus} proofId={task.zkProofId} />
         </div>
       </div>

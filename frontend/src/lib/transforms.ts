@@ -84,6 +84,7 @@ export function toTask(row: DbTask): Task {
     agentWalletAddress: row.agents?.wallet_address ?? undefined,
     hasOpenDispute: row.has_open_dispute ?? false,
     escrowToken: (row.escrow_token as 'ETH' | 'USDC') ?? 'ETH',
+    easAttestationUid: row.eas_attestation_uid ?? undefined,
   };
 }
 

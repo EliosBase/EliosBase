@@ -537,6 +537,39 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await logActivity({ type: 'task', message: `Task completed: ${updated.title}` });
     await logActivity({ type: 'proof', message: `ZK proof generated for: ${updated.title}` });
 
+    // Mint EAS attestation for task completion (best-effort)
+    try {
+      const { mintTaskCompletionAttestation } = await import('@/lib/easAttestation');
+      const { data: submitterUser } = await supabase
+        .from('users')
+        .select('wallet_address')
+        .eq('id', updated.submitter_id)
+        .single();
+
+      if (submitterUser?.wallet_address) {
+        const attestation = await mintTaskCompletionAttestation({
+          taskId: updated.id,
+          agentId: updated.assigned_agent ?? '',
+          submitterAddress: submitterUser.wallet_address,
+          reward: updated.reward,
+          zkProofHash: updated.zk_verify_tx_hash ?? '',
+          completedAt: Math.floor(Date.now() / 1000),
+        });
+
+        await supabase
+          .from('tasks')
+          .update({
+            eas_attestation_uid: attestation.attestationUid,
+            eas_attestation_tx: attestation.txHash,
+          })
+          .eq('id', updated.id);
+
+        await logActivity({ type: 'proof', message: `EAS attestation minted for: ${updated.title}` });
+      }
+    } catch (easErr) {
+      console.error('EAS attestation failed (non-blocking):', easErr);
+    }
+
     // Set agent back to online
     if (updated.assigned_agent) {
       await supabase

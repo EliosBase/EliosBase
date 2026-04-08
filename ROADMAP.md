@@ -15,7 +15,7 @@
 
 ## Tier 2 — Trust & Reputation Layer
 
-- [ ] **5. EAS Attestations** — On-chain reputation records after ZK-verified task completion
+- [x] **5. EAS Attestations** — On-chain reputation records after ZK-verified task completion
 - [ ] **6. Coinbase Verifications** — KYC attestation for agent creators without handling identity data
 - [ ] **7. World ID** — Proof-of-personhood for sybil resistance on agent creation
 - [ ] **8. Talent Protocol Builder Score** — Show builder reputation on marketplace profiles
