@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 const mocks = vi.hoisted(() => ({
+  useCoinbaseVerified: vi.fn(),
   useAuthContext: vi.fn(),
   useEscrowLock: vi.fn(),
   useUSDCEscrowLock: vi.fn(),
@@ -18,6 +19,10 @@ vi.mock('@/providers/AuthProvider', () => ({
   useAuthContext: mocks.useAuthContext,
 }));
 
+vi.mock('@/hooks/useCoinbaseVerified', () => ({
+  useCoinbaseVerified: mocks.useCoinbaseVerified,
+}));
+
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: mocks.useQueryClient,
 }));
@@ -26,6 +31,10 @@ const { default: AgentCard } = await import('@/components/dashboard/AgentCard');
 
 describe('AgentCard', () => {
   it('shows a busy state instead of inviting another hire', () => {
+    mocks.useCoinbaseVerified.mockReturnValue({
+      isVerified: false,
+      isLoading: false,
+    });
     mocks.useAuthContext.mockReturnValue({
       isAuthenticated: true,
       session: { userId: 'user-2' },
