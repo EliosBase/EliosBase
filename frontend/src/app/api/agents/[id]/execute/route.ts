@@ -151,7 +151,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Agent is offline' }, { status: 409 });
   }
 
-  const raw = await req.json().catch(() => null);
+  const raw = await req.clone().json().catch(() => null);
   const parsed = x402ExecuteSchema.safeParse(raw);
   if (!parsed.success) {
     const firstIssue = parsed.error.issues[0]?.message ?? 'Invalid input';

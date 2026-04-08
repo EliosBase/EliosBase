@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   checkRateLimit: vi.fn(),
+  createX402RequestContext: vi.fn(),
   createServiceClient: vi.fn(),
   executeAgentTask: vi.fn(),
   generateId: vi.fn(),
@@ -45,7 +46,7 @@ vi.mock('@/lib/x402', () => ({
   appendSettlementHeaders: (headers: Headers, settlement: { headers: Record<string, string> }) => {
     Object.entries(settlement.headers).forEach(([name, value]) => headers.set(name, value));
   },
-  createX402RequestContext: vi.fn(() => ({ path: '/api/agents/ag-1/execute', method: 'POST' })),
+  createX402RequestContext: mocks.createX402RequestContext,
   getAgentExecutionPaymentConfig: mocks.getAgentExecutionPaymentConfig,
   getX402HttpServer: mocks.getX402HttpServer,
   isVerifiedX402Request: mocks.isVerifiedX402Request,
@@ -158,6 +159,7 @@ describe('POST /api/agents/[id]/execute', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.checkRateLimit.mockResolvedValue({ allowed: true });
+    mocks.createX402RequestContext.mockImplementation((req: NextRequest) => ({ request: req, path: '/api/agents/ag-1/execute', method: 'POST' }));
     mocks.getConfiguredSiteUrl.mockReturnValue('https://preview.eliosbase.net');
     mocks.getAgentExecutionPaymentConfig.mockResolvedValue({
       agentId: 'ag-1',
@@ -241,6 +243,39 @@ describe('POST /api/agents/[id]/execute', () => {
       error: 'Payment required',
       code: 'payment_required',
     });
+  });
+
+  it('keeps the original request body readable for the x402 adapter', async () => {
+    mocks.isVerifiedX402Request.mockReturnValue(false);
+    mocks.getX402HttpServer.mockResolvedValue({
+      processHTTPRequest: vi.fn(async (context: { request: NextRequest }) => {
+        const body = await context.request.clone().json();
+        expect(body).toEqual({
+          title: 'Paid execution',
+          description: 'Summarize the repo state',
+        });
+
+        return {
+          type: 'payment-error',
+          response: {
+            status: 402,
+            headers: {},
+            body: { error: 'Payment required', code: 'payment_required' },
+          },
+        };
+      }),
+      processSettlement: vi.fn(),
+      server: { verifyPayment: vi.fn() },
+    });
+
+    const response = await POST(makeRequest({
+      title: 'Paid execution',
+      description: 'Summarize the repo state',
+    }), {
+      params: Promise.resolve({ id: 'ag-1' }),
+    });
+
+    expect(response.status).toBe(402);
   });
 
   it('creates a paid task and returns canonical receipt links when payment settles', async () => {
