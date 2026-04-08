@@ -3,7 +3,7 @@
 import { useState } from "react";
 import NeuralBackground from "@/components/ui/flow-field-background";
 
-const CONTRACT_ADDRESS = "0xXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+const CONTRACT_ADDRESS = "0x002b28fa26982da609f069383ee424b4d36f1b07";
 
 export default function Hero() {
   const [copied, setCopied] = useState(false);
