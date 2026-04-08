@@ -691,6 +691,28 @@ function buildTransactionEvent(row: DbTransaction, taskId: string, urls: UrlCont
   };
 }
 
+function buildTaskPaymentEvent(task: Task, urls: UrlContext): GraphActivityEvent | null {
+  if (task.payment?.method !== 'x402' || !task.payment.txHash) {
+    return null;
+  }
+
+  return {
+    id: `task-payment-${task.id}`,
+    type: 'payment',
+    message: task.payment.status === 'failed'
+      ? `X402 payment failed for task: ${task.title}`
+      : `X402 payment accepted for task: ${task.title}`,
+    timestamp: relativeTime(task.submittedAt),
+    source: 'transaction',
+    occurredAt: task.submittedAt,
+    eventType: task.payment.status === 'failed' ? 'payment.failed' : 'payment.accepted',
+    entityType: 'payment',
+    entityId: task.id,
+    entityUrl: buildAbsoluteUrl(getTaskPath(task.id), urls.siteUrl),
+    txHash: task.payment.txHash,
+  };
+}
+
 function pickClosestTransaction(transactions: DbTransaction[], referenceAt: string) {
   const referenceTime = new Date(referenceAt).getTime();
   return [...transactions].sort((left, right) => (
@@ -765,11 +787,12 @@ function buildTaskTimeline(params: {
     .map((alert) => buildSecurityEvent(alert, params.task.id, params.urls));
 
   const taskTransactions = pickTaskTransactions(params.task, params.transactions, params.agent);
+  const fallbackPaymentEvent = taskTransactions.payment ? null : buildTaskPaymentEvent(params.task, params.urls);
   const transactionEvents = [taskTransactions.payment, taskTransactions.lock, taskTransactions.release, taskTransactions.refund]
     .filter((row): row is DbTransaction => Boolean(row))
     .map((row) => buildTransactionEvent(row, params.task.id, params.urls));
 
-  return [...activityEvents, ...taskAuditEvents, ...disputeEvents, ...transactionEvents]
+  return [...activityEvents, ...taskAuditEvents, ...disputeEvents, ...transactionEvents, ...(fallbackPaymentEvent ? [fallbackPaymentEvent] : [])]
     .sort((left, right) => new Date(right.occurredAt).getTime() - new Date(left.occurredAt).getTime())
     .slice(0, 12);
 }
@@ -913,6 +936,8 @@ export function buildTaskReceipt(params: {
       txHash: taskTransactions.payment.tx_hash,
       paymentReference: taskTransactions.payment.payment_reference ?? taskTransactions.payment.tx_hash,
     }
+    : params.task.payment
+      ? params.task.payment
     : {
       method: taskTransactions.lock || taskTransactions.release || taskTransactions.refund ? 'escrow' : 'none',
       status: 'none' as const,
@@ -977,7 +1002,7 @@ export async function getAgentPassport(id: string) {
   const [agentRes, tasksRes, activityRes, transactionsRes, alertsRes] = await Promise.all([
     supabase
       .from('agents')
-      .select('*')
+      .select('*, users:owner_id(wallet_address)')
       .eq('id', id)
       .single(),
     supabase

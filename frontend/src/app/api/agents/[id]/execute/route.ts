@@ -23,6 +23,7 @@ import {
 } from '@/lib/x402';
 import { buildAbsoluteUrl, getTaskPath } from '@/lib/web4Links';
 import { getConfiguredSiteUrl } from '@/lib/runtimeConfig';
+import type { TaskExecutionPayment } from '@/lib/types';
 
 function formatUsdcAmount(value: string | undefined, fallback: string) {
   if (!value) {
@@ -61,6 +62,82 @@ async function upsertSubmitter(walletAddress: string) {
   }
 
   return data;
+}
+
+function isMissingColumnError(error: { code?: string; message?: string } | null | undefined, column: string) {
+  const message = error?.message ?? '';
+  return (
+    (error?.code === 'PGRST204' && message.includes(`'${column}' column`))
+    || (error?.code === '42703' && message.includes(column))
+  );
+}
+
+function usesLegacyTransactionsSchema(error: { code?: string; message?: string } | null | undefined) {
+  return ['task_id', 'agent_id', 'payment_network', 'payment_reference', 'payment_method']
+    .some((column) => isMissingColumnError(error, column));
+}
+
+function buildExecutionPayment(params: {
+  amount: string;
+  network: string;
+  payer: string;
+  txHash: string;
+}): TaskExecutionPayment {
+  return {
+    method: 'x402',
+    amount: params.amount,
+    currency: 'USDC',
+    network: params.network,
+    payer: params.payer,
+    status: 'settled',
+    txHash: params.txHash,
+    paymentReference: params.txHash,
+  };
+}
+
+async function insertPaymentRecord(
+  supabase: ReturnType<typeof createServiceClient>,
+  payload: {
+    id: string;
+    type: 'payment';
+    from: string;
+    to: string;
+    amount: string;
+    token: 'USDC';
+    status: 'confirmed';
+    tx_hash: string;
+    user_id: string;
+    timestamp: string;
+    task_id: string;
+    agent_id: string;
+    payment_network: string;
+    payment_reference: string;
+    payment_method: 'x402';
+  },
+) {
+  const { error } = await supabase.from('transactions').insert(payload);
+  if (!error) {
+    return null;
+  }
+
+  if (!usesLegacyTransactionsSchema(error)) {
+    return error;
+  }
+
+  const legacyPayload = {
+    id: payload.id,
+    type: payload.type,
+    from: payload.from,
+    to: payload.to,
+    amount: payload.amount,
+    token: payload.token,
+    status: payload.status,
+    tx_hash: payload.tx_hash,
+    user_id: payload.user_id,
+    timestamp: payload.timestamp,
+  };
+  const legacy = await supabase.from('transactions').insert(legacyPayload);
+  return legacy.error;
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -139,6 +216,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const now = new Date().toISOString();
     const paymentAmount = formatUsdcAmount(settlement.amount, config.pricingSummary.amount);
     const reward = `${paymentAmount} USDC`;
+    const payment = buildExecutionPayment({
+      amount: paymentAmount,
+      network: settlement.network,
+      payer,
+      txHash: settlement.transaction,
+    });
 
     const { data: createdTask, error: taskError } = await supabase
       .from('tasks')
@@ -159,6 +242,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           model: DEFAULT_AGENT_EXECUTION_MODEL,
           agentType: config.type,
           capabilities: config.capabilities,
+          payment,
         },
         escrow_token: 'USDC',
       })
@@ -171,24 +255,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const paymentId = generateId('tx');
-    const { error: paymentError } = await supabase
-      .from('transactions')
-      .insert({
-        id: paymentId,
-        type: 'payment',
-        from: payer,
-        to: config.payTo,
-        amount: paymentAmount,
-        token: 'USDC',
-        status: 'confirmed',
-        tx_hash: settlement.transaction,
-        user_id: submitter.id,
-        task_id: taskId,
-        agent_id: agentId,
-        payment_network: settlement.network,
-        payment_reference: settlement.transaction,
-        payment_method: 'x402',
-      });
+    const paymentError = await insertPaymentRecord(supabase, {
+      id: paymentId,
+      type: 'payment',
+      from: payer,
+      to: config.payTo,
+      amount: paymentAmount,
+      token: 'USDC',
+      status: 'confirmed',
+      tx_hash: settlement.transaction,
+      user_id: submitter.id,
+      timestamp: now,
+      task_id: taskId,
+      agent_id: agentId,
+      payment_network: settlement.network,
+      payment_reference: settlement.transaction,
+      payment_method: 'x402',
+    });
 
     if (paymentError) {
       await releaseAgent(agentId);
@@ -229,6 +312,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           execution_result: {
             status: 'succeeded',
             completedAt,
+            payment,
             result: executionResult,
           },
         })
@@ -255,6 +339,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           step_changed_at: new Date().toISOString(),
           execution_result: {
             status: 'failed',
+            payment,
             failure: {
               code: failure.code,
               message: failure.message,

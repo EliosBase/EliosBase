@@ -143,6 +143,14 @@ function extractAgentId(path: string) {
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
+function isMissingColumnError(error: { code?: string; message?: string } | null | undefined, column: string) {
+  const message = error?.message ?? '';
+  return (
+    (error?.code === 'PGRST204' && message.includes(`'${column}' column`))
+    || (error?.code === '42703' && message.includes(column))
+  );
+}
+
 async function selectAgentExecutionPricingRow(agentId: string) {
   const supabase = createServiceClient();
   const { data, error } = await supabase
@@ -151,11 +159,28 @@ async function selectAgentExecutionPricingRow(agentId: string) {
     .eq('id', agentId)
     .single();
 
-  if (error || !data) {
+  if (!error && data) {
+    return data as AgentExecutionPricingRow;
+  }
+
+  if (!isMissingColumnError(error, 'x402_price_usd')) {
     return null;
   }
 
-  return data as AgentExecutionPricingRow;
+  const legacy = await supabase
+    .from('agents')
+    .select('id, name, description, status, type, capabilities, wallet_address, users:owner_id(wallet_address)')
+    .eq('id', agentId)
+    .single();
+
+  if (legacy.error || !legacy.data) {
+    return null;
+  }
+
+  return {
+    ...(legacy.data as Omit<AgentExecutionPricingRow, 'x402_price_usd'>),
+    x402_price_usd: null,
+  };
 }
 
 function resolvePayTo(row: AgentExecutionPricingRow) {

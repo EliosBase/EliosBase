@@ -24,7 +24,7 @@ import {
   getAgentWalletSession,
   getAgentWalletStandard,
 } from './agentWalletCompat';
-import { getExecutionFailure, getExecutionResult } from './types/agentExecution';
+import { getExecutionFailure, getExecutionPayment, getExecutionResult } from './types/agentExecution';
 import { normalizeTransactionType } from './transactions';
 
 export function toAgent(row: DbAgent): Agent {
@@ -42,7 +42,7 @@ export function toAgent(row: DbAgent): Agent {
     status: row.status,
     type: row.type,
     ownerId: row.owner_id ?? undefined,
-    walletAddress: row.wallet_address ?? undefined,
+    walletAddress: row.wallet_address ?? row.users?.wallet_address ?? undefined,
     walletKind: row.wallet_kind ?? undefined,
     walletStandard: getAgentWalletStandard(row),
     walletStatus: row.wallet_status ?? undefined,
@@ -62,6 +62,7 @@ export function toAgent(row: DbAgent): Agent {
 export function toTask(row: DbTask): Task {
   const executionResult = getExecutionResult(row.execution_result);
   const executionFailure = getExecutionFailure(row.execution_result);
+  const executionPayment = getExecutionPayment(row.execution_result);
 
   return {
     id: row.id,
@@ -83,6 +84,18 @@ export function toTask(row: DbTask): Task {
     agentOperatorAddress: row.agents?.users?.wallet_address ?? undefined,
     agentPayoutAddress: row.agents?.wallet_address ?? row.agents?.users?.wallet_address ?? undefined,
     agentWalletAddress: row.agents?.wallet_address ?? undefined,
+    payment: executionPayment
+      ? {
+        method: executionPayment.method,
+        amount: executionPayment.amount,
+        currency: executionPayment.currency,
+        network: executionPayment.network,
+        payer: executionPayment.payer,
+        status: executionPayment.status,
+        txHash: executionPayment.txHash,
+        paymentReference: executionPayment.paymentReference,
+      }
+      : undefined,
     hasOpenDispute: row.has_open_dispute ?? false,
     escrowToken: (row.escrow_token as 'ETH' | 'USDC') ?? 'ETH',
     easAttestationUid: row.eas_attestation_uid ?? undefined,
