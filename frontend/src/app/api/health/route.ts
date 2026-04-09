@@ -105,7 +105,6 @@ export async function GET() {
   }
 
   const hasFail = checks.some((c) => c.status === 'fail');
-  const hasWarn = checks.some((c) => c.status === 'warn');
 
   return NextResponse.json(
     {
