@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import StatCard from '@/components/dashboard/StatCard';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useAdminOverview } from '@/hooks/useAdminOverview';
-import { useAdminTasks, useAdminRetry, useAdminCancel, useAdminReassign } from '@/hooks/useAdminTasks';
+import { useAdminTasks, useAdminRetry, useAdminCancel, useAdminReassign, useAdminHold } from '@/hooks/useAdminTasks';
 import { useAgents } from '@/hooks/useAgents';
 import type { Task, Agent } from '@/lib/types';
 import {
@@ -19,6 +19,8 @@ import {
   Zap,
   ShieldAlert,
   ChevronDown,
+  PauseCircle,
+  PlayCircle,
 } from 'lucide-react';
 
 type StatusFilter = 'all' | 'active' | 'failed' | 'completed';
@@ -42,6 +44,7 @@ const stepBadge: Record<string, { icon: typeof Clock; color: string }> = {
   Executing: { icon: Loader2, color: 'text-yellow-400' },
   'ZK Verifying': { icon: ShieldAlert, color: 'text-cyan-400' },
   Complete: { icon: CheckCircle, color: 'text-green-400' },
+  Hold: { icon: PauseCircle, color: 'text-orange-400' },
 };
 
 function ReassignModal({
@@ -104,27 +107,33 @@ function TaskRow({
   onRetry,
   onCancel,
   onReassign,
+  onHold,
   retryPending,
   cancelPending,
   reassignPending,
+  holdPending,
 }: {
   task: Task;
   agents: Agent[];
   onRetry: (id: string) => void;
   onCancel: (id: string) => void;
   onReassign: (taskId: string, agentId: string) => void;
+  onHold: (id: string, release: boolean) => void;
   retryPending: boolean;
   cancelPending: boolean;
   reassignPending: boolean;
+  holdPending: boolean;
 }) {
   const [showReassign, setShowReassign] = useState(false);
   const badge = statusBadge[task.status] ?? statusBadge.active;
   const step = stepBadge[task.currentStep];
   const StepIcon = step?.icon ?? Clock;
   const agentName = agents.find((a) => a.id === task.assignedAgent)?.name;
+  const isHeld = task.currentStep === 'Hold';
   const canRetry = task.status === 'failed' && task.assignedAgent;
   const canCancel = task.status !== 'completed';
   const canReassign = task.status !== 'completed';
+  const canHold = task.status !== 'completed' && task.status !== 'failed';
 
   return (
     <>
@@ -175,6 +184,16 @@ function TaskRow({
                 {reassignPending ? <Loader2 size={14} className="animate-spin" /> : <ArrowRightLeft size={14} />}
               </button>
             ) : null}
+            {canHold ? (
+              <button
+                onClick={() => onHold(task.id, isHeld)}
+                disabled={holdPending}
+                className={`p-2 rounded-lg transition-colors disabled:opacity-50 ${isHeld ? 'text-green-400 hover:bg-green-400/10' : 'text-orange-400 hover:bg-orange-400/10'}`}
+                title={isHeld ? 'Release from hold' : 'Put on hold'}
+              >
+                {holdPending ? <Loader2 size={14} className="animate-spin" /> : isHeld ? <PlayCircle size={14} /> : <PauseCircle size={14} />}
+              </button>
+            ) : null}
             {canCancel ? (
               <button
                 onClick={() => onCancel(task.id)}
@@ -214,6 +233,7 @@ export default function AdminPage() {
   const retryMutation = useAdminRetry();
   const cancelMutation = useAdminCancel();
   const reassignMutation = useAdminReassign();
+  const holdMutation = useAdminHold();
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [actionError, setActionError] = useState('');
 
@@ -231,6 +251,11 @@ export default function AdminPage() {
     setActionError('');
     reassignMutation.mutate({ taskId, agentId }, { onError: (err) => setActionError(err.message) });
   }, [reassignMutation]);
+
+  const handleHold = useCallback((taskId: string, release: boolean) => {
+    setActionError('');
+    holdMutation.mutate({ taskId, release }, { onError: (err) => setActionError(err.message) });
+  }, [holdMutation]);
 
   if (!canAccess) {
     return (
@@ -332,9 +357,11 @@ export default function AdminPage() {
                   onRetry={handleRetry}
                   onCancel={handleCancel}
                   onReassign={handleReassign}
+                  onHold={handleHold}
                   retryPending={retryMutation.isPending}
                   cancelPending={cancelMutation.isPending}
                   reassignPending={reassignMutation.isPending}
+                  holdPending={holdMutation.isPending}
                 />
               ))}
             </div>
@@ -351,9 +378,11 @@ export default function AdminPage() {
                   onRetry={handleRetry}
                   onCancel={handleCancel}
                   onReassign={handleReassign}
+                  onHold={handleHold}
                   retryPending={retryMutation.isPending}
                   cancelPending={cancelMutation.isPending}
                   reassignPending={reassignMutation.isPending}
+                  holdPending={holdMutation.isPending}
                 />
               ))}
             </div>
@@ -370,9 +399,11 @@ export default function AdminPage() {
                   onRetry={handleRetry}
                   onCancel={handleCancel}
                   onReassign={handleReassign}
+                  onHold={handleHold}
                   retryPending={retryMutation.isPending}
                   cancelPending={cancelMutation.isPending}
                   reassignPending={reassignMutation.isPending}
+                  holdPending={holdMutation.isPending}
                 />
               ))}
             </div>
@@ -389,9 +420,11 @@ export default function AdminPage() {
                   onRetry={handleRetry}
                   onCancel={handleCancel}
                   onReassign={handleReassign}
+                  onHold={handleHold}
                   retryPending={retryMutation.isPending}
                   cancelPending={cancelMutation.isPending}
                   reassignPending={reassignMutation.isPending}
+                  holdPending={holdMutation.isPending}
                 />
               ))
             ) : (
@@ -405,9 +438,11 @@ export default function AdminPage() {
                     onRetry={handleRetry}
                     onCancel={handleCancel}
                     onReassign={handleReassign}
+                    onHold={handleHold}
                     retryPending={retryMutation.isPending}
                     cancelPending={cancelMutation.isPending}
                     reassignPending={reassignMutation.isPending}
+                    holdPending={holdMutation.isPending}
                   />
                 ))
             )}
