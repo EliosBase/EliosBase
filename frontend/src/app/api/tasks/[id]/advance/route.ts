@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { createServiceClient } from '@/lib/supabase/server';
 import { readEnv } from '@/lib/env';
 import { getSession } from '@/lib/session';
@@ -428,6 +429,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       });
 
       if (terminal) {
+        Sentry.captureException(failure, {
+          tags: { taskId: id, agentType, step: 'Executing', terminal: 'true' },
+          extra: { attempts, assignedAgent: task.assigned_agent },
+        });
+
         const alert = buildTerminalExecutionAlert({
           failure,
           taskTitle: task.title,
@@ -508,6 +514,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       } catch (err) {
         // If proof generation/submission fails, stay at ZK Verifying step
         console.error('ZK proof failed:', err);
+        Sentry.captureException(err, {
+          tags: { taskId: id, step: 'ZK Verifying' },
+          extra: { assignedAgent: task.assigned_agent },
+        });
+        await createSecurityAlert({
+          severity: 'high',
+          title: 'ZK proof submission failed',
+          description: `Proof generation or on-chain verification failed for task ${id}: ${err instanceof Error ? err.message : String(err)}`,
+          source: 'proof-submitter',
+        });
         return NextResponse.json({
           advanced: false,
           reason: 'ZK proof generation or on-chain verification failed',

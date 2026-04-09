@@ -246,10 +246,19 @@ export async function executeAgentTask(task: TaskRuntime, agent: AgentRuntime): 
     });
   }
 
-  // Spend ceiling check — if configured, count recent executions
+  // Spend ceiling check — if configured, estimate cost and enforce
   const spendCeilingCents = readIntEnv(process.env.AI_SPEND_CEILING_CENTS, 0);
   if (spendCeilingCents > 0) {
+    // Estimate cost: ~1400 output tokens + ~800 input tokens at Sonnet pricing
+    // Sonnet: $3/1M input, $15/1M output → ~$0.023 per execution
+    const estimatedCostCents = 2.3;
     logMetric('ai_spend_ceiling_check', spendCeilingCents, { taskId: task.id });
+    if (estimatedCostCents > spendCeilingCents) {
+      throw new AgentExecutionError(
+        `Estimated execution cost ($${(estimatedCostCents / 100).toFixed(4)}) exceeds spend ceiling ($${(spendCeilingCents / 100).toFixed(2)})`,
+        { code: 'spend_ceiling_exceeded', retryable: false },
+      );
+    }
   }
 
   const client = new Anthropic({ apiKey });
@@ -292,11 +301,20 @@ export async function executeAgentTask(task: TaskRuntime, agent: AgentRuntime): 
       });
     }
 
-    const tokensUsed = (response.usage.input_tokens ?? 0) + (response.usage.output_tokens ?? 0);
+    const inputTokens = response.usage.input_tokens ?? 0;
+    const outputTokens = response.usage.output_tokens ?? 0;
+    const tokensUsed = inputTokens + outputTokens;
     const executionTimeMs = Date.now() - startedAt;
+    // Sonnet pricing: $3/1M input, $15/1M output
+    const estimatedCostUsd = (inputTokens * 3 + outputTokens * 15) / 1_000_000;
     logMetric('agent_execution_ms', executionTimeMs, { agentType: agent.type, agentId: agent.id });
     logMetric('agent_tokens_used', tokensUsed, { agentType: agent.type, agentId: agent.id });
-    return normalizeResult(text, agent, executionTimeMs, tokensUsed);
+    logMetric('agent_cost_usd', estimatedCostUsd * 100, { agentType: agent.type, agentId: agent.id, taskId: task.id });
+    const result = normalizeResult(text, agent, executionTimeMs, tokensUsed);
+    result.metadata.inputTokens = inputTokens;
+    result.metadata.outputTokens = outputTokens;
+    result.metadata.estimatedCostUsd = estimatedCostUsd;
+    return result;
   } catch (error) {
     Sentry.captureException(error, { tags: { agentId: agent.id, agentType: agent.type, taskId: task.id } });
     throw classifyExecutionError(error);

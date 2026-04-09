@@ -19,6 +19,7 @@ const pageTitles: Record<string, string> = {
   '/app/tasks': 'Task Management',
   '/app/wallet': 'Wallet & Payments',
   '/app/security': 'Security Center',
+  '/app/admin': 'Operator Console',
 };
 
 const appFooterLinks = [

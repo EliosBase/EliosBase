@@ -40,4 +40,5 @@ export const framesRateLimitMiddleware: MiddlewareHandler = async (c, next) => {
     }
   }
   await next();
+  return;
 };

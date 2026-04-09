@@ -49,7 +49,7 @@ export interface Agent {
   worldidVerified?: boolean;
 }
 
-export type TaskStep = 'Submitted' | 'Decomposed' | 'Assigned' | 'Executing' | 'ZK Verifying' | 'Complete';
+export type TaskStep = 'Submitted' | 'Decomposed' | 'Assigned' | 'Executing' | 'ZK Verifying' | 'Complete' | 'Hold';
 
 export interface Task {
   id: string;

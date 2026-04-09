@@ -4,7 +4,7 @@ export type GraphEntityType = 'agent' | 'task' | 'proof' | 'payment' | 'security
 export type AgentKind = 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
 export type AgentStatus = 'online' | 'busy' | 'offline';
 export type TaskStatus = 'active' | 'completed' | 'failed';
-export type TaskStep = 'Submitted' | 'Decomposed' | 'Assigned' | 'Executing' | 'ZK Verifying' | 'Complete';
+export type TaskStep = 'Submitted' | 'Decomposed' | 'Assigned' | 'Executing' | 'ZK Verifying' | 'Complete' | 'Hold';
 export type ActivityKind = 'task' | 'agent' | 'payment' | 'security' | 'proof';
 
 export interface AgentPricingSummary {

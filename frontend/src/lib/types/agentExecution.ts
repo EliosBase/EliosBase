@@ -10,6 +10,9 @@ export interface AgentExecutionMetadata {
   model: string;
   promptVersion?: string;
   tokensUsed: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  estimatedCostUsd?: number;
   executionTimeMs: number;
   agentType: string;
   capabilities: string[];

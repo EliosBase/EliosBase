@@ -4,6 +4,7 @@ import { type Frog, Button } from 'frog';
 import { createPublicServerClient } from '@/lib/supabase/server';
 import { parseEther } from 'frog';
 import { ESCROW_ABI } from '@/lib/contracts';
+import { activeChainId } from '@/lib/chainConfig';
 import { getConfiguredFramesBaseUrl } from '@/lib/runtimeConfig';
 import { getTaskPath } from '@/lib/web4Links';
 import {
@@ -106,7 +107,7 @@ export function registerEscrowFrames(app: Frog) {
 
     return c.contract({
       abi: ESCROW_ABI,
-      chainId: 'eip155:8453',
+      chainId: `eip155:${activeChainId}`,
       functionName: 'lockFunds',
       to: escrowAddress,
       args: [taskIdBytes32, agentIdBytes32],
