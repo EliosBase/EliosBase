@@ -165,7 +165,7 @@ function makeSupabaseClient() {
         if ((makeSupabaseClient as unknown as { reads?: number }).reads === undefined) {
           (makeSupabaseClient as unknown as { reads?: number }).reads = 0;
         }
-        (makeSupabaseClient as unknown as { reads?: number }).reads += 1;
+        (makeSupabaseClient as unknown as { reads: number }).reads += 1;
         return (makeSupabaseClient as unknown as { reads: number }).reads === 1
           ? makeSelectBuilder({ data: transfer, error: null })
           : makeUpdateBuilder({ data: executedTransfer, error: null });
