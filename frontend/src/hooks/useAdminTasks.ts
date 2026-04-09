@@ -50,6 +50,26 @@ export function useAdminCancel() {
   });
 }
 
+export function useAdminHold() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ taskId, release }: { taskId: string; release?: boolean }) => {
+      const res = await fetch(`/api/admin/tasks/${taskId}/hold`, {
+        method: release ? 'DELETE' : 'POST',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || (release ? 'Release failed' : 'Hold failed'));
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+}
+
 export function useAdminReassign() {
   const queryClient = useQueryClient();
   return useMutation({

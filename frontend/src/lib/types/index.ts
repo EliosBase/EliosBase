@@ -48,7 +48,7 @@ export interface Agent {
   walletSession?: import('./agentWallet').AgentWalletSessionState;
 }
 
-export type TaskStep = 'Submitted' | 'Decomposed' | 'Assigned' | 'Executing' | 'ZK Verifying' | 'Complete';
+export type TaskStep = 'Submitted' | 'Decomposed' | 'Assigned' | 'Executing' | 'ZK Verifying' | 'Complete' | 'Hold';
 
 export interface Task {
   id: string;
