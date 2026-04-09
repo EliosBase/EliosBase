@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, Store, ListChecks, Wallet, ShieldCheck, X } from 'lucide-react';
+import { LayoutDashboard, Store, ListChecks, Wallet, ShieldCheck, Settings, X } from 'lucide-react';
 import { useAuthContext } from '@/providers/AuthProvider';
 import { useMounted } from '@/hooks/useMounted';
 import { useWallet } from '@/hooks/useWallet';
@@ -14,6 +14,7 @@ const navItems = [
   { href: '/app/tasks', label: 'Tasks', icon: ListChecks },
   { href: '/app/wallet', label: 'Wallet', icon: Wallet },
   { href: '/app/security', label: 'Security', icon: ShieldCheck, privileged: true },
+  { href: '/app/admin', label: 'Operator', icon: Settings, privileged: true },
 ];
 
 interface SidebarProps {
