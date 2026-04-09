@@ -93,7 +93,8 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     ? executionResult.heldFromStep
     : 'Assigned';
 
-  const { heldFromStep: _, heldAt: __, heldBy: ___, ...cleanResult } = executionResult;
+  const { heldFromStep: _held, heldAt: _at, heldBy: _by, ...cleanResult } = executionResult;
+  void _held; void _at; void _by;
 
   await supabase
     .from('tasks')
