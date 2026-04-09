@@ -110,7 +110,7 @@ export async function GET() {
   return NextResponse.json(
     {
       ok: !hasFail,
-      status: hasFail ? 'unhealthy' : hasWarn ? 'degraded' : 'healthy',
+      status: hasFail ? 'unhealthy' : 'live',
       checks,
       latencyMs: Date.now() - start,
       timestamp: new Date().toISOString(),
