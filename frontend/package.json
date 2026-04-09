@@ -15,6 +15,7 @@
     "e2e:wallet:metamask": "npx --yes tsx scripts/wallet-e2e-run.ts metamask",
     "e2e:wallet:phantom": "npx --yes tsx scripts/wallet-e2e-run.ts phantom",
     "e2e:wallet:coinbase": "npx --yes tsx scripts/wallet-e2e-run.ts coinbase",
+    "analyze": "cross-env ANALYZE=true next build",
     "smoke:real": "node scripts/smoke-real-env.mjs",
     "smoke:prod-live": "node scripts/smoke-production-live.mjs",
     "smoke:preview:x402": "node scripts/smoke-preview-x402.mjs",
@@ -68,6 +69,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@next/bundle-analyzer": "^16.2.3",
     "@next/eslint-plugin-next": "16.2.2",
     "@playwright/test": "^1.59.1",
     "@synthetixio/synpress": "^4.1.2",
@@ -76,6 +78,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^17.4.0",
