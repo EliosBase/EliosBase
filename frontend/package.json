@@ -42,6 +42,7 @@
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
     "@walletconnect/ethereum-provider": "^2.23.9",
+    "@worldcoin/idkit": "^4.1.1",
     "@x402/core": "^2.9.0",
     "@x402/evm": "^2.9.0",
     "@x402/fetch": "^2.9.0",

@@ -56,6 +56,7 @@ export function toAgent(row: DbAgent): Agent {
         rotatedAt: walletSession.rotatedAt,
       }
       : undefined,
+    worldidVerified: row.worldid_verified ?? false,
   };
 }
 

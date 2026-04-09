@@ -184,6 +184,11 @@ export default function AgentCard({ agent }: AgentCardProps) {
                   CB Verified
                 </span>
               )}
+              {agent.worldidVerified && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Verified Human
+                </span>
+              )}
             </div>
           </div>
         </div>

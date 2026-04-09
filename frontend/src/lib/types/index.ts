@@ -46,6 +46,7 @@ export interface Agent {
   walletPolicy?: import('./agentWallet').AgentWalletPolicy;
   walletModules?: import('./agentWallet').AgentWalletModules;
   walletSession?: import('./agentWallet').AgentWalletSessionState;
+  worldidVerified?: boolean;
 }
 
 export type TaskStep = 'Submitted' | 'Decomposed' | 'Assigned' | 'Executing' | 'ZK Verifying' | 'Complete';
