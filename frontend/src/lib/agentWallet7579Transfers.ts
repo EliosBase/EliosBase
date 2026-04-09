@@ -36,6 +36,7 @@ import {
 import { decryptSessionKey } from '@/lib/agentWalletSecrets';
 import { getMaxPendingNonce } from '@/lib/baseRpc';
 import { readEnv, readRequiredEnv } from '@/lib/env';
+import { isTestnet } from '@/lib/chainConfig';
 import {
   buildStoredSafe7579Session,
   ELIOS_POLICY_MANAGER_ABI,
@@ -658,7 +659,7 @@ async function sendPolicySignerTransaction(
       safe7579PublicClient,
       address as `0x${string}`,
       attempt,
-      (target) => getMaxPendingNonce(safeWalletChain.id !== 8453, target),
+      (target) => getMaxPendingNonce(isTestnet, target),
     );
 
     try {

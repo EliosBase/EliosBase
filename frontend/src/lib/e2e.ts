@@ -1,6 +1,7 @@
 'use client';
 
-import { readEnv, readIntEnv } from '@/lib/env';
+import { readEnv } from '@/lib/env';
+import { activeChainId } from '@/lib/chainConfig';
 
 const isBrowser = typeof window !== 'undefined';
 
@@ -26,7 +27,7 @@ export interface E2EWalletState {
 const defaultWalletState: E2EWalletState = {
   connected: false,
   address: '0x123400000000000000000000000000000000abcd',
-  chainId: readIntEnv(process.env.NEXT_PUBLIC_BASE_CHAIN_ID, 8453),
+  chainId: activeChainId,
 };
 
 function dispatch(name: string) {
