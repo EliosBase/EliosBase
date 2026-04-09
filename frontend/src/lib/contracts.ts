@@ -162,7 +162,13 @@ export const ESCROW_CONTRACT_ADDRESS = (readEnv(process.env.NEXT_PUBLIC_ESCROW_A
 
 // ─── USDC Escrow Contract ──────────────────────────────────────────
 
-export const USDC_TOKEN_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as `0x${string}`;
+const USDC_MAINNET = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+const USDC_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
+
+export const USDC_TOKEN_ADDRESS = (
+  readEnv(process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS)
+    ?? (readEnv(process.env.NEXT_PUBLIC_CHAIN) === 'testnet' ? USDC_SEPOLIA : USDC_MAINNET)
+) as `0x${string}`;
 
 export const USDC_TOKEN_ABI = [
   {
