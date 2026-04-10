@@ -35,9 +35,12 @@ export interface Agent {
   tasksCompleted: number;
   pricePerTask: string;
   x402PriceUsd?: string;
-  status: 'online' | 'busy' | 'offline';
+  status: 'online' | 'busy' | 'offline' | 'suspended';
   type: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
   ownerId?: string;
+  suspendedAt?: string;
+  suspendedReason?: string;
+  suspendedBy?: string;
   walletAddress?: string;
   walletKind?: import('./agentWallet').AgentWalletStandard;
   walletStandard?: import('./agentWallet').AgentWalletStandard;

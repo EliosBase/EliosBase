@@ -57,6 +57,9 @@ export function toAgent(row: DbAgent): Agent {
       }
       : undefined,
     worldidVerified: row.worldid_verified ?? false,
+    suspendedAt: row.suspended_at ?? undefined,
+    suspendedReason: row.suspended_reason ?? undefined,
+    suspendedBy: row.suspended_by ?? undefined,
   };
 }
 

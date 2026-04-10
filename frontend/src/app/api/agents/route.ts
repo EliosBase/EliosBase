@@ -15,7 +15,13 @@ export async function GET(req: NextRequest) {
   if (type) query = query.eq('type', type);
 
   const status = searchParams.get('status');
-  if (status) query = query.eq('status', status);
+  if (status) {
+    query = query.eq('status', status);
+  } else {
+    // Hide suspended agents from the public marketplace by default.
+    // Admins can still query them explicitly via ?status=suspended.
+    query = query.neq('status', 'suspended');
+  }
 
   const search = searchParams.get('search');
   if (search) {

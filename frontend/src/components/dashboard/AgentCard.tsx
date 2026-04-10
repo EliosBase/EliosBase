@@ -20,6 +20,7 @@ const statusColors = {
   online: 'bg-green-500',
   busy: 'bg-yellow-500',
   offline: 'bg-white/30',
+  suspended: 'bg-red-500',
 };
 
 type HireStep = 'idle' | 'signing' | 'mining' | 'confirming' | 'hired' | 'error';

@@ -26,9 +26,12 @@ export interface DbAgent {
   tasks_completed: number;
   price_per_task: string;
   x402_price_usd?: string | null;
-  status: 'online' | 'busy' | 'offline';
+  status: 'online' | 'busy' | 'offline' | 'suspended';
   type: 'sentinel' | 'analyst' | 'executor' | 'auditor' | 'optimizer';
   owner_id: string | null;
+  suspended_at?: string | null;
+  suspended_reason?: string | null;
+  suspended_by?: string | null;
   wallet_address?: string | null;
   wallet_kind?: AgentWalletStandard | null;
   wallet_standard?: AgentWalletStandard | null;
