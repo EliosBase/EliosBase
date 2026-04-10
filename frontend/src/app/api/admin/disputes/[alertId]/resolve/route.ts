@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { logAudit, logActivity } from '@/lib/audit';
 import { getTaskIdFromDisputeSource } from '@/lib/taskDisputes';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 const resolveSchema = z.object({
   resolution: z.enum(['refund', 'release', 'dismiss']),
@@ -34,6 +35,9 @@ export async function POST(
 
   const { alertId } = await params;
   const actor = auth.session.walletAddress ?? auth.session.userId;
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.adminMutation, actor);
+  if (rateLimitError) return rateLimitError;
 
   let raw: unknown;
   try {

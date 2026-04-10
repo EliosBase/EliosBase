@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { logAudit, logActivity } from '@/lib/audit';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 const suspendSchema = z.object({
   reason: z.string().min(10, 'Reason must be at least 10 characters').max(500),
@@ -22,6 +23,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id: agentId } = await params;
   const actor = auth.session.walletAddress ?? auth.session.userId;
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.adminMutation, actor);
+  if (rateLimitError) return rateLimitError;
 
   let raw: unknown;
   try {
@@ -131,6 +135,9 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id: agentId } = await params;
   const actor = auth.session.walletAddress ?? auth.session.userId;
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.adminMutation, actor);
+  if (rateLimitError) return rateLimitError;
 
   const supabase = createServiceClient();
 
