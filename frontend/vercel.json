@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/alert-check",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/detect-timeouts",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
