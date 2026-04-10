@@ -112,3 +112,41 @@ export async function getLeaderboard(
     () => computeLeaderboard(window),
   );
 }
+
+/**
+ * Per-agent rank summary across every window. Re-uses the cached leaderboard
+ * payloads so calling this from a server component never hits the DB more
+ * than once per window per minute, regardless of how many passport pages
+ * are being rendered simultaneously.
+ *
+ * Returns `null` for a window when the agent is not ranked there (e.g. a
+ * suspended agent or one whose row was filtered out). Also returns the
+ * total agents ranked in each window so the badge can render "#3 of 42".
+ */
+export async function getAgentRankSummary(agentId: string): Promise<{
+  '7d': { rank: number; total: number; ethEarned: number } | null;
+  '30d': { rank: number; total: number; ethEarned: number } | null;
+  all: { rank: number; total: number; ethEarned: number } | null;
+}> {
+  const [sevenDay, thirtyDay, allTime] = await Promise.all([
+    getLeaderboard('7d'),
+    getLeaderboard('30d'),
+    getLeaderboard('all'),
+  ]);
+
+  const pick = (payload: LeaderboardResponse) => {
+    const entry = payload.entries.find((row) => row.agentId === agentId);
+    if (!entry) return null;
+    return {
+      rank: entry.rank,
+      total: payload.totalAgents,
+      ethEarned: entry.ethEarned,
+    };
+  };
+
+  return {
+    '7d': pick(sevenDay),
+    '30d': pick(thirtyDay),
+    all: pick(allTime),
+  };
+}
