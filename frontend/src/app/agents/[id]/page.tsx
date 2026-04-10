@@ -8,7 +8,20 @@ import {
   PublicObjectLayout,
   SectionCard,
 } from '@/components/web4/PublicObjectLayout';
+import { AgentRankBadge } from '@/components/AgentRankBadge';
+import { AgentRecentPayouts } from '@/components/AgentRecentPayouts';
+import { EarningsSparkline } from '@/components/EarningsSparkline';
+import { fetchAgentDailyEarnings } from '@/lib/agentEarnings';
+import { getAgentRankSummary } from '@/lib/leaderboard';
+import { createServiceClient } from '@/lib/supabase/server';
+import type { DbTransaction } from '@/lib/types/database';
 import { getAgentPassport } from '@/lib/web4Graph';
+
+// Revalidate the agent passport page every 60 seconds so leaderboard rank
+// changes and new payouts propagate without a deploy. The Upstash cache
+// layer behind `getLeaderboard` means the per-request DB cost is bounded
+// regardless of how many distinct agent passports are being browsed.
+export const revalidate = 60;
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -38,6 +51,41 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
+/**
+ * Look up the chain id the release explorer should point at. We fall back
+ * to Base mainnet (8453) when the env var is missing or malformed so the
+ * links still resolve to a real host rather than an obvious misconfig.
+ */
+function getBaseChainId(): number {
+  const raw = process.env.NEXT_PUBLIC_BASE_CHAIN_ID;
+  if (!raw) return 8453;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : 8453;
+}
+
+/**
+ * Fetch the last N confirmed escrow_release rows for a single agent. Uses
+ * a service-role client because transactions are not publicly readable via
+ * RLS. Returns [] on error so the rest of the passport page still renders.
+ */
+async function fetchAgentRecentTransactions(agentId: string): Promise<DbTransaction[]> {
+  try {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('agent_id', agentId)
+      .eq('status', 'confirmed')
+      .in('type', ['escrow_release', 'escrow_refund'])
+      .order('timestamp', { ascending: false })
+      .limit(20);
+    if (error) return [];
+    return (data ?? []) as DbTransaction[];
+  } catch {
+    return [];
+  }
+}
+
 export default async function AgentPassportPage({ params }: Props) {
   const { id } = await params;
   const passport = await getAgentPassport(id);
@@ -45,6 +93,16 @@ export default async function AgentPassportPage({ params }: Props) {
   if (!passport) {
     notFound();
   }
+
+  // Fetch earnings-related data in parallel. Each branch is independently
+  // fault-tolerant — the passport page must never crash because the
+  // leaderboard cache or the transactions query hiccuped.
+  const serviceSupabase = createServiceClient();
+  const [dailyEarnings, rankSummary, recentTransactions] = await Promise.all([
+    fetchAgentDailyEarnings(serviceSupabase, id, { days: 30 }).catch(() => []),
+    getAgentRankSummary(id).catch(() => ({ '7d': null, '30d': null, all: null })),
+    fetchAgentRecentTransactions(id),
+  ]);
 
   const protocolLinks = [
     { href: passport.pageUrl, label: 'Canonical Page' },
@@ -62,6 +120,17 @@ export default async function AgentPassportPage({ params }: Props) {
     >
       <SectionCard title="Protocol Links">
         <ExternalLinkRow links={protocolLinks} />
+      </SectionCard>
+
+      <SectionCard title="Earnings">
+        <div className="mb-5">
+          <AgentRankBadge summary={rankSummary} />
+        </div>
+        <EarningsSparkline buckets={dailyEarnings} />
+      </SectionCard>
+
+      <SectionCard title="Recent Payouts">
+        <AgentRecentPayouts rows={recentTransactions} chainId={getBaseChainId()} />
       </SectionCard>
 
       <SectionCard title="Trust Surface">
