@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { logAudit, logActivity } from '@/lib/audit';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 // POST /api/admin/tasks/[id]/cancel — cancel a task and flag for refund
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -11,6 +12,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id: taskId } = await params;
   const supabase = createServiceClient();
   const actor = auth.session.walletAddress ?? auth.session.userId;
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.adminMutation, actor);
+  if (rateLimitError) return rateLimitError;
 
   const { data: task, error: taskError } = await supabase
     .from('tasks')

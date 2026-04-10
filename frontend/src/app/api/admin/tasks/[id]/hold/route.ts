@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { logAudit, logActivity } from '@/lib/audit';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 /**
  * POST /api/admin/tasks/[id]/hold
@@ -15,6 +16,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id } = await params;
   const actor = auth.session.userId;
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.adminMutation, actor);
+  if (rateLimitError) return rateLimitError;
+
   const supabase = createServiceClient();
 
   const { data: task, error } = await supabase
@@ -69,6 +74,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   const { id } = await params;
   const actor = auth.session.userId;
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.adminMutation, actor);
+  if (rateLimitError) return rateLimitError;
+
   const supabase = createServiceClient();
 
   const { data: task, error } = await supabase

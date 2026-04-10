@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { requireAdminOrOperator } from '@/lib/adminAuth';
 import { logAudit, logActivity } from '@/lib/audit';
+import { enforceRateLimit, RATE_LIMITS } from '@/lib/rateLimit';
 
 // POST /api/admin/tasks/[id]/reassign — reassign a task to a different agent
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -9,6 +10,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (auth.error) return auth.error;
 
   const { id: taskId } = await params;
+  const actor = auth.session.walletAddress ?? auth.session.userId;
+
+  const rateLimitError = await enforceRateLimit(req, RATE_LIMITS.adminMutation, actor);
+  if (rateLimitError) return rateLimitError;
+
   const body = await req.json();
   const { agentId } = body;
 
@@ -17,7 +23,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const supabase = createServiceClient();
-  const actor = auth.session.walletAddress ?? auth.session.userId;
 
   const { data: task, error: taskError } = await supabase
     .from('tasks')
