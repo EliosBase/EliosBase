@@ -8,8 +8,33 @@ const SECURITY_HEADERS = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
 };
 
+// Maximum allowed request body size for API routes (1 MiB).
+// Enforced at the edge so oversized payloads are rejected before hitting
+// route handlers or Supabase. Applies to POST/PUT/PATCH/DELETE on /api/*.
+export const MAX_REQUEST_BODY_BYTES = 1024 * 1024;
+
+const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Body size limit for all API routes that can carry a body.
+  if (pathname.startsWith('/api/') && BODY_METHODS.has(req.method)) {
+    const contentLengthHeader = req.headers.get('content-length');
+    if (contentLengthHeader) {
+      const contentLength = Number(contentLengthHeader);
+      if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BODY_BYTES) {
+        return NextResponse.json(
+          {
+            error: 'Request body too large',
+            maxBytes: MAX_REQUEST_BODY_BYTES,
+            receivedBytes: contentLength,
+          },
+          { status: 413 },
+        );
+      }
+    }
+  }
 
   // Admin API routes require a session
   if (pathname.startsWith('/api/admin')) {
