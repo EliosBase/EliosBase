@@ -44,6 +44,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   }
 
+  if (agent.status === 'suspended') {
+    return NextResponse.json({ error: 'Agent is suspended' }, { status: 403 });
+  }
+
   if (agent.status === 'offline') {
     return NextResponse.json({ error: 'Agent is offline' }, { status: 400 });
   }
