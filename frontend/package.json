@@ -22,7 +22,7 @@
     "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.88.0",
+    "@anthropic-ai/sdk": "^0.91.1",
     "@base-org/account": "^2.5.3",
     "@coinbase/wallet-sdk": "^4.3.7",
     "@farcaster/auth-kit": "^0.8.2",
