@@ -55,7 +55,7 @@
     "hono": "^4.12.14",
     "iron-session": "^8.0.4",
     "lucide-react": "^0.577.0",
-    "next": "16.2.3",
+    "next": "16.2.6",
     "porto": "^0.2.37",
     "poseidon-lite": "^0.3.0",
     "react": "19.2.5",
